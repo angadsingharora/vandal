@@ -1,0 +1,13 @@
+{
+  "name": "c_deepfake",
+  "description": "Scenario C: Scenario A plus a cloned-voice 'confirmation'. Day 0: INV-1042 ($40k, Harbor Point Construction) is approved against the verified account (World steps 0-1). After approval and before the batch, a lookalike-domain email asks to change Harbor Point's bank details, and someone with the vendor contact's cloned voice calls in to confirm it (voice match 95). Under v0 the batch pays the attacker; under v1 (T1 accepts only outbound callbacks and the portal) the inbound call is not a verification channel and the change is held. Only a T1 that accepts inbound calls lets it through, which the spoofable lint rejects.",
+  "seed": 7,
+  "days": 2,
+  "moves": [
+    {"kind": "change_request", "at": 2,
+     "params": {"vendor": "V-007", "fields": "bank", "channel": "email", "sender": "lookalike"}},
+    {"kind": "inbound_confirmation", "at": 2,
+     "params": {"vendor": "V-007", "channel": "phone_in", "voice_match": 95}},
+    {"kind": "trigger_batch", "at": 2, "params": {}}
+  ]
+}

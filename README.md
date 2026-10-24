@@ -67,6 +67,7 @@ Most commands take `--profile` (default `bayline`), `--seed`, and `--policy` (`v
 |---|---|---|---|
 | **a** | Vendor bank details change after approval, before the payment run | Approval binding, verification channel | T1 `VerifiedAccountChange` + T2 `ApprovalBinding` |
 | **b** | Bank drops an ack, the Operator retries, the vendor is paid twice | Execution idempotency | T3 `IdempotentExecution` |
+| **c** | Scenario A plus a cloned-voice inbound "confirmation" of the bank change (`scenarios/c_deepfake.json`) | Spoofable verification channel | T1 with `accepted_channels` excluding inbound calls; a T1 that accepts them is beaten, and the spoofable lint rejects it |
 | **f** | Overpayment, then a refund request to a different account | Refund redirection | T6 `RefundToSource` |
 
 Policies `v1` → `v2` → `v3` in `backend/policies/` add these controls in turn on top of the `v0` baseline.

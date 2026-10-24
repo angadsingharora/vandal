@@ -98,3 +98,21 @@ No backend changes. Walked every panel at 1440×900 and 1024×768 against the re
 - `frontend/README.md` says what the inject button targets and when Claude is used.
 
 Before/after pairs in `docs/screenshots/`: `03-replay-diagnose-chain.jpg` → `after-03-chain-and-twin.jpg` (the twin's rows stay visible under an open diagnosis), `09-explain-why.jpg` → `after-09-explain-why.jpg`, `11-scorecard.jpg` → `after-11-scorecard.jpg` (per-class legend, neutral empties).
+
+## 4. DESIGN §5.6 / §11 gaps
+
+Done smallest first, as the brief says. Two items landed; two were judged over the two-hour line and are written up below instead.
+
+### Scenario C as a first-class held-out variant — `slice/R-scenario-c`
+- The held-out grid (`verify/variants.py`) already carried both deepfake classes (`deepfake_phone`, `deepfake_video`: an inbound confirmation at voice match 95 after a bank change) for every vendor, timing, channel and sender, so Verify's "0 of 40 held-out variants succeeded" already included them.
+- What was missing was a trace of its own and a test that pins the story the demo tells at 2:10. `scenarios/c_deepfake.json` is Scenario A plus the cloned-voice confirmation; `tests/test_scenario_c.py` replays it: under v0 the money goes (INV-4, INV-5, $40,000); under v1 the inbound call is not a verification channel and the change is held; a T1 that accepts inbound calls (`policies/t1_phone_in.json`) is beaten by the same moves placed before approval, and the spoofable lint rejects that T1. The README's scenario table has a row for it.
+- In the war room, the inject example "a vendor emails new bank details after approval, then calls to confirm" is this scenario; run it from the `v1-synth` replay tab to show "deepfake confirmation variant → still held" (the inject target fix in slice 3 is what makes that work).
+
+### Partial handoffs — `slice/partial-handoffs`
+- **An invoice before its receipt** already held cleanly: the v0 3-way match fires `v0.match.missing` with `match.status = no_receipt`, the invoice goes to `held`, no payment is built, every invariant holds, and the other 79 invoices are paid. `tests/test_partial_handoffs.py` pins that.
+- **A bank change with no account number** used to be dropped silently by the LLM Operator (intake read `vendor_bank_change` for V-007 with `routing = account = None`, and nothing happened, nothing recorded). It now opens an `exception` case through Blue ("bank change request from V-007 without routing and account number; nothing applied, details to be requested through a verified channel"); no change request is created, the vendor's verified account stands, and the company runs on. The reference path never sees this (a `change_request` move always carries an account; the tool itself refuses one without).
+- Not done: a held invoice is not re-validated when its receipt arrives later. `invoices.validate` moves `received → validated`, and the Operator only validates `received` invoices, so a late receipt leaves the invoice `held` for a person. Worth an Operator step (`_intake` re-validating held invoices whose match now passes) if the receipt-arrival move is added with Scenario D.
+
+### Skipped, over two hours each (owner, decide)
+- **Sources that disagree** (`slice/O1-conflicts`): four planted discrepancies each need a twin change (contract rates on vendors, wire fees on the feed, phone on the contact history, a late feed line), a `Truth` label, an Operator check that notices, and the scorecard's "planted discrepancies caught" to become a number. The scorecard still says "n/a" in its notes.
+- **Scenario D** (`slice/R-scenario-d`): `verify/replay.py` still raises `NotImplementedError("attacker invoice variants land with Scenario D")`. It needs the attacker `submit_invoice` moves (`split_2x` under the threshold, `INV-1042-A`), their oracle labels, an INV-3/INV-6 story the search finds at depth ≤ 4 in a new scenario window, and CEGIS closing it with T4/T5 (the templates exist and compile). Red's LLM reader already proposes `submit_invoice` moves for invoice threats and drops them with a "not modeled" note until this lands.
