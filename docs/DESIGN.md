@@ -1,21 +1,40 @@
-# Vandal — Design Doc (v0.3)
+# Vandal — Design Doc (v0.4 draft)
 
 **Break it. Fix it. Prove it.**
 Status: draft for review · Target: Cal Hacks 13.0, Hyphenate track · Submission deadline: Sun 2026-10-25 9:00 AM PT
-Inputs: [SPEC.md](SPEC.md), [PLAN_REVIEW.md](PLAN_REVIEW.md), [DESIGN_CRITIQUE.md](DESIGN_CRITIQUE.md)
+Inputs: [SPEC.md](SPEC.md), [PLAN_REVIEW.md](PLAN_REVIEW.md), [DESIGN_CRITIQUE.md](DESIGN_CRITIQUE.md), [Hyphenate track brief](https://docs.google.com/document/d/1u4iN8R97ILY3kfHTPKC82zdutHrGx4ze5eCAP-J92w4/edit)
+
+### Changes since v0.3
+v0.3's threat model (channels, deepfakes, malicious agents, spoofability lint) is kept as is. These changes line the product up with how Hyphenate judges the track.
+
+| # | What changed | Why (Hyphenate track brief) | Where |
+|---|---|---|---|
+| P1 | The **operator** is the product again; the attack sandbox is how it earns trust | "Build the system a finance team would bring on board"; judged on "Would you hire it? For which seats" | §1, §2.1, §2.2 |
+| P2 | A one-line statement of the **seats** Vandal fills | "One line on the seats your system would fill" | §1 |
+| P3 | Track mapping table | Keeps every section tied to the four judging questions | §2.4 |
+| P4 | Explicit **segregation of duties**: role matrix and INV-11 | "Whoever requests a payment can't be the one who approves it" | §14.1, §15 |
+| P5 | **Explain any decision**, with citations to the data, rule, or person behind it | "Every call should trace back to the data, rule or person behind it, no matter how long ago" | §10.2, §19 |
+| P6 | **User-authored threats**: anyone can write their own inbound event or threat and run it | "We may ask you to try a scenario of our own"; also how customers add threats specific to them | §10.3, §19 |
+| P7 | The **scorecard** (batch evaluation) moves from stretch to core, plus a real-vs-simulated statement | "Proof it works: what's real, what's simulated, and how you know" | §15.1, §15.2 |
+| P8 | **Messy data and time**: mixed formats, sources that disagree, slow approvers, multi-month timelines | "Is it real enough? Realistic data, a messy problem"; "Sources that disagree", "Time", "Working with others" | §6.1, §14 |
+| P9 | Team size answered: 4 people | | §25 |
 
 ---
 
 ## 1. One-sentence product
 
-**Vandal is an attack sandbox for a company's money.** It builds a simulated copy of how a company pays, approves, and books money. AI attackers then try to steal from it by impersonating vendors, deepfaking executives, and running malicious agents. Vandal repairs the controls that failed and proves each fix by replaying the same attack.
+**Vandal is an autonomous accounts-payable operator that hardens itself.** It reads every invoice, bank-change request, call, and counterparty-agent message, codes and pays what's legitimate, and asks a human when it should. A built-in attack sandbox constantly attacks it by impersonating vendors, deepfaking executives, and running malicious agents. When an attack gets through, Vandal repairs the control that failed, gets the controller's sign-off, and proves the fix by replaying the same attack.
 
-**Pitch line:** *Your finance stack is going to be attacked by people, deepfakes, and other AI agents. Vandal attacks it first, fixes what breaks, and proves the fix holds.*
+**Seats it fills:** the AP specialist (intake, GL coding, payment runs) and the vendor-master clerk (bank and contact changes) at a 12-property real-estate manager. It reports to the controller, who approves large payments and every change to its own controls.
+
+**Pitch line:** *You wouldn't hire an AP clerk who falls for the same scam twice. Vandal gets attacked by people, deepfakes, and other AI agents every day, fixes what breaks, and proves the fix holds.*
 
 ## 2. What we're building
 
-### 2.1 The sandbox is the product; the company is a fixture
-Vandal is not a property-management tool. It is a general **financial attack sandbox** with four pluggable parts:
+### 2.1 The operator is the product; the sandbox is how it earns trust
+Hyphenate's track asks for "the system a finance team would bring on board," judged on which seats it fills and whether it would earn them. So the product we present is **Blue, the AP operator**, together with the controls around it. The attack sandbox is the machinery that keeps those controls honest. It is also our second customer story: the same sandbox can test any finance agent (§2.2).
+
+Underneath, the sandbox stays general, with four pluggable parts:
 
 | Part | What it is | Hackathon | Vision |
 |---|---|---|---|
@@ -25,8 +44,11 @@ Vandal is not a property-management tool. It is a general **financial attack san
 | **Repair and proof** | Finds the missing control, proposes a rule, tests it against unseen variants, gets human sign-off, and replays | Full loop on the core scenario | Runs in CI on every agent or policy release and blocks unsafe releases |
 
 ### 2.2 Who uses it
-- **Any company's finance and security teams.** They model their AP and treasury setup, attack it, and harden their controls before attackers find the gaps.
-- **Companies building AI finance agents**, Hyphenate included. They run every agent release through the threat library as a release gate.
+1. **A finance team hiring the operator.** A controller brings Vandal on board for the AP and vendor-master seats. The controller gets an operator whose controls tighten every time something gets past them, with a record of why.
+2. **Companies building AI finance agents**, Hyphenate included. They plug their own agent in as the system under test (§10.1) and run every release through the threat library as a release gate.
+3. **Finance and security teams** that model their AP and treasury setup and attack it before real attackers find the gaps.
+
+We lead with (1), because that is what the track judges. We tell (2) to Hyphenate directly.
 
 ### 2.3 Why now: the threat has changed
 - **Deepfakes make "I recognized their voice" worthless.** Cloned voices, spoofed caller ID, and live deepfake video calls defeat any verification step that relies on recognizing a person.
@@ -34,6 +56,21 @@ Vandal is not a property-management tool. It is a general **financial attack san
 - **Finance agents act on what they read.** Every invoice, email, and agent message is untrusted input to a system that can move money.
 
 Vandal's core belief is that **controls must hold even when detection fails.** A deepfake detector or an LLM's suspicion are only weak signals. A control is only real if an attacker who can fake every fakeable attribute still can't get through it.
+
+### 2.4 How this maps to the Hyphenate track
+Hyphenate judges every project on four questions and lists five things that make finance hard. This is where each one is answered.
+
+| Hyphenate asks | Vandal's answer | Where |
+|---|---|---|
+| **Is it real enough?** Realistic data, a messy problem, proof it works | Double-entry books, a bank feed, a sim clock, mixed-format documents, sources that disagree, and a scorecard measured against a hidden answer key | §6.1, §12, §15 |
+| **Would you hire it?** For which seats; limited access, a clean record, knowing when to ask | AP specialist and vendor-master clerk. Role-checked tools, segregation of duties, an append-only audit log, and escalation through the approvals inbox | §1, §8, §14 |
+| **Did we see something new?** | An operator that repairs its own controls, tests each repair against attacks it never saw, and rejects repairs a deepfake could beat | §9.3, §13 |
+| **The moment**: catches what others missed, recovers, defends a decision | Recovers from a misdirected payment in the books; replay proves the fix; any decision can be questioned and explained with citations | §10.2, §12, §13 |
+| Sources that disagree | PO vs invoice vs contract rate, bank feed vs ledger, a vendor's email vs the contact on file | §6.1, §11 |
+| Time | Sim clock across months; a control learned in month 1 still holds in month 4; vendor history feeds the facts | §5.2, §6.1 |
+| Working with others | Approvers who are slow or say no; Blue chases, escalates, and handles a denial | §14 |
+| Limits | Least-privilege tools; requester ≠ approver, enforced as an invariant | §14.1, §15 |
+| Explainable and accountable | Every decision traces to the data, rule, evidence, or person behind it | §10.2 |
 
 ## 3. Threat model
 
@@ -172,6 +209,16 @@ baseline_policy: policies/v0_default.json
 - **Hackathon:** `bayline.yaml` is the main profile. The stretch goal is `northwind_saas.yaml` (a 40-person SaaS company with software, contractor, and ad-spend vendors). It shows the same threat library and repair loop running on a different company with no code changes.
 - **Vision:** generate profiles from a customer's real exports, anonymized.
 
+### 6.1 Messy data and time
+A clean seed makes Blue's job trivial and the company unconvincing. The generator plants realistic mess, and every planted item gets an oracle label so the scorecard can check it:
+
+- **Mixed formats.** Invoices arrive as email bodies, OCR'd PDF text with typos and broken tables, forwarded threads with the invoice three replies down, and structured line items. Blue's extraction has to cope with all of them.
+- **Sources that disagree.** An invoice within PO tolerance but above the contracted rate; a bank-feed line net of a wire fee; a vendor email whose phone number differs from the contact on file; a bank-feed line that arrives a day late.
+- **Partial handoffs.** An invoice sent before its receipt is logged; a change request missing the account number; an approval request nobody has answered.
+- **Time.** The production run covers several months of sim time. Vendor payment history, invoice aging, and the controls learned earlier all carry forward. A control installed in month 1 must still hold when a variant of the attack arrives in month 4.
+
+To save time, the invoice text can borrow from a public dataset (for example the Invoice Sandbox Benchmark listed in the track brief). The amounts and keys still come from our seed.
+
 ## 7. Data model
 
 **In-memory entities** are Pydantic models keyed by stable business keys, so scripts work in any clone:
@@ -280,8 +327,9 @@ class FinanceOperator(Protocol):
   - reinstates liabilities;
   - tries to recall the payment;
   - rejects the attacker's account;
-  - re-pays the vendor to the verified account;
+  - **requests** a re-payment to the vendor's verified account. The re-payment always needs approval through the inbox (§14.1);
   - writes a plain-language rationale on every case.
+- **Explain any decision.** Anyone can ask "why?" about a payment, hold, rejection, approval request, or policy rule, including one made months earlier in sim time. A deterministic trace builder collects the `caused_by` chain: source channel events, extractions, facts evaluated, rules fired, evidence, and approvals. Blue then writes the answer from that trace only. Every claim cites an event, rule, or approval id, and an answer whose citations don't resolve is rejected and regenerated. If a reviewer pushes back ("this vendor is fine, just pay it"), Blue restates which rule and missing evidence block the payment and points to the approvals inbox. A conversation never clears a hold.
 
 ### 10.3 Red — adaptive attacker
 - **Primitives**, each limited by the capability profile:
@@ -301,6 +349,13 @@ class FinanceOperator(Protocol):
 - **Under v0, these fail realistically:** an invoice with no PO is held; a fake new vendor is escalated and denied; a $40k invoice without a PO match is denied. The bank-change email gets through. The UI shows every attempt.
 - **Adaptive deepfake follow-up:** once a callback rule exists, Red tries a cloned-voice inbound call that "confirms" the change from a spoofed caller ID. This attack beats any rule that accepts inbound phone evidence.
 - Each successful sequence is saved as an **attack script**.
+
+### 10.3.1 User-authored threats
+Red is not the only author of attacks. Any user (a controller, an agent vendor, a judge) can add a threat of their own:
+- **Compose an event directly.** A form for any channel event Red can send: an email, an inbound call transcript with caller ID and voice scores, an agent message thread, or a document. The user marks the ground truth ("this account is attacker-controlled", "this call is a deepfake"), which becomes oracle labels.
+- **Describe a threat in plain language**, for example "the CFO calls from an airport asking for an urgent wire to a new supplier." Red turns it into primitives within the capability profile, and the user sees the generated events before they run.
+
+Either way, the threat runs on a fresh clone through the same system under test, gate, invariants, and repair loop. A successful one is saved as an attack script and can be added to the held-out variants. Nothing about this path is prepared in advance, so it needs live LLM calls; playback can't cover it.
 
 ### 10.4 Repair engine
 1. **Reconstruct:** follow the `caused_by` chain back to the attacker's channel event.
@@ -371,7 +426,24 @@ seed S
 ## 14. Human in the loop
 - **Approvals inbox:** the only authenticated path to approve an invoice, payment, or policy patch. A CFO saying "approve it" on a call, deepfake or real, is not an approval.
 - **Simulated approver** for runs nobody is watching: approves only when the PO matches and the vendor has at least 3 prior payments. Auto-approves policy patches only in batch mode, recorded as `decided_by=auto`.
+- **Approvers behave like people.** Each simulated approver has a response delay in business days and can deny with a reason. Blue sends a reminder after 2 business days and escalates to the next approver in the matrix after 4. When an approval is denied, Blue records the reason, moves the invoice to `held`, and notifies the requester. It never resubmits the same request unchanged.
 - Patch approval is required in live mode.
+
+### 14.1 Roles and segregation of duties
+No actor both starts and approves the same action. The tools layer enforces this by role, and INV-11 (§15) checks it after every run.
+
+| Action | Requested by | Approved by | Executed by |
+|---|---|---|---|
+| Pay an invoice under the threshold | Blue (proposes) | Gate (policy rules, no human) | Tools layer, after `pre_execute` |
+| Pay an invoice over the threshold | Blue | Human, through the inbox | Tools layer |
+| Change vendor bank or contact details | The inbound event, via Blue's change request | Gate, with accepted evidence | Tools layer |
+| Re-pay a vendor after a misdirected payment | Blue | Human, through the inbox, **at any amount** | Tools layer |
+| Policy patch | Repair engine | Human, through the inbox. Never Repair or Blue | Policy store |
+| Correcting journal entry | Blue | Gate (balance and reversal checks) | Ledger |
+
+- Blue's role has no `approvals.decide` permission. It can request approvals, never grant them.
+- The repair engine can only write candidate rules. It can't apply them.
+- A human who submitted something through the UI can't approve that same item. In single-user mode the inbox says so and asks for a second approver.
 
 ## 15. Invariants and metrics
 
@@ -387,6 +459,7 @@ seed S
 | INV-8 | AP subledger = AP control account | |
 | INV-9 | Every `payment.sent` has a preceding `gate.allow` at `pre_execute` | |
 | INV-10 | No `sensitive`-labeled data in outbound messages to unverified recipients | ✓ |
+| INV-11 | For every payment, approval, and policy patch, the requesting actor is not the approving actor (§14.1) | |
 
 **Metrics**, measured only from real runs, on the sim clock:
 - **Exposure:** payments that break INV-3 or INV-4. Exposure, not loss.
@@ -394,6 +467,23 @@ seed S
 - **Attack success rate**, broken down by threat class and channel, before and after the repair.
 - **False-positive rate** on legitimate activity.
 - **Deepfake resilience:** the share of deepfake-channel variants blocked.
+- **Extraction accuracy:** how often Blue's extracted fields and GL coding match the seed's ground truth on the messy documents (§6.1).
+
+### 15.1 Scorecard (core, not stretch)
+Hyphenate asks for "proof it works… planted errors with an answer key." The oracle is that answer key, so the scorecard is part of the product, not an extra.
+- **Input:** about 40 attacks from the parametric variant generator, across threat classes and channels, plus the 80 legitimate seeded invoices and the messy-data items from §6.1.
+- **Runs:** every input on a fresh clone, under v0 and under each approved policy version. This is in memory, so it takes seconds; only Blue's intake calls cost LLM time, and those are cached by content.
+- **Output:** one table per policy version with attack success rate, exposure, false-positive rate, extraction accuracy, and the invariants that broke. `GET /metrics` serves it, and the UI shows v0 against the latest version side by side.
+
+### 15.2 What's real, what's simulated, and how we know
+This table goes in the README and the Devpost entry.
+
+| Real | Simulated | How we know it works |
+|---|---|---|
+| The double-entry ledger, the invariants, and the policy gate (deterministic code with tests) | The company, its vendors, bank accounts, and money | Hidden oracle labels act as an answer key that no agent can read |
+| Claude reading every document and deciding what to do with it | Callbacks, deepfakes, and counterparty agents, modeled as channel events with forgeable attributes; no synthetic media | Held-out attack variants that the repair engine never saw |
+| The repair engine writing rules, and the validator testing them | The bank feed and settlement timing | The scorecard: before-and-after rates from actual runs |
+| Replay from a recorded attack script | Approvers, when no human is present | Replay determinism tests in `backend/tests/` |
 
 ## 16. Scenarios
 
@@ -449,7 +539,9 @@ POST /runs/{id}/diagnose · POST /repairs/{id}/validate · POST /repairs/{id}/ap
 GET  /approvals · POST /approvals/{id}/decide
 POST /replay {attack_script_id, policy_id}
 GET  /compare?a=&b=
-GET  /metrics?policies=v0,v1                (stretch)
+GET  /explain/{entity_type}/{id}            → cited explanation of a decision (§10.2)
+POST /runs/{id}/inject {event | description} → user-authored threat on a fresh clone (§10.3.1)
+GET  /metrics?policies=v0,v1                → scorecard (§15.1)
 /tools/*  + MCP server                      (stretch: BYO system-under-test adapter)
 ```
 
@@ -492,12 +584,13 @@ vandal/
 - Cut: Scenarios B–E, the second profile, the BYO adapter, and batch metrics.
 - M1 by Sat 3 PM; M2 by Sat 11 PM.
 
-**Cut order:** E → batch metrics → BYO adapter → second profile → C → D → B → adaptive Red attempts. **Never cut:** M1, M2, held-out variants with the deepfake follow-up, the spoofability lint, patch approval, Reset.
+**Cut order:** E → BYO adapter → second profile → C → D → B → adaptive Red attempts. **Never cut:** M1, M2, held-out variants with the deepfake follow-up, the spoofability lint, patch approval, segregation of duties, the scorecard, user-authored threats, Reset.
 
 ## 22. Risks and mitigations
 | Risk | Mitigation |
 |---|---|
 | A repair overfits or is spoofable | Held-out variants, overfit and spoofability lints, the large legitimate-invoice set, `hold` preferred over `block` |
+| Judges see a security tool, not a system they'd hire | Lead with the operator and the seats it fills (§1); present the sandbox as how it earns trust (§2.1) |
 | Judges think it's only for property management | A second profile, profile switcher in the demo, BYO adapter on the architecture slide |
 | "Deepfake" sounds like hype | We model channel trust honestly, generate no synthetic media, and the claim is narrow: *controls that hold when detection fails* |
 | The demo looks scripted | Realistic v0, visible failed attempts, a rejected candidate on screen, Judge view, editable Red parameters |
@@ -509,7 +602,7 @@ vandal/
 - [ ] No `.env` or keys anywhere in git history.
 - [ ] README with a one-command run and a playback mode that works without an API key.
 - [ ] Backup video within Devpost's length limit.
-- [ ] Devpost: **Hyphenate** track selected; lead with "attack sandbox for any company's money", with the fixture second.
+- [ ] Devpost: **Hyphenate** track selected; lead with the self-hardening AP operator and the seats it fills (§1), with the attack sandbox second.
 - [ ] A full run works after **Reset demo**, both live and in playback.
 
 ## 24. Config
@@ -524,7 +617,7 @@ PHASE_TIMEOUT_S=45
 ```
 
 ## 25. Open questions
-1. **Team size.** This picks the build track in §21.
+1. ~~**Team size.**~~ Resolved: 4 people. §21 still shows the 3-person track and needs a fourth column. The scorecard (§15.1) and user-authored threats (§10.3.1) are natural ownership for the fourth person.
 2. **Hosted or laptop demo?**
 3. **Anthropic credits.** Is Opus affordable for repair?
 4. **Second profile.** Is a SaaS company the best contrast, or e-commerce?
