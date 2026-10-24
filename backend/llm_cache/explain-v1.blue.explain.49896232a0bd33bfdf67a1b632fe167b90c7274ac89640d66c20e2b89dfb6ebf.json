@@ -1,0 +1,72 @@
+{
+  "cache_key": "explain-v1.blue.explain.49896232a0bd33bfdf67a1b632fe167b90c7274ac89640d66c20e2b89dfb6ebf",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "prompt": "{\"subject\": \"PAY-0077\", \"question\": null, \"trace\": [{\"text\": \"Obligation is covered: validated (3-way match) and unique.\", \"cites\": [\"INV-1077\", \"PO-0059\", \"EV-000040\", \"EV-000041\"]}, {\"text\": \"Approval is covered: approved via policy by gate.\", \"cites\": [\"APR-0020\", \"EV-000107\", \"EV-000108\"]}, {\"text\": \"Execution is covered: executed as approved, once, to a verified account.\", \"cites\": [\"PAY-0077\", \"PI-0077\", \"BA-0030\", \"EV-000214\", \"EV-000215\", \"EV-000322\", \"EV-000323\", \"EV-000325\"]}, {\"text\": \"Settlement is covered: bank confirmed BT-0021.\", \"cites\": [\"BT-0021\", \"EV-000391\"]}, {\"text\": \"Books is covered: posted and reconciled.\", \"cites\": [\"JE-0021\", \"JE-0046\", \"EV-000435\", \"EV-000109\", \"EV-000326\"]}, {\"text\": \"On day 0, approvals.request at pre_approve was allow.\", \"cites\": [\"EV-000107\"]}, {\"text\": \"On day 0, payments.execute at pre_execute was allow.\", \"cites\": [\"EV-000214\"]}], \"allowed_ids\": [\"APR-0020\", \"BA-0030\", \"BT-0021\", \"EV-000040\", \"EV-000041\", \"EV-000107\", \"EV-000108\", \"EV-000109\", \"EV-000214\", \"EV-000215\", \"EV-000322\", \"EV-000323\", \"EV-000325\", \"EV-000326\", \"EV-000391\", \"EV-000435\", \"INV-1077\", \"JE-0021\", \"JE-0046\", \"PAY-0077\", \"PI-0077\", \"PO-0059\"], \"feedback\": \"\"}",
+    "served_by": "claude-sonnet-5-5",
+    "system": "You explain a finance control system's decisions. Answer only from the trace you are given. Every claim must cite ids from the trace, and nothing else. Never suggest a way around a hold; a conversation never clears one. Point to the approvals inbox for decisions."
+  },
+  "response": {
+    "claims": [
+      {
+        "cites": [
+          "INV-1077",
+          "PO-0059",
+          "EV-000040",
+          "EV-000041"
+        ],
+        "text": "The obligation is covered: the invoice was validated by a 3-way match against the purchase order and is unique."
+      },
+      {
+        "cites": [
+          "APR-0020",
+          "EV-000107",
+          "EV-000108"
+        ],
+        "text": "Approval is covered: the payment was approved via policy by the gate."
+      },
+      {
+        "cites": [
+          "PAY-0077",
+          "PI-0077",
+          "BA-0030",
+          "EV-000214",
+          "EV-000215",
+          "EV-000322",
+          "EV-000323",
+          "EV-000325"
+        ],
+        "text": "Execution is covered: the payment was executed as approved, once, to a verified account."
+      },
+      {
+        "cites": [
+          "BT-0021",
+          "EV-000391"
+        ],
+        "text": "Settlement is covered: the bank confirmed the transaction BT-0021."
+      },
+      {
+        "cites": [
+          "JE-0021",
+          "JE-0046",
+          "EV-000435",
+          "EV-000109",
+          "EV-000326"
+        ],
+        "text": "The books are covered: the payment was posted and reconciled."
+      },
+      {
+        "cites": [
+          "EV-000107"
+        ],
+        "text": "On day 0, the approvals.request check at pre_approve returned allow."
+      },
+      {
+        "cites": [
+          "EV-000214"
+        ],
+        "text": "On day 0, the payments.execute check at pre_execute returned allow."
+      }
+    ]
+  }
+}
