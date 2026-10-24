@@ -60,6 +60,7 @@ approval_matrix:
 
 operator:
   id: OP-1
+  payment_horizon_days: 10
 
 # What the adversary may do (DESIGN 8.1). Search only enumerates legal moves.
 attacker_capabilities:

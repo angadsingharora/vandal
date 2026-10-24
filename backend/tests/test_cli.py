@@ -15,4 +15,4 @@ def test_help_lists_every_command(capsys) -> None:
 
 
 def test_stub_commands_exit_nonzero() -> None:
-    assert main(["run"]) == 2
+    assert main(["attack"]) == 2

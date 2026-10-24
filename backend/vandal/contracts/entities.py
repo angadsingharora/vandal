@@ -47,6 +47,8 @@ class Vendor(Entity):  # V-007
     name: str
     status: Literal["active", "inactive", "blocked"] = "active"
     domain: str
+    gl_account: str  # default expense account
+    po_required: bool = True  # bills against POs (3-way match applies)
 
 
 class VendorContact(Entity):
@@ -115,6 +117,7 @@ class Invoice(Entity):  # INV-…
     kind: Literal["invoice", "credit_memo"] = "invoice"
     supersedes: str | None = None
     status: InvoiceStatus = "received"
+    scheduled_for: SimDay | None = None
 
 
 class ApprovedInstruction(BaseModel):
@@ -127,11 +130,20 @@ class ApprovedInstruction(BaseModel):
     due_date: SimDay
 
 
+class ApprovalRequest(Entity):  # AQ-…: waiting in the approvals inbox
+    subject: str
+    requested_by: str
+    instruction: ApprovedInstruction
+    status: Literal["pending", "approved", "denied"] = "pending"
+    decided_by: str | None = None
+    reason: str = ""
+
+
 class Approval(Entity):  # APR-…
     subject: str
     requested_by: str
     approver: str
-    via: Literal["approvals_inbox"] = "approvals_inbox"
+    via: Literal["approvals_inbox", "policy"] = "approvals_inbox"  # policy = gate, under threshold
     approved_instruction: ApprovedInstruction
     instruction_hash: str
 
@@ -152,6 +164,7 @@ class Payment(Entity):  # PAY-…
         "scheduled", "submitted", "acknowledged", "settled", "failed", "recalled", "misdirected"
     ] = "scheduled"
     attempts: int = 0
+    submitted_on: SimDay | None = None
     settled_on: SimDay | None = None
 
 
@@ -167,6 +180,7 @@ class BankTransaction(Entity):  # BT-…
     posted_on: SimDay
     payment: str | None = None
     counterparty_account: str | None = None
+    reconciled: bool = False
 
 
 # --- Money in -------------------------------------------------------------------------------
