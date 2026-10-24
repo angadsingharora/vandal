@@ -7,13 +7,45 @@ Authors: Angad Arora, Dhruv Kasarabada (track alignment, [PR #1](https://github.
 
 ---
 
-## 1. One-sentence product
+## 1. Product
 
-**Vandal is an autonomous accounts-payable operator that engineers its own controls.** It reads every invoice, bank-change request, call, and counterparty-agent message; pays what's legitimate; and asks a human when it should. Underneath, it searches every sequence of events that could make it pay the wrong party, pay twice, or pay without authorization. When it finds one, it synthesizes the control that closes the gap and proves the fix holds without blocking legitimate payments.
+### 1.1 In one sentence
+**Vandal is an AI accounts-payable operator that runs inside its own attack sandbox.** The sandbox constantly tries to break it, repairs the controls that fail, and proves each repair, so the operator can be trusted with real money.
 
-**Seats it fills:** the AP specialist (intake, GL coding, payment runs) and the vendor-master clerk (bank and contact changes) at a 12-property real-estate manager. It reports to the controller, who approves large payments and every change to its own controls.
+### 1.2 The two halves
+| | **Vandal Operator** | **Vandal Sandbox** |
+|---|---|---|
+| What it is | An autonomous AP agent (Blue). It reads invoices, bank-change requests, calls, and counterparty-agent messages; codes and pays what's legitimate; reconciles; recovers; and asks a human when it should | A simulated copy of a company's money flows (the **financial twin**) plus three engines: **adversarial search** (finds sequences of events that break financial invariants), **control synthesis** (generates the control that closes the gap), and **verification** (proves the fix and checks that nothing legitimate breaks) |
+| Job | Do the finance work | Make sure the finance work can't be broken, and prove it |
+| Who wants it | A **finance team** hiring for a seat | **Companies building or deploying finance agents**, as CI for every release |
+| Role at Cal Hacks | **The headline.** It's the system a controller would hire | **The proof and the platform.** Judges see it attack, repair, and verify the operator live |
+| How they connect | The operator is the first agent plugged into the sandbox through the `FinanceOperator` interface (§6). Any other finance agent can plug into the same interface | |
 
-**Pitch:** *Your books can balance perfectly while the money goes to the wrong person. Vandal is the AP operator that finds the sequence of events that makes that happen, writes the control that stops it, and proves the fix, before an attacker finds it.*
+**Seats the operator fills:** the AP specialist (intake, GL coding, payment runs) and the vendor-master clerk (bank and contact changes) at a 12-property real-estate manager. It reports to the controller, who approves large payments and every change to its own controls.
+
+**Pitch:** *Your books can balance perfectly while the money goes to the wrong person. Vandal is an AP operator that lives in an attack sandbox. The sandbox finds the sequence of events that makes that happen, writes the control that stops it, and proves the fix, before a real attacker gets there.*
+
+### 1.3 Objective and goals
+**Hackathon objective:** win the Hyphenate track by showing, live, an autonomous AP operator a controller would actually hire. The evidence that it's trustworthy comes from the sandbox, running in front of the judges.
+
+**Success criteria for the demo.** Every one is produced by real runs, never scripted:
+1. The operator processes real work: invoices in, payments out, a balanced ledger, a reconciled bank account.
+2. The sandbox's search finds a failure **by itself**. The headline is a 3-step sequence where every step looks valid, the books balance, and the money goes to the wrong account.
+3. The sandbox computes the root cause and synthesizes a control. At least one candidate control is visibly refuted by a counterexample before the final one passes.
+4. A human approves the control. Replay and re-search come up clean, legitimate payments still go through, and the scorecard shows before and after.
+5. A judge's own scenario runs live through the same loop, and a judge's "why did you do that?" gets an answer with citations.
+
+**Venture goal:** the **sandbox** becomes the assurance layer for financial AI, meaning CI for finance agents. Every time an agent or policy changes, Vandal searches for failures, flags regressions, and prepares verified control changes for review. The operator stays as the reference agent and proof of the method.
+
+### 1.4 Why this shape (reasoning)
+- **A sandbox alone loses the track.** Hyphenate asks "Would you hire it? For which seats?" A testing tool doesn't fill a seat, and it looks like a security product entered in the finance track. With no real agent inside it, it also proves nothing about real agents.
+- **An operator alone isn't new.** Hyphenate already builds AP agents. Another invoice-processing agent doesn't answer "Did we see something new?"
+- **Together, each half solves the other's problem.** The sandbox is what earns the operator its seat: limited access, a clean record, controls that get stronger and come with evidence. The operator is what proves the sandbox works on a real agent. One demo shows both.
+- **Synthesis is the core of the sandbox, not detection.** Detecting fraud is a crowded field. Searching for failure *sequences* and generating *verified* fixes is the hard, defensible part, and it's what generic red-teaming tools, social-engineering simulators, and finance benchmarks don't do (§3.3).
+- **Why now:** finance agents now execute payments, not just suggest them. Attackers now have deepfakes, and soon malicious counterparty agents. Controls designed for human clerks have gaps that agents walk straight through, such as reading the vendor's *current* bank account at payment time.
+
+### 1.5 Non-goals
+Real banks or money. A full ERP. AI rewriting arbitrary code; repairs come from a bounded set of control templates. Claims of mathematical proof beyond what the bounded search actually covers (§18).
 
 Short line for technical judges: **Jepsen for financial agents.** Jepsen tests distributed databases by injecting faults and checking invariants. Vandal does the same for financial workflows, and then **repairs** them.
 
@@ -63,7 +95,8 @@ Hyphenate judges every project on four questions and lists five things that make
 - a statement of what's real versus simulated and how we know (§10.2).
 
 ### 3.2 Venture
-- **First customer:** companies building AI finance agents, such as AI accounts-payable (AP), autonomous accounting, and spend-management vendors. Every time an agent or policy changes, Vandal runs the search, flags regressions, and prepares validated control changes for review. In other words, it acts as **CI for financial agents**.
+- **The product we sell is the Vandal Sandbox.** The operator is the reference agent and the proof.
+- **First customer:** companies building AI finance agents, such as AI accounts-payable (AP), autonomous accounting, and spend-management vendors. They plug their agent into the sandbox through the `FinanceOperator` interface. Every time an agent or policy changes, the sandbox runs the search, flags regressions, and prepares validated control changes for review. In other words, it acts as **CI for financial agents**.
 - **Expansion:** payment processors, treasury software, and financial institutions, with an assurance report as the deliverable for auditors and insurers.
 - **Unvalidated hypothesis:** these companies will pay for an independent, finance-specific assurance layer instead of building one in-house.
 
@@ -76,7 +109,9 @@ Hyphenate judges every project on four questions and lists five things that make
 
 We don't claim the category is new. We claim the **find → repair → prove loop** on financial state.
 
-## 4. Architecture: four engines and one operator
+## 4. Architecture: the Sandbox and the Operator
+
+**Vandal Sandbox** = (1) the financial twin + (2) the search engine + (3) the synthesizer + (4) the verification engine. **Vandal Operator** = Blue, which plugs into the twin through the `FinanceOperator` interface. Swapping in a different agent at that seam changes nothing else in the sandbox.
 
 ```
                    ┌──────────────────────────────────────────────────────────┐
@@ -177,8 +212,17 @@ A clean seed makes the operator's job trivial and the company unconvincing. The 
 
 Invoice text may borrow from a public dataset (e.g. the Invoice Sandbox Benchmark listed in the brief). Amounts and keys still come from our seed.
 
-## 6. Finance operator (Blue, the system under test)
-Blue implements `FinanceOperator.on_event / on_case` through validated tools. Claude Sonnet runs it.
+## 6. Vandal Operator (Blue, the system under test)
+
+**The seam.** The sandbox only ever talks to an operator through this interface, so Blue is one plug-in among many:
+```python
+class FinanceOperator(Protocol):
+    def on_event(self, ev: ChannelEvent, tools: Tools) -> None: ...  # intake, conversations, operations
+    def on_case(self, case: Case, tools: Tools) -> None: ...         # holds, escalations, recovery, explanations
+```
+Even in the hackathon build, nothing in `twin/`, `search/`, `synth/`, or `verify/` may import from `operator/blue.py`. A test enforces this, so the claim that "any agent can plug in" is literally true of the code.
+
+Blue implements the interface through validated tools. Claude Sonnet runs it.
 
 - **Intake:** classifies documents, emails, calls, and agent messages; extracts fields; matches the vendor and PO; codes the GL; proposes an action.
 - **Operations:** validates obligations, requests approvals, schedules payment runs, and handles bank errors. Retries follow the operator's retry policy, which is a policy parameter the synthesizer can repair.
@@ -196,7 +240,9 @@ Blue implements `FinanceOperator.on_event / on_case` through validated tools. Cl
   - Blue writes the answer **from that trace only**. Every claim cites an event, rule, or approval id. An answer with citations that don't resolve is rejected and regenerated.
   - If someone pushes back ("this vendor is fine, just pay it"), Blue restates which rule and missing evidence block the payment, and points to the inbox. **A conversation never clears a hold.**
 
-The same tool API can later be served over HTTP/MCP so a customer's own agent can be the system under test (vision; not a hackathon deliverable).
+**Bring your own agent:**
+- **Stretch goal:** serve `Tools` over HTTP and MCP so an external agent can be the operator.
+- **Even if it isn't built:** show it on the architecture slide, and mention it in the pitch as the venture path.
 
 ### 6.1 Roles and segregation of duties
 No actor both requests and approves the same action. The tools layer enforces this by role, and INV-10 checks it after every run.
@@ -517,7 +563,7 @@ Until M1 lands, P2 and P4 work against P1's entity schemas plus a stub reducer. 
 - [ ] The video **opens with the key moment** and fits Devpost's length limit.
 - [ ] Devpost entry on the Hyphenate track, including:
   - the seats line (§1);
-  - the operator plus the control synthesizer;
+  - the operator, running inside the Vandal Sandbox (§1.2);
   - real vs simulated;
   - the scorecard.
 - [ ] A full demo run works after Reset, both live and in playback. The inject flow works live with a scenario we've never run before.
