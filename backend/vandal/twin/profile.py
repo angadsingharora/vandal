@@ -102,6 +102,16 @@ class VendorSpec(_Spec):
     po: bool
 
 
+class CustomerSpec(_Spec):
+    """A tenant (money in, R11): open rent invoices, and the account they pay from."""
+
+    id: str
+    name: str
+    property: str
+    rent: Cents
+    open_invoices: int = 1
+
+
 class FixtureInvoice(_Spec):
     id: str
     vendor: str
@@ -130,6 +140,7 @@ class Profile(_Spec):
     risk_appetite: RiskAppetite
     generation: GenerationSpec
     vendors: list[VendorSpec]
+    customers: list[CustomerSpec] = []
     fixtures: Fixtures = Field(default_factory=Fixtures)
 
 

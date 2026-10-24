@@ -121,7 +121,8 @@ def _grid(template: str, profile: Profile) -> list[dict]:
             return [{"window_days": w, "threshold": threshold} for w in (5, 10)]
         case "T6":
             return [
-                {"allowed": a, "require_cleared_funds": True, "cooling_days": 0}
+                {"allowed": a, "require_cleared_funds": cleared, "cooling_days": 0}
+                for cleared in (False, True)
                 for a in ("source_only", "source_or_verified")
             ]
     return []

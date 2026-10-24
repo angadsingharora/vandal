@@ -310,7 +310,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
     for cls in sorted(after.attack_success):
         b, a = before.attack_success.get(cls), after.attack_success[cls]
         print(
-            f"  {cls:<18} {f'{b.succeeded}/{b.attempts}' if b else '-':>10} "
+            f"  {cls:<26} {f'{b.succeeded}/{b.attempts}' if b else '-':>2} "
             f"{f'{a.succeeded}/{a.attempts}':>10}"
         )
     path = pack.write(args.out)

@@ -25,7 +25,7 @@ from vandal.contracts.controls import Decision, Stage
 from vandal.contracts.entities import Actor, ApprovedInstruction
 from vandal.contracts.interfaces import Action, Guard, ToolResult
 from vandal.contracts.verdicts import Verdict
-from vandal.twin import bank, ledger
+from vandal.twin import bank, ledger, money_in
 from vandal.twin.facts import current_account
 from vandal.twin.state import State, construct
 from vandal.twin.world import Run
@@ -95,6 +95,23 @@ class InvoiceArgs(_Args):
     supersedes: str | None = None  # the invoice a credit memo corrects
     po: str | None = None
     message: str | None = None
+
+
+class CashArgs(_Args):
+    """Apply a deposit: the customer and invoices the Operator read from its remittance memo
+    (None = unidentified, to suspense)."""
+
+    transaction: str
+    customer: str | None = None
+    invoices: list[str] = []
+
+
+class RefundArgs(_Args):
+    customer: str
+    amount: int
+    destination_account: str  # routing:account
+    reason: str = ""
+    message: str | None = None  # the request it answers
 
 
 class ChangeRef(_Args):
@@ -564,6 +581,44 @@ def _record_portal(ctx: Ctx, args: ChangeRef) -> list[EventSpec]:
     return [("evidence.created", {"evidence": evidence})]
 
 
+def _apply_cash(ctx: Ctx, args: CashArgs) -> list[EventSpec]:
+    state = ctx.state
+    txn = state.bank_transactions.get(args.transaction)
+    if txn is None or txn.amount <= 0 or txn.reconciled or txn.returns:
+        raise ToolError(f"{args.transaction} is not an unapplied deposit")
+    if args.customer is not None and args.customer not in state.customers:
+        raise ToolError(f"unknown customer {args.customer}")
+    return money_in.apply(state, txn.id, args.customer, args.invoices)
+
+
+def _reverse_cash(ctx: Ctx, args: TransactionRef) -> list[EventSpec]:
+    txn = ctx.state.bank_transactions.get(args.transaction)
+    if txn is None or txn.returns is None or txn.reconciled:
+        raise ToolError(f"{args.transaction} is not an unreconciled returned deposit")
+    return money_in.reverse(ctx.state, txn.id)
+
+
+def _refund(status: str) -> Effect:
+    def effect(ctx: Ctx, args: RefundArgs) -> list[EventSpec]:
+        state = ctx.state
+        if args.customer not in state.customers:
+            raise ToolError(f"unknown customer {args.customer}")
+        credit = money_in.credit_balance(state, args.customer)
+        if not 0 < args.amount <= credit:
+            raise ToolError(f"{args.customer} has a credit of {credit}, not {args.amount}")
+        return money_in.refund(
+            state,
+            args.customer,
+            args.amount,
+            args.destination_account,
+            args.reason,
+            args.message,
+            status,
+        )
+
+    return effect
+
+
 @dataclass(frozen=True)
 class ToolSpec:
     stage: Stage
@@ -589,6 +644,18 @@ TOOLS: dict[str, ToolSpec] = {
     "payments.execute": ToolSpec("pre_execute", InvoiceRef, {"allow": _execute}),
     "payments.submit": ToolSpec("submit", PaymentRef, {"allow": _submit}),
     "payments.retry": ToolSpec("retry", PaymentRef, {"allow": _retry}),
+    "cash.apply": ToolSpec("journal", CashArgs, {"allow": _apply_cash}),
+    "cash.reverse": ToolSpec("journal", TransactionRef, {"allow": _reverse_cash}),
+    "refunds.issue": ToolSpec(
+        "refund",
+        RefundArgs,
+        {
+            "allow": _refund("refunded"),
+            "hold": _refund("held"),
+            "escalate": _refund("held"),
+            "block": _refund("rejected"),
+        },
+    ),
     "payments.query_status": ToolSpec("retry", PaymentRef, {"allow": _query_status}),
     "ledger.reconcile": ToolSpec("journal", TransactionRef, {"allow": _reconcile}),
     "vendors.change_request": ToolSpec(

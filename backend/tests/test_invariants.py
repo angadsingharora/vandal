@@ -57,7 +57,7 @@ def add_payment(state, pid: str, invoice: str, amount: int, payee: str, day: int
 
 
 def test_all_invariants_hold_on_legitimate_ops(legit) -> None:
-    assert set(CHECKS) == {f"INV-{n}" for n in range(1, 10)}
+    assert set(CHECKS) == {f"INV-{n}" for n in (*range(1, 10), 11)}
     assert check(legit.run.state) == []
 
 

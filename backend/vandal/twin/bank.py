@@ -23,6 +23,7 @@ from vandal.twin.state import State
 
 OPERATING = "CB-OPER"
 SETTLEMENT_LAG = 1  # business days
+CLEARING_DAYS = 2  # a provisional deposit clears, or comes back, this many days later
 FAULT_KINDS = ("timeout", "drop_ack", "duplicate_ack", "delay", "feed_delay")
 
 EventSpec = tuple[str, dict[str, Any]]
@@ -87,6 +88,31 @@ def status(state: State, payment: str) -> EventSpec:
     )
 
 
+def deposit(
+    state: State, amount: int, source: str, memo: str, cleared: bool, comes_back: bool
+) -> EventSpec:
+    """Money arrives on the feed. A provisional one (`cleared=False`) resolves later: it
+    clears, or (`comes_back`) the bank returns it."""
+    txn = {
+        "id": f"BT-{len(state.bank_transactions) + 1:04d}",
+        "bank_account": OPERATING,
+        "amount": amount,
+        "posted_on": state.day,
+        "counterparty_account": source,
+        "memo": memo,
+        "cleared": cleared,
+    }
+    pending = None
+    if not cleared:
+        pending = {
+            "id": f"BD-{len(state.bank_deposits) + 1:04d}",
+            "transaction": txn["id"],
+            "outcome": "return" if comes_back else "clear",
+            "on": state.day + CLEARING_DAYS,
+        }
+    return ("bank.deposit", {"transaction": txn, "pending": pending})
+
+
 def settle_due(state: State) -> list[EventSpec]:
     """Processed submissions whose settlement day has come settle today, unless the feed is
     down."""
@@ -97,6 +123,24 @@ def settle_due(state: State) -> list[EventSpec]:
                 return specs
             specs.append(("bank.fault_used", {"fault": f.id}))
     n = len(state.bank_transactions)
+    for dep in state.bank_deposits.values():
+        if dep.status != "pending" or dep.on > state.day:
+            continue
+        if dep.outcome == "clear":
+            specs.append(("bank.deposit_cleared", {"deposit": dep.id}))
+            continue
+        original = state.bank_transactions[dep.transaction]
+        n += 1
+        returned = {
+            "id": f"BT-{n:04d}",
+            "bank_account": original.bank_account,
+            "amount": -original.amount,
+            "posted_on": state.day,
+            "counterparty_account": original.counterparty_account,
+            "memo": f"Returned deposit {original.id}",
+            "returns": original.id,
+        }
+        specs.append(("bank.deposit_returned", {"deposit": dep.id, "transaction": returned}))
     for sub in state.bank_submissions.values():
         if sub.status != "processed" or sub.settle_on > state.day:
             continue

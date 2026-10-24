@@ -279,6 +279,63 @@ def _fixture_portal_expect(seed: State, final: State) -> list[str]:
     )
 
 
+# --- money in (R11) -------------------------------------------------------------------------
+
+
+def _tenant(s: State) -> str:
+    """The first tenant with one open invoice."""
+    counts: dict[str, int] = {}
+    for inv in s.customer_invoices.values():
+        counts[inv.customer] = counts.get(inv.customer, 0) + 1
+    return min(c for c, n in counts.items() if n == 1)
+
+
+def _two_invoice_tenant(s: State) -> str:
+    return min(
+        c
+        for c in s.customers
+        if sum(1 for i in s.customer_invoices.values() if i.customer == c) > 1
+    )
+
+
+def _rent(s: State, at: int, amount, tenant: str | None = None, memo: str = "customer") -> Move:
+    params = {"customer": tenant or _tenant(s), "amount": amount, "memo": memo}
+    return Move(kind="deposit", at=at, params=params)
+
+
+def _rent_expect(status: str, credit: int, tenant=_tenant):
+    def expect(seed: State, final: State) -> list[str]:
+        who = tenant(seed)
+        problems = [
+            f"{i.id} is {i.status}, expected {status}"
+            for i in final.customer_invoices.values()
+            if i.customer == who and i.status != status
+        ]
+        got = sum(p.credit for p in final.incoming_payments.values() if p.payer == who)
+        if got != credit:
+            problems.append(f"{who} has a credit of {got}, expected {credit}")
+        return problems
+
+    return expect
+
+
+def _suspense_expect(seed: State, final: State) -> list[str]:
+    (payment,) = final.incoming_payments.values() or [None]
+    if payment is None or payment.payer is not None or payment.applied:
+        return ["the unidentified deposit wasn't held in suspense"]
+    return []
+
+
+def _refund_expect(seed: State, final: State) -> list[str]:
+    refunds = list(final.refunds.values())
+    if [r.status for r in refunds] != ["refunded"]:
+        return [f"expected one refund, got {[(r.id, r.status) for r in refunds]}"]
+    sources = {p.source_account for p in final.incoming_payments.values()}
+    if refunds[0].destination_account not in sources:
+        return [f"{refunds[0].id} didn't go back to the paying account"]
+    return []
+
+
 CASES: list[Case] = [
     Case(
         "baseline",
@@ -436,6 +493,39 @@ CASES: list[Case] = [
         "The bank times out for real (nothing processed); the retry pays once",
         lambda s: [Move(kind="fault", at=2, params={"kind": "timeout"})],
         pending_paid,
+    ),
+    Case(
+        "rent_paid_exactly",
+        "A tenant pays this month's rent exactly; it is applied and nothing is refunded",
+        lambda s: [_rent(s, 0, "exact")],
+        _rent_expect("paid", credit=0),
+    ),
+    Case(
+        "partial_rent",
+        "A tenant pays half; the invoice stays partly open",
+        lambda s: [_rent(s, 0, "partial")],
+        _rent_expect("partially_paid", credit=0),
+    ),
+    Case(
+        "one_deposit_two_invoices",
+        "One deposit pays two open invoices it names",
+        lambda s: [_rent(s, 0, "exact", tenant=_two_invoice_tenant(s), memo="invoice")],
+        _rent_expect("paid", credit=0, tenant=_two_invoice_tenant),
+    ),
+    Case(
+        "unidentified_deposit",
+        "A deposit names no tenant: it waits in suspense, applied to nothing",
+        lambda s: [_rent(s, 0, 250_000, memo="none")],
+        _suspense_expect,
+    ),
+    Case(
+        "overpayment_refund_to_source",
+        "A tenant overpays (cleared) and asks for the credit back to the account it paid from",
+        lambda s: [
+            _rent(s, 0, "overpay"),
+            Move(kind="refund_request", at=4, params={"customer": _tenant(s), "dest": "source"}),
+        ],
+        _refund_expect,
     ),
     Case(
         "duplicate_ack",

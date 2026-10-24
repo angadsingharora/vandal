@@ -204,7 +204,11 @@ class BankTransaction(Entity):  # BT-…
     posted_on: SimDay
     payment: str | None = None
     submission: str | None = None  # the bank submission it settles (BS-…)
+    refund: str | None = None
     counterparty_account: str | None = None
+    memo: str = ""  # remittance text on a deposit
+    cleared: bool = True  # a deposit can post provisionally and clear (or come back) later
+    returns: str | None = None  # a returned deposit: the transaction it reverses
     reconciled: bool = False
 
 
@@ -222,6 +226,13 @@ class BankFault(Entity):  # BF-…: armed by a fault move, used by the next subm
     status: Literal["armed", "used"] = "armed"
 
 
+class BankDeposit(Entity):  # BD-…: a provisional deposit and how it resolves (bank-internal)
+    transaction: str
+    outcome: Literal["clear", "return"]
+    on: SimDay
+    status: Literal["pending", "done"] = "pending"
+
+
 class BankSubmission(Entity):  # BS-…: one submission the bank processed (and will settle)
     payment: str
     amount: Cents
@@ -237,22 +248,26 @@ class BankSubmission(Entity):  # BS-…: one submission the bank processed (and 
 
 class Customer(Entity):  # C-…
     name: str
+    accounts_on_file: list[str] = []  # accounts verified at lease signing
 
 
 class CustomerInvoice(Entity):  # AR-…
     customer: str
     amount: Cents
     due_date: SimDay
+    paid: Cents = 0
     status: Literal["open", "partially_paid", "paid", "overpaid"] = "open"
 
 
-class IncomingPayment(Entity):  # IN-…
+class IncomingPayment(Entity):  # IN-…: a deposit as cash application recorded it
     bank_transaction: str
-    payer: str | None = None
+    payer: str | None = None  # customer id; None = unidentified, held in suspense
     source_account: str
     amount: Cents
     remittance: str = ""
     applied: dict[str, Cents] = {}  # customer invoice id -> cents applied
+    credit: Cents = 0  # left over: a customer credit (or suspense, if unidentified)
+    returned: bool = False
 
 
 class Refund(Entity):  # RF-…
@@ -260,8 +275,10 @@ class Refund(Entity):  # RF-…
     amount: Cents
     destination_account: str
     reason: str
+    message: str | None = None  # the request it answers
+    requested_on: SimDay = 0
     approval: str | None = None
-    status: Literal["requested", "approved", "refunded", "rejected"] = "requested"
+    status: Literal["requested", "held", "refunded", "rejected"] = "requested"
 
 
 # --- Ledger ---------------------------------------------------------------------------------

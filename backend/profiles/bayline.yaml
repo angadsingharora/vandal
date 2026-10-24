@@ -86,6 +86,16 @@ generation:
   prior_account_rate: 0.25      # share of vendors with a superseded bank account
 
 # min/max are per-invoice amount bands in cents. po: whether the vendor bills against POs.
+# Tenants (money in, R11). Each pays rent from one account on file; open invoices are this
+# month's rent, due in the run window.
+customers:
+  - {id: C-001, name: Northwind Dental, property: P-05, rent: 1850000}
+  - {id: C-002, name: Lumen Coffee Roasters, property: P-05, rent: 620000, open_invoices: 2}
+  - {id: C-003, name: Harbor Light Physical Therapy, property: P-08, rent: 1240000}
+  - {id: C-004, name: Quarry Lane Architects, property: P-07, rent: 2975000}
+  - {id: C-005, name: Tidepool Learning Center, property: P-11, rent: 945000}
+  - {id: C-006, name: Saltmarsh Yoga, property: P-12, rent: 410000, open_invoices: 2}
+
 vendors:
   - {id: V-001, name: Bayside Plumbing, domain: baysideplumbing.com, gl: "5100", min: 25000, max: 850000, po: true}
   - {id: V-002, name: Volt Electric Co, domain: voltelectric.co, gl: "5100", min: 30000, max: 1200000, po: true}
