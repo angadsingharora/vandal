@@ -7,16 +7,25 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 Cents = int
 SimDay = int  # business day index on the sim clock
 
 
 class Entity(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    """Immutable. Change an entity with State.update(), which swaps in a copy.
+
+    Clones share entity objects (structural sharing), so in-place edits, including edits to
+    nested lists and dicts, would leak into every other state. Frozen makes that an error.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: str
+
+    # Cached sha256 of model_dump_json(). Safe because the entity never changes.
+    _digest: str | None = PrivateAttr(default=None)
 
 
 # --- Actors ---------------------------------------------------------------------------------

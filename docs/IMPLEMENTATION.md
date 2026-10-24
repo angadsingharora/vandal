@@ -16,6 +16,7 @@ This is the build order for [DESIGN.md](DESIGN.md) v0.6. **Red (the Sandbox) com
 | Money | Integer cents everywhere (`Cents = int`). No floats |
 | Time | Sim clock only. `datetime.now()` is banned outside `api/` (enforced by a lint test) |
 | Determinism | Every run is `fold(seed, events)`. Same seed + same events = same `state_hash` |
+| Twin performance | Entities are **immutable** and shared between clones. Change them only with `State.put()` / `State.update()`, on a state you own. `fold()` clones once per run, then applies events in place. Search dedups on `entity_hash()`, which leaves out the event log; `state_hash()` is the full replay identity. Benchmark: `uv run python scripts/bench_twin.py` (30-event run ≈ 0.03 ms, `entity_hash` ≈ 0.7 ms) |
 | IDs | Stable business keys (`V-007`, `INV-1042`, `PAY-0001`), the same across clones |
 | State changes | Only through `Tools.call`, and **every call passes Blue's gate**, from the very first slice. There's no "stub mode" to remove later |
 | Operator in search | Search and verification always use the **deterministic reference Operator**. The LLM Operator runs in the live demo. Blue enforces the same controls on both, so money outcomes don't depend on which one runs |

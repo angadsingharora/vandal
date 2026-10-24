@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 import pytest
+from pydantic import ValidationError
 
 from vandal.cli import main
 from vandal.twin.profile import load_profile
@@ -47,13 +48,22 @@ def test_clone_is_independent(profile) -> None:
     original = seed_state(profile)
     before = original.state_hash()
     clone = original.clone()
-    clone.vendors["V-007"].status = "blocked"
-    clone.invoices["INV-1042"].amount += 1
-    clone.bank_accounts["CB-OPER"].balance = 0
-    clone.journal[0].memo = "tampered"
+    clone.update("vendors", "V-007", status="blocked")
+    clone.update("invoices", "INV-1042", amount=clone.invoices["INV-1042"].amount + 1)
+    clone.update("bank_accounts", "CB-OPER", balance=0)
+    clone.journal.pop()
     assert original.state_hash() == before
     assert original.vendors["V-007"].status == "active"
     assert clone.state_hash() != before
+
+
+def test_entities_cannot_be_edited_in_place(profile) -> None:
+    # Clones share entity objects, so an in-place edit would leak into every state.
+    state = seed_state(profile)
+    with pytest.raises(ValidationError):
+        state.vendors["V-007"].status = "blocked"
+    with pytest.raises(ValidationError):
+        state.journal[0].memo = "tampered"
 
 
 def test_company_shape(profile) -> None:
