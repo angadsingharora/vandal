@@ -229,3 +229,8 @@ def _callback_answered(state: State, event: Event) -> None:
         status="answered",
         confirms=bool(event.payload["confirms"]),
     )
+
+
+@handles("invoice.cancelled")
+def _invoice_cancelled(state: State, event: Event) -> None:
+    state.update("invoices", event.payload["invoice"], status="cancelled")

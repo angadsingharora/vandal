@@ -48,12 +48,16 @@ def prior_settled_payments(state: State, vendor: str) -> int:
     )
 
 
+# Invoices that no longer count as obligations for duplicate and window checks.
+CLOSED = ("rejected", "cancelled", "applied")
+
+
 def _invoice_facts(state: State, inv: Invoice) -> dict[str, Any]:
     vendor = state.vendors[inv.vendor]
     others = [
         o
         for o in state.invoices.values()
-        if o.vendor == inv.vendor and o.id != inv.id and o.status != "rejected"
+        if o.vendor == inv.vendor and o.id != inv.id and o.status not in CLOSED
     ]
     duplicate = any(o.number == inv.number for o in others)
     return {
@@ -95,7 +99,7 @@ def _executions(state: State, invoice: str, besides: str | None = None) -> int:
 
 def _duplicate_and_window_facts(inv: Invoice, others: list[Invoice]) -> dict[str, Any]:
     """Near-duplicate obligations (T4) and per-vendor totals (T5), per window. `others` are the
-    vendor's other invoices that aren't rejected."""
+    vendor's other invoices, minus CLOSED ones."""
     number = normalize_number(inv.number)
     out: dict[str, Any] = {
         "dup.normalized_number": any(normalize_number(o.number) == number for o in others),

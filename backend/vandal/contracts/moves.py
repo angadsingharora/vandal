@@ -16,6 +16,7 @@ MoveKind = Literal[
     "deposit",
     "refund_request",
     "tick",
+    "message",  # content with no structured request: an inquiry, pressure, small talk
 ]
 
 

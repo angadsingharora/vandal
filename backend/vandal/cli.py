@@ -6,6 +6,7 @@ import argparse
 import os
 import sys
 from collections.abc import Callable
+from pathlib import Path
 
 # Exhaustive depth 4 takes ~75s even with partial-order reduction and 8-10 workers, so the
 # default is 3 (IMPLEMENTATION R4, step 5). --depth 4 still works.
@@ -31,10 +32,23 @@ def cmd_seed(args: argparse.Namespace) -> int:
     return 0
 
 
-def _policy(args: argparse.Namespace):
+POLICIES_DIR = Path(__file__).resolve().parents[1] / "policies"
+
+
+def load_policy(name: str | None):
+    """`v0`, a name under policies/ (`v1` -> policies/v1.json), or a path."""
     from vandal.synth.templates import V0, Policy
 
-    return Policy.load(args.policy) if args.policy else V0
+    if not name or name == "v0":
+        return V0
+    path = Path(name)
+    if not path.suffix:
+        path = POLICIES_DIR / f"{name}.json"
+    return Policy.load(path)
+
+
+def _policy(args: argparse.Namespace):
+    return load_policy(args.policy)
 
 
 def _lint_policy(policy, profile) -> list[str]:
@@ -242,7 +256,69 @@ def cmd_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_verify(args: argparse.Namespace) -> int:
+    from functools import partial
+
+    from vandal.sandbox import new_sandbox
+    from vandal.verify.suite import verify
+
+    policy = load_policy(args.policy)
+    parent = load_policy(args.parent or policy.parent or "v0")
+    _print_policy(policy)
+    pack = verify(
+        policy,
+        parent,
+        lambda p: partial(new_sandbox, args.profile, policy=p),
+        profile=args.profile,
+        seed=args.seed,
+        depth=args.depth,
+        workers=args.workers,
+    )
+    print(f"verification of {pack.version} against {parent.version}:")
+    for c in pack.checks:
+        print(f"  {'PASS' if c.passed else 'FAIL'}  {c.number} {c.name:<11} {c.detail}")
+    if pack.counterexample:
+        cx = pack.counterexample
+        moves = "; ".join(f"{m.kind}@{m.at}" for m in cx.moves)
+        print(f"  counterexample (under {cx.found_under}): {moves} -> {', '.join(cx.violated)}")
+    if pack.diagnosis:
+        print(f"  diagnosis: {pack.diagnosis['gap']} at the {pack.diagnosis['link']} link")
+    for line in pack.candidates[0].lint:
+        print(f"  lint {line}")
+    before, after = pack.metrics["before"], pack.metrics["after"]
+    print(f"scorecard            {before.policy:>10} {after.policy:>10}")
+    rows = [
+        ("sequences explored", before.sequences_explored, after.sequences_explored),
+        ("violations found", before.violations_found, after.violations_found),
+        ("attack success", f"{before.attack_success_rate:.0%}", f"{after.attack_success_rate:.0%}"),
+        ("exposure", f"${before.exposure / 100:,.0f}", f"${after.exposure / 100:,.0f}"),
+        (
+            "false positives",
+            f"{before.false_positive_rate:.0%}",
+            f"{after.false_positive_rate:.0%}",
+        ),
+        ("holds", before.holds, after.holds),
+        (
+            "broken invariants",
+            ",".join(before.broken_invariants) or "-",
+            ",".join(after.broken_invariants) or "-",
+        ),
+    ]
+    for name, b, a in rows:
+        print(f"  {name:<18} {b!s:>10} {a!s:>10}")
+    for cls in sorted(after.attack_success):
+        b, a = before.attack_success.get(cls), after.attack_success[cls]
+        print(
+            f"  {cls:<18} {f'{b.succeeded}/{b.attempts}' if b else '-':>10} "
+            f"{f'{a.succeeded}/{a.attempts}':>10}"
+        )
+    path = pack.write(args.out)
+    print(f"{'approvable' if pack.approvable else 'NOT approvable'}: wrote {path}")
+    return 0 if pack.approvable else 1
+
+
 IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {
+    "verify": cmd_verify,
     "search": cmd_search,
     "seed": cmd_seed,
     "run": cmd_run,
@@ -257,11 +333,22 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="command", required=True)
     for name, (help_text, _slice) in COMMANDS.items():
         cmd = sub.add_parser(name, help=help_text)
-        if name in ("seed", "run", "attack", "search"):
+        if name in ("seed", "run", "attack", "search", "verify"):
             cmd.add_argument("--profile", default="bayline", help="profile name or YAML path")
             cmd.add_argument("--seed", type=int, default=DEFAULT_SEED)
-        if name in ("run", "attack", "search"):
-            cmd.add_argument("--policy", help="policy JSON (policies/*.json); default v0")
+        if name in ("run", "attack", "search", "verify"):
+            cmd.add_argument("--policy", help="v0, a name under policies/, or a JSON path")
+        if name == "verify":
+            cmd.add_argument("--parent", help="policy to compare against (default: its parent)")
+            cmd.add_argument(
+                "--depth", type=int, default=int(os.environ.get("SEARCH_DEPTH", DEFAULT_DEPTH))
+            )
+            cmd.add_argument(
+                "--workers",
+                type=int,
+                default=int(os.environ.get("SEARCH_WORKERS", min(8, os.cpu_count() or 1))),
+            )
+            cmd.add_argument("--out", default="evidence", help="directory for the evidence pack")
         if name == "run":
             cmd.add_argument("--days", type=int, default=5)
         if name == "search":

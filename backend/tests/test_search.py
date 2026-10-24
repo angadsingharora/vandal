@@ -55,6 +55,27 @@ def test_alphabet_respects_attacker_capabilities() -> None:
     assert not [m for m in build_alphabet(A, state, no_fakes) if m.kind == "inbound_confirmation"]
 
 
+def test_portal_takeover_is_its_own_channel_class() -> None:
+    """A portal submission is authenticated evidence on its own, so it can't share a class with
+    email: with a takeover, search tries it, and it beats a T1 that accepts the portal."""
+    from vandal.synth.templates import Policy
+
+    profile = load_profile()
+    caps = profile.attacker_capabilities.model_dump()
+    with pytest.raises(ValueError, match="portal_takeover"):
+        type(profile.attacker_capabilities).model_validate(
+            caps | {"change_request_channels": ["email", "portal"]}
+        )
+    takeover = _caps(
+        profile, change_request_channels=["email", "agent_msg", "portal"], portal_takeover=True
+    )
+    channels = {m.params.get("channel") for m in build_alphabet(A, seed_state(), takeover)}
+    assert {"email", "portal"} <= channels and "agent_msg" not in channels
+    v1 = partial(new_sandbox, takeover, policy=Policy.load(Path("policies/v1.json")))
+    result = search(v1, A, depth=1)
+    assert result.best is not None and result.best.moves[0].params["channel"] == "portal"
+
+
 def test_search_finds_scenario_a_unaided(found) -> None:
     best = found.best
     assert best is not None and len(best.moves) == 1

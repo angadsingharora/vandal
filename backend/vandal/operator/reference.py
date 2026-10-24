@@ -16,6 +16,7 @@ from vandal.twin.flows import (
     ChangeRequestArgs,
     DecideArgs,
     InboundEvidenceArgs,
+    InvoiceArgs,
     InvoiceRef,
     PaymentRef,
     ScheduleArgs,
@@ -41,6 +42,8 @@ class ReferenceOperator:
                 self._reconcile(tools)
             case _ if ev.meta.get("intent") in ("vendor_bank_change", "vendor_contact_change"):
                 self._change_request(ev, tools)
+            case _ if ev.meta.get("intent") == "invoice":
+                self._receive_invoice(ev, tools)
             case _ if ev.meta.get("intent") == "change_confirmation":
                 self._inbound_confirmation(ev, tools)
             case _ if ev.meta.get("intent") == "callback_answered":
@@ -103,9 +106,35 @@ class ReferenceOperator:
         if held:
             self._verify(held[-1].id, result.verdict.facts.get("gate.requires", []), tools)
 
+    def _receive_invoice(self, ev: ChannelEvent, tools: Tools) -> None:
+        m = ev.meta
+        tools.call(
+            self.actor,
+            "invoices.receive",
+            InvoiceArgs(
+                vendor=str(m["vendor"]),
+                number=str(m["number"]),
+                amount=int(m["amount"]),
+                dimension=str(m.get("dimension", "P-01")),
+                due_in_days=int(m.get("due_in_days", 5)),
+                kind=m.get("kind", "invoice"),
+                supersedes=m.get("supersedes") or None,
+                po=m.get("po") or None,
+                message=ev.id,
+            ),
+        )
+
     def _verify(self, change: str, requires: list[dict], tools: Tools) -> None:
-        """Answer an evidence-gated hold the way the control asks: an outbound callback to the
-        contact on file as of `contact_as_of`. Inbound calls are never solicited."""
+        """Answer an evidence-gated hold the way the control asks. A portal submission carries
+        its own evidence; otherwise an outbound callback to the contact on file as of
+        `contact_as_of`. Inbound calls are never solicited."""
+        cr = tools.view.change_requests[change]
+        portal = cr.channel == "portal" and any(
+            "portal" in r.get("accepted_channels", []) for r in requires
+        )
+        if portal and tools.call(self.actor, "evidence.record_portal", ChangeRef(change=change)).ok:
+            self._apply(change, tools)
+            return
         for req in requires:
             if "phone_outbound" in req.get("accepted_channels", []):
                 tools.call(
