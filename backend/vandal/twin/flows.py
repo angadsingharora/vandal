@@ -67,6 +67,17 @@ class TransactionRef(_Args):
     transaction: str
 
 
+class ChangeRequestArgs(_Args):
+    """A vendor-master change as the Operator extracted it from an inbound message."""
+
+    vendor: str
+    channel: str
+    sender: str
+    message: str | None = None
+    routing: str
+    account: str
+
+
 # --- Tool effects ---------------------------------------------------------------------------
 
 
@@ -257,6 +268,59 @@ def _reconcile(ctx: Ctx, args: TransactionRef) -> list[EventSpec]:
     return [("bank.reconciled", {"transaction": txn.id, "payment": txn.payment})]
 
 
+def _change_request(state: State, args: ChangeRequestArgs, status: str) -> dict[str, Any]:
+    if args.vendor not in state.vendors:
+        raise ToolError(f"unknown vendor {args.vendor}")
+    return {
+        "id": f"CR-{len(state.change_requests) + 1:04d}",
+        "vendor": args.vendor,
+        "proposed": {"routing": args.routing, "account": args.account},
+        "channel": args.channel,
+        "sender": args.sender,
+        "message": args.message,
+        "received_on": state.day,
+        "status": status,
+    }
+
+
+def _apply_change(ctx: Ctx, args: ChangeRequestArgs) -> list[EventSpec]:
+    """v0: the vendor master is updated as requested, with no verification."""
+    state = ctx.state
+    request = _change_request(state, args, "open")
+    superseded = [
+        a.id
+        for a in state.vendor_bank_accounts.values()
+        if a.vendor == args.vendor and a.status in ("verified", "unverified")
+    ]
+    account = {
+        "id": f"BA-{len(state.vendor_bank_accounts) + 1:04d}",
+        "vendor": args.vendor,
+        "routing": args.routing,
+        "account": args.account,
+        "status": "unverified",
+        "source": f"change_request:{request['id']}",
+    }
+    return [
+        ("change_request.created", {"request": request}),
+        (
+            "vendor.bank_changed",
+            {"request": request["id"], "account": account, "superseded": superseded},
+        ),
+    ]
+
+
+def _stop_change(status: str) -> Effect:
+    def effect(ctx: Ctx, args: ChangeRequestArgs) -> list[EventSpec]:
+        return [
+            (
+                "change_request.created",
+                {"request": _change_request(ctx.state, args, status), "checks": ctx.verdict.fired},
+            )
+        ]
+
+    return effect
+
+
 @dataclass(frozen=True)
 class ToolSpec:
     stage: Stage
@@ -282,6 +346,16 @@ TOOLS: dict[str, ToolSpec] = {
     "payments.execute": ToolSpec("pre_execute", InvoiceRef, {"allow": _execute}),
     "payments.submit": ToolSpec("submit", PaymentRef, {"allow": _submit}),
     "ledger.reconcile": ToolSpec("journal", TransactionRef, {"allow": _reconcile}),
+    "vendors.change_request": ToolSpec(
+        "change_request",
+        ChangeRequestArgs,
+        {
+            "allow": _apply_change,
+            "hold": _stop_change("held"),
+            "escalate": _stop_change("held"),
+            "block": _stop_change("rejected"),
+        },
+    ),
 }
 
 

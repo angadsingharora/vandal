@@ -16,6 +16,7 @@ from vandal.twin.flows import GatedTools
 from vandal.twin.profile import Profile, load_profile
 from vandal.twin.seed import DEFAULT_SEED, seed_state
 from vandal.twin.world import Run, run_world
+from vandal.verify.replay import RunResult, Trace, replay_trace
 
 
 @dataclass
@@ -44,3 +45,9 @@ def new_sandbox(profile: Profile | str = "bayline", seed: int = DEFAULT_SEED) ->
         operator=ReferenceOperator(profile),
         approver=SimulatedApprover(profile),
     )
+
+
+def replay_with_reference(trace: Trace, profile: Profile | str = "bayline") -> RunResult:
+    """Replay a trace with the deterministic reference Operator (IMPLEMENTATION 0)."""
+    loaded = load_profile(profile) if isinstance(profile, str) else profile
+    return replay_trace(trace, sandbox=lambda seed: new_sandbox(loaded, seed=seed))

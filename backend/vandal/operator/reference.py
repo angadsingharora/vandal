@@ -11,6 +11,7 @@ from vandal.contracts.events import ChannelEvent
 from vandal.contracts.interfaces import Tools
 from vandal.twin.facts import match_facts, prior_settled_payments
 from vandal.twin.flows import (
+    ChangeRequestArgs,
     DecideArgs,
     InvoiceRef,
     PaymentRef,
@@ -35,6 +36,8 @@ class ReferenceOperator:
                 self._pay(tools)
             case "bank_feed":
                 self._reconcile(tools)
+            case _ if ev.meta.get("intent") == "vendor_bank_change":
+                self._change_request(ev, tools)
 
     def on_case(self, case: Case, tools: Tools) -> None:
         """Exceptions and recovery land in O2."""
@@ -63,6 +66,23 @@ class ReferenceOperator:
         for pay in list(tools.view.payments.values()):
             if pay.status == "scheduled":
                 tools.call(self.actor, "payments.submit", PaymentRef(payment=pay.id))
+
+    def _change_request(self, ev: ChannelEvent, tools: Tools) -> None:
+        """Intake of a bank-detail change. The reference Operator reads the structured fields
+        the message carries; the LLM Operator (O1) extracts them from the body instead."""
+        m = ev.meta
+        tools.call(
+            self.actor,
+            "vendors.change_request",
+            ChangeRequestArgs(
+                vendor=str(m["vendor"]),
+                channel=ev.channel,
+                sender=ev.sender,
+                message=ev.id,
+                routing=str(m["routing"]),
+                account=str(m["account"]),
+            ),
+        )
 
     def _reconcile(self, tools: Tools) -> None:
         for txn in list(tools.view.bank_transactions.values()):

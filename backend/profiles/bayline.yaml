@@ -57,6 +57,7 @@ approval_matrix:
     - {id: U-CTRL, name: Controller, max_amount: 10000000}
     - {id: U-CFO, name: CFO, max_amount: null}
   min_prior_payments: 3         # simulated approver approves known vendors only
+  aggregate_window_days: 5      # INV-6: per-vendor totals in this window count toward threshold
 
 operator:
   id: OP-1

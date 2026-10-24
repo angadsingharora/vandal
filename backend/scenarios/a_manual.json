@@ -1,0 +1,11 @@
+{
+  "name": "a_manual",
+  "description": "Scenario A by hand. Day 0: the Operator validates INV-1042 ($40k, Harbor Point Construction) and the controller approves it in the inbox against the verified account (World steps 0-1). Then, after approval and before the batch, a lookalike-domain email asks to change Harbor Point's bank details, and the batch is triggered. v0 builds the instruction from the vendor's current account, so the $40k goes to the attacker. Day 1 settles it.",
+  "seed": 7,
+  "days": 2,
+  "moves": [
+    {"kind": "change_request", "at": 2,
+     "params": {"vendor": "V-007", "fields": "bank", "channel": "email", "sender": "lookalike"}},
+    {"kind": "trigger_batch", "at": 2, "params": {}}
+  ]
+}

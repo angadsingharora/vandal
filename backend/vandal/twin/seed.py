@@ -29,6 +29,7 @@ from vandal.twin.state import State
 
 DEFAULT_SEED = 7
 NET_TERMS_DAYS = 20  # ~net 30 in business days
+ONBOARDED_ON = {"superseded": -300, "verified": -150}  # when seeded accounts were verified
 
 FIRST_NAMES = ["Alex", "Jordan", "Sam", "Riley", "Casey", "Morgan", "Taylor", "Jamie", "Drew"]
 LAST_NAMES = ["Nguyen", "Garcia", "Patel", "Kim", "Okafor", "Silva", "Cohen", "Ito", "Moreau"]
@@ -140,6 +141,7 @@ def _add_account(
         status=status,
         source="vendor_onboarding",
         verified_by="phone_outbound",
+        verified_on=ONBOARDED_ON[status],
     )
 
 
@@ -161,7 +163,13 @@ def _seed_invoices(state: State, profile: Profile, rng: random.Random, ids: _Ids
 
     pending_slots = gen.pending_invoices - len(fixtures.invoices)
     # Pending generated invoices stay under the approval threshold; fixtures cover the big ones.
-    pending_vendors = [rng.choice(profile.vendors).id for _ in range(pending_slots)]
+    # At most one per vendor, and none for fixture vendors: a scenario's exposure is then exactly
+    # its fixture, and no vendor's open total crosses the aggregate threshold (INV-6).
+    fixture_vendors = {f.vendor for f in fixtures.invoices}
+    candidates = [v.id for v in profile.vendors if v.id not in fixture_vendors]
+    if pending_slots > len(candidates):
+        raise ValueError("more pending invoices than non-fixture vendors")
+    pending_vendors = rng.sample(candidates, pending_slots)
 
     reserved = {f.id for f in fixtures.invoices}
     next_number = 1001
