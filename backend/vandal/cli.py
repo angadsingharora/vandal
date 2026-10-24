@@ -1,4 +1,4 @@
-"""vandal seed | run | attack | search | synth | verify | inject"""
+"""vandal seed | run | attack | search | synth | verify | inject | intake"""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ COMMANDS: dict[str, tuple[str, str]] = {
     "verify": ("Run the verification suite against a policy", "R7"),
     "inject": ("Run a user-authored threat in plain language", "R9"),
     "rebuild": ("Rebuild a persisted run from its events and check its hash", "R12"),
+    "intake": ("Score the LLM Operator's intake on the messy-document items", "O1"),
 }
 
 
@@ -75,7 +76,14 @@ def cmd_run(args: argparse.Namespace) -> int:
             kind="operate", profile=args.profile, policy=policy.version, seed=args.seed
         )
         writer = store.writer(run_id)
-    sb = new_sandbox(args.profile, seed=args.seed, policy=policy, sink=writer)
+    sb = new_sandbox(
+        args.profile,
+        seed=args.seed,
+        policy=policy,
+        sink=writer,
+        operator=args.operator,
+        use_llm=not args.no_llm,
+    )
     sb.operate(args.days)
     state = sb.run.state
     if store is not None and writer is not None and run_id is not None:
@@ -289,7 +297,7 @@ def cmd_search(args: argparse.Namespace) -> int:
 def cmd_verify(args: argparse.Namespace) -> int:
     from functools import partial
 
-    from vandal.sandbox import new_sandbox
+    from vandal.sandbox import intake_extractor, new_sandbox
     from vandal.verify.suite import verify
 
     policy = load_policy(args.policy)
@@ -304,6 +312,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
         depth=args.depth,
         workers=args.workers,
         scenarios=args.scenario.split(","),
+        intake=intake_extractor(args.profile, use_llm=not args.no_llm),
     )
     print(f"verification of {pack.version} against {parent.version}:")
     for c in pack.checks:
@@ -334,6 +343,8 @@ def cmd_verify(args: argparse.Namespace) -> int:
             ",".join(before.broken_invariants) or "-",
             ",".join(after.broken_invariants) or "-",
         ),
+        ("extraction accuracy", _pct(before.extraction_accuracy), _pct(after.extraction_accuracy)),
+        ("GL-coding accuracy", _pct(before.gl_coding_accuracy), _pct(after.gl_coding_accuracy)),
     ]
     for name, b, a in rows:
         print(f"  {name:<18} {b!s:>10} {a!s:>10}")
@@ -348,10 +359,14 @@ def cmd_verify(args: argparse.Namespace) -> int:
     return 0 if pack.approvable else 1
 
 
+def _pct(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.0%}"
+
+
 def cmd_synth(args: argparse.Namespace) -> int:
     from functools import partial
 
-    from vandal.sandbox import new_sandbox
+    from vandal.sandbox import intake_extractor, new_sandbox
     from vandal.synth.cegis import cegis
     from vandal.synth.propose import LLMProposer, SweepProposer
     from vandal.twin.profile import load_profile
@@ -414,12 +429,51 @@ def cmd_synth(args: argparse.Namespace) -> int:
         workers=args.workers,
         candidates=candidates,
         scenarios=sorted({"a", args.scenario}),  # a repair must not reopen Scenario A
+        intake=intake_extractor(args.profile, use_llm=not args.no_llm),
     )
     for c in pack.checks:
         print(f"  {'PASS' if c.passed else 'FAIL'}  {c.number} {c.name:<11} {c.detail}")
     path = pack.write(args.out)
     print(f"{'approvable' if pack.approvable else 'NOT approvable'}: wrote {path}")
     return 0 if pack.approvable else 1
+
+
+def cmd_intake(args: argparse.Namespace) -> int:
+    """O1: every planted messy-document item through the LLM Operator's intake, scored against
+    the answer key. Exit 0 when both accuracies reach the target (DESIGN: 90% or better)."""
+    from vandal.sandbox import intake_extractor, new_sandbox
+    from vandal.verify.messy import messy_items, score
+
+    sb = new_sandbox(args.profile, seed=args.seed)
+    items = messy_items(sb.run.state, sb.profile)
+    acc = score(items, intake_extractor(sb.profile, use_llm=not args.no_llm), sb.run.state)
+    formats = {}
+    for item in items:
+        formats[item.format] = formats.get(item.format, 0) + 1
+    print(
+        f"{sb.run.state.company}: {acc.items} messy-document items "
+        f"({', '.join(f'{n} {f}' for f, n in sorted(formats.items()))}; "
+        f"{sum(i.twisted for i in items)} coded outside the vendor's default account)"
+    )
+    paths = ", ".join(f"{n} {s}" for s, n in sorted(acc.sources.items()))
+    print(f"  intake path          {paths}")
+    print(
+        f"  extraction accuracy  {acc.extraction_accuracy:.1%} "
+        f"({acc.fields_correct}/{acc.fields_total} fields)"
+    )
+    for fmt, value in acc.by_format.items():
+        print(f"    {fmt:<18} {value:.1%}")
+    print(f"  GL-coding accuracy   {acc.gl_coding_accuracy:.1%} ({acc.gl_correct}/{acc.gl_total})")
+    for miss in acc.misses:
+        print(f"  miss  {miss}")
+    if args.show:
+        for item in items:
+            if item.id == args.show:
+                print(f"\n--- {item.id} ({item.format}) from {item.message.sender}")
+                print(f"Subject: {item.message.subject}\n\n{item.message.body}")
+    ok = acc.extraction_accuracy >= args.target and acc.gl_coding_accuracy >= args.target
+    print(f"{'meets' if ok else 'BELOW'} the {args.target:.0%} target")
+    return 0 if ok else 1
 
 
 def _short(move) -> str:
@@ -560,6 +614,7 @@ IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {
     "seed": cmd_seed,
     "run": cmd_run,
     "attack": cmd_attack,
+    "intake": cmd_intake,
 }
 
 
@@ -570,9 +625,16 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="command", required=True)
     for name, (help_text, _slice) in COMMANDS.items():
         cmd = sub.add_parser(name, help=help_text)
-        if name in ("seed", "run", "attack", "search", "verify", "synth", "inject"):
+        if name in ("seed", "run", "attack", "search", "verify", "synth", "inject", "intake"):
             cmd.add_argument("--profile", default="bayline", help="profile name or YAML path")
             cmd.add_argument("--seed", type=int, default=DEFAULT_SEED)
+        if name in ("run", "verify", "intake"):
+            cmd.add_argument(
+                "--no-llm", action="store_true", help="intake by the deterministic reader only"
+            )
+        if name == "intake":
+            cmd.add_argument("--target", type=float, default=0.9, help="accuracy to reach")
+            cmd.add_argument("--show", help="print one item by id, e.g. MSY-003")
         if name in ("run", "attack", "search", "verify", "synth", "inject"):
             cmd.add_argument("--policy", help="v0, a name under policies/, or a JSON path")
         if name == "synth":
@@ -596,6 +658,12 @@ def build_parser() -> argparse.ArgumentParser:
             cmd.add_argument("--scenario", default="a", help="threat family to repair")
         if name == "run":
             cmd.add_argument("--days", type=int, default=5)
+            cmd.add_argument(
+                "--operator",
+                choices=("reference", "llm"),
+                default="reference",
+                help="the deterministic reference Operator, or the LLM Operator (O1)",
+            )
             cmd.add_argument(
                 "--persist",
                 action="store_true",

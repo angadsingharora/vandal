@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from vandal.api import deps
 from vandal.contracts.moves import Move
-from vandal.sandbox import new_sandbox
+from vandal.sandbox import intake_extractor, new_sandbox
 from vandal.search.alphabet import SCENARIOS
 from vandal.search.bfs import search
 from vandal.synth.cegis import cegis
@@ -212,6 +212,7 @@ def start_verify(request: Request, body: VerifyRequest) -> dict[str, Any]:
             depth=body.depth,
             workers=body.workers,
             candidates=candidates,
+            intake=intake_extractor(body.profile),
         )
         for c in pack.checks:
             job.channel.publish("check", c.model_dump(mode="json"))
@@ -234,7 +235,12 @@ def metrics(
     for name in [p.strip() for p in policies.split(",") if p.strip()]:
         policy = deps.policy(name)
         runs = collect(
-            policy, partial(new_sandbox, profile, policy=policy), seed=seed, depth=depth, workers=1
+            policy,
+            partial(new_sandbox, profile, policy=policy),
+            seed=seed,
+            depth=depth,
+            workers=1,
+            intake=intake_extractor(profile),
         )
         out[name] = scorecard(runs).model_dump(mode="json")
     return {"depth": depth, "scorecards": out}

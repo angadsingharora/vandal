@@ -34,15 +34,18 @@ from vandal.verify.evidence_pack import (
     Scorecard,
 )
 from vandal.verify.invariants import EXECUTED, Limits, check
+from vandal.verify.messy import Extractor, IntakeAccuracy, messy_items
+from vandal.verify.messy import score as score_intake
 from vandal.verify.regression import SuiteResult, run_suite
 from vandal.verify.replay import SandboxFactory, replay, replay_detailed
 from vandal.verify.variants import Variant, sample
 
 FactoryFor = Callable[[Policy], SandboxFactory]
 NOTES = [
-    "extraction and GL-coding accuracy: n/a for the reference Operator, which reads structured "
-    "fields; the LLM Operator (O1) reports them",
-    "planted discrepancies: n/a until the messy-data seed (DESIGN 5.6) lands",
+    "extraction and GL-coding accuracy: not measured in this run; pass the LLM Operator's intake "
+    "(vandal intake, or verify/synth from the CLI and API) to score the messy-document items",
+    "planted discrepancies: n/a; the messy-document items (DESIGN 5.6) plant formats and GL "
+    "twists, not conflicting sources",
 ]
 
 
@@ -122,6 +125,14 @@ def run_variants(
     return out
 
 
+def intake_accuracy(factory: SandboxFactory, extract: Extractor, seed: int = 7) -> IntakeAccuracy:
+    """Every planted messy-document item (DESIGN 5.6) through one intake, scored against the
+    answer key. The items depend only on the seed, not on the policy."""
+    template = factory(seed)
+    state = template.run.state
+    return score_intake(messy_items(state, template.profile), extract, state)
+
+
 @dataclass
 class Runs:
     policy: Policy
@@ -129,6 +140,7 @@ class Runs:
     variants: list[VariantRun]
     regression: SuiteResult
     legit: list[LegitOp]
+    intake: IntakeAccuracy | None = None  # O1: only when an intake was given
 
     @property
     def findings(self):
@@ -148,6 +160,7 @@ def collect(
     depth: int,
     workers: int,
     scenarios: Sequence[str] = ("a",),
+    intake: Extractor | None = None,
 ) -> Runs:
     return Runs(
         policy=policy,
@@ -158,6 +171,7 @@ def collect(
         variants=run_variants(factory, seed, scenarios=scenarios),
         regression=run_suite(factory, seed),
         legit=legit_ops(factory, seed),
+        intake=intake_accuracy(factory, intake, seed) if intake is not None else None,
     )
 
 
@@ -188,6 +202,15 @@ def scorecard(runs: Runs) -> Scorecard:
     attacks = len(runs.variants)
     succeeded = sum(1 for r in runs.variants if _attacked(r))
     worst = runs.best.exposure if runs.best else 0
+    notes = list(NOTES)
+    extraction = gl_coding = None
+    if runs.intake is not None:
+        extraction, gl_coding = runs.intake.extraction_accuracy, runs.intake.gl_coding_accuracy
+        paths = ", ".join(f"{n} {s}" for s, n in sorted(runs.intake.sources.items()))
+        notes[0] = (
+            f"extraction and GL-coding accuracy: {runs.intake.items} messy-document items "
+            f"(DESIGN 5.6) through the LLM Operator's intake ({paths})"
+        )
     return Scorecard(
         policy=runs.policy.version,
         search_depth=max(s.depth for s in runs.searches),
@@ -202,7 +225,9 @@ def scorecard(runs: Runs) -> Scorecard:
         holds=holds,
         false_positive_rate=failed / legit_total if legit_total else 0.0,
         broken_invariants=broken,
-        notes=NOTES,
+        extraction_accuracy=extraction,
+        gl_coding_accuracy=gl_coding,
+        notes=notes,
     )
 
 
@@ -380,13 +405,21 @@ def verify(
     days: int = 2,
     candidates: list[Candidate] | None = None,
     scenarios: Sequence[str] = ("a",),
+    intake: Extractor | None = None,
 ) -> EvidencePack:
     """`candidates` is what synthesis tried (R8's CEGIS log); a hand-written policy is its own
     single candidate. `scenarios` are the threat families re-searched and sampled for held-out
-    variants."""
+    variants. `intake` is the LLM Operator's reader (O1); with it, the scorecard reports
+    extraction and GL-coding accuracy over the messy-document items."""
     after_factory = factory_for(policy)
     before_factory = factory_for(parent)
-    opts = {"seed": seed, "depth": depth, "workers": workers, "scenarios": scenarios}
+    opts = {
+        "seed": seed,
+        "depth": depth,
+        "workers": workers,
+        "scenarios": scenarios,
+        "intake": intake,
+    }
     after = collect(policy, after_factory, **opts)
     before = after if parent == policy else collect(parent, before_factory, **opts)
     cx = counterexample(before, before_factory, seed, days)

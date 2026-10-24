@@ -139,6 +139,7 @@ class Invoice(Entity):  # INV-…
     due_date: SimDay
     kind: Literal["invoice", "credit_memo"] = "invoice"
     supersedes: str | None = None
+    gl_account: str | None = None  # as the Operator coded it (O1); None = the vendor's default
     status: InvoiceStatus = "received"
     scheduled_for: SimDay | None = None
 
