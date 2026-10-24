@@ -160,6 +160,7 @@ def cegis(
                 reason=f"{parent.version} has no violation within depth {depth}",
             )
         cx_moves, cx_result, diagnosis = counterexample(parent_factory, found.best.moves)
+    injected = cx_moves if start is not None else None  # every candidate must hold against it
     if diagnosis is None:
         return CEGISResult(
             status="cannot_auto_repair",
@@ -267,17 +268,27 @@ def cegis(
                 evaluated.append(_Evaluated(proposal=proposal, entry=entry))
                 continue
 
-            s = search(factory, scenario, seed=seed, depth=depth, workers=workers)
+            s = search(
+                factory, scenario, seed=seed, depth=depth, workers=workers, labels=start_labels
+            )
+            beaten_by = s.best.moves if s.best else None
+            residual, found_cx = sum(f.exposure for f in s.findings), len(s.findings)
+            if beaten_by is None and injected is not None:
+                # Search may not reach the injected threat (its moves can sit outside the
+                # alphabet), so replay it directly.
+                again = replay(seed, injected, sandbox=factory, days=days, labels=start_labels)
+                if again.violations:
+                    beaten_by, residual, found_cx = injected, again.exposure, 1
             m = Measurement(
-                residual_exposure=sum(f.exposure for f in s.findings),
-                counterexamples=len(s.findings),
+                residual_exposure=residual,
+                counterexamples=found_cx,
                 legit_blocked=blocked,
                 legit_failed=len(failed),
                 holds=holds,
                 templates=len(controls),
                 params=_param_count(controls),
             )
-            if s.best is None and failed:
+            if beaten_by is None and failed:
                 # Search can't beat it, but legitimate operations the base already broke are
                 # still broken, and there's no counterexample to diagnose the next step from.
                 entry = record(
@@ -297,7 +308,7 @@ def cegis(
                 )
                 evaluated.append(_Evaluated(proposal=proposal, entry=entry))
                 continue
-            if s.best is None:
+            if beaten_by is None:
                 entry = record(
                     LogEntry(
                         **common,
@@ -311,7 +322,7 @@ def cegis(
                 )
                 evaluated.append(_Evaluated(proposal=proposal, entry=entry))
                 continue
-            moves, result, d = counterexample(factory, s.best.moves)
+            moves, result, d = counterexample(factory, beaten_by)
             entry = record(
                 LogEntry(
                     **common,
@@ -365,6 +376,7 @@ def cegis(
             best_partial.entry.counterexample or [],
             sandbox=factory_for(Policy(version="base", controls=parent.controls + base)),
             days=days,
+            labels=start_labels,
         )
 
     kept = [describe(c) for c in base]

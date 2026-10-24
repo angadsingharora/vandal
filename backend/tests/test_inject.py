@@ -16,7 +16,7 @@ from vandal.search.alphabet import SCENARIOS
 from vandal.search.bfs import search
 from vandal.search.minimize import minimize_trace
 from vandal.synth.cegis import cegis
-from vandal.synth.propose import SweepProposer
+from vandal.synth.propose import Proposal, SweepProposer
 from vandal.synth.templates import V0, Policy
 from vandal.twin.profile import load_profile
 from vandal.verify.oracle import account_key
@@ -141,3 +141,30 @@ def test_cegis_with_a_harmless_start_has_nothing_to_repair() -> None:
         start=[exec_call()],
     )
     assert r.status == "nothing_to_repair" and "breaks nothing" in r.reason
+
+
+@pytest.mark.slow
+def test_candidates_must_hold_against_the_given_counterexample() -> None:
+    """Search alone may never reach an injected threat, so a candidate that leaves it working
+    is refuted by replaying it, not reported as a survivor."""
+
+    class OnlyT3:
+        name = "test"
+
+        def propose(self, ctx):
+            t3 = Control(template="T3", params={})  # idempotency: does nothing for a redirect
+            return [Proposal(controls=[t3], rationale="", source="sweep")]
+
+    profile = load_profile()
+    r = cegis(
+        V0,
+        factory_for,
+        profile=profile,
+        proposer=OnlyT3(),
+        depth=0,
+        max_iterations=1,
+        start=[change(2)],
+    )
+    assert r.status == "cannot_auto_repair"
+    (entry,) = r.log
+    assert entry.outcome == "counterexample" and entry.counterexample == [change(2)]
