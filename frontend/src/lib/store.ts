@@ -19,10 +19,13 @@ import type {
   Explanation,
   Finding,
   InjectResult,
+  IntakeRead,
   Job,
   JournalEntry,
   LogEntry,
+  MessyDocument,
   Metrics,
+  OperatorKind,
   OracleLabel,
   PatchRequest,
   PolicyInfo,
@@ -79,6 +82,11 @@ interface State {
   activity: VandalEvent[];
 
   operate: { phase: Phase; day: number | null; events: number | null };
+  /** O1: which Operator a new run gets, the documents it can receive, and what intake read. */
+  operator: OperatorKind;
+  documents: MessyDocument[];
+  intake: IntakeRead[];
+  delivering: Phase;
   search: {
     phase: Phase;
     scenario: string;
@@ -114,7 +122,10 @@ interface Actions {
   clearError(): void;
   toggleJudge(): void;
   setPlayback(on: boolean): Promise<void>;
-  reset(policy: string): Promise<void>;
+  reset(policy: string, operator?: OperatorKind): Promise<void>;
+  setOperator(operator: OperatorKind): void;
+  loadIntake(): Promise<void>;
+  deliverDocument(documentId: string): Promise<void>;
   operateDays(days: number): Promise<void>;
   focus(runId: string): Promise<void>;
   refresh(): Promise<void>;
@@ -234,6 +245,10 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     alerts: [],
     activity: [],
     operate: { ...idle, day: null, events: null },
+    operator: "reference",
+    documents: [],
+    intake: [],
+    delivering: "idle",
     search: { ...idle, scenario: "a", depth: 3, jobId: null, explored: 0, atDepth: 0, result: null },
     attack: null,
     diagnosis: { ...idle, data: null, reason: null },
@@ -270,12 +285,45 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       set({ settings: await api().setSettings({ playback: on }) });
     }),
 
-    reset: guard(async (policy: string) => {
+    setOperator: (operator: OperatorKind) => set({ operator }),
+
+    loadIntake: guard(async () => {
+      const runId = get().focusRunId;
+      if (!runId || get().summary?.operator !== "llm") {
+        set({ documents: [], intake: [] });
+        return;
+      }
       const a = api();
-      const run = await a.reset(policy);
+      const [documents, intake] = await Promise.all([a.documents(runId), a.intake(runId)]);
+      if (get().focusRunId === runId) set({ documents, intake });
+    }),
+
+    deliverDocument: guard(async (documentId: string) => {
+      const runId = get().focusRunId;
+      if (!runId) return;
+      set({ delivering: "running" });
+      try {
+        await api().deliver(runId, documentId);
+        set({ delivering: "done" });
+      } catch (err) {
+        set({ delivering: "failed" });
+        throw err;
+      } finally {
+        await get().refresh();
+        await get().loadIntake();
+      }
+    }),
+
+    reset: guard(async (policy: string, operator: OperatorKind = get().operator) => {
+      const a = api();
+      const run = await a.reset(policy, operator);
       set({
         tabs: [{ id: run.run_id, label: "Live", policy: run.policy, kind: "live" }],
         liveRunId: run.run_id,
+        operator,
+        documents: [],
+        intake: [],
+        delivering: "idle",
         operate: { ...idle, day: null, events: null },
         search: { ...get().search, ...idle, jobId: null, explored: 0, atDepth: 0, result: null },
         attack: null,
@@ -306,6 +354,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       const a = api();
       const [summary, entities, ledger] = await Promise.all([a.state(runId), a.entities(runId), a.ledger(runId)]);
       if (get().focusRunId === runId) set({ summary, entities, ledger });
+      if (summary.operator === "llm" && get().documents.length === 0) await get().loadIntake();
     }),
 
     operateDays: guard(async (days: number) => {

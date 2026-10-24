@@ -64,6 +64,7 @@ class RunHandle:
     writer: EventWriter | None = None
     labels: list[OracleLabel] = field(default_factory=list)  # answer key of a replayed trace
     lock: threading.RLock = field(default_factory=threading.RLock)
+    operator: str = "reference"  # or "llm": the LLM Operator with document intake (O1)
 
     @property
     def state(self):
@@ -103,7 +104,12 @@ class Registry:
     # --- runs -------------------------------------------------------------------------------
 
     def create_run(
-        self, profile: str, seed: int, policy: Policy, kind: str = "operate"
+        self,
+        profile: str,
+        seed: int,
+        policy: Policy,
+        kind: str = "operate",
+        operator: str = "reference",
     ) -> RunHandle:
         run_id = _id("run")
         channel = Channel()
@@ -125,8 +131,17 @@ class Registry:
             if writer is not None:
                 writer(ev)
 
-        sb = new_sandbox(profile, seed=seed, policy=policy, sink=sink, monitor=True)
-        handle = RunHandle(run_id, profile, seed, policy, sb, channel, verdicts, writer)
+        sb = new_sandbox(
+            profile,
+            seed=seed,
+            policy=policy,
+            sink=sink,
+            monitor=True,
+            operator="llm" if operator == "llm" else "reference",
+        )
+        handle = RunHandle(
+            run_id, profile, seed, policy, sb, channel, verdicts, writer, operator=operator
+        )
         self.runs[run_id] = handle
         return handle
 
