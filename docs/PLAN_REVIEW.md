@@ -76,7 +76,9 @@ Replay must re-run **Red's recorded actions** from the same seed snapshot. Askin
 
 ## Supabase
 
-The Supabase connector in this session is signed in to an account with **no projects**. Project `cduqfuzdkwkjobiqmgqs` belongs to a different Supabase account or organization, so I couldn't connect to it. To fix this, do one of these:
+**Update (resolved):** the connector was re-authorized and now reaches project `cduqfuzdkwkjobiqmgqs` in the "vandal" org (Postgres 17, us-east-1, empty `public` schema).
+
+Originally, the Supabase connector in this session was signed in to an account with **no projects**. Project `cduqfuzdkwkjobiqmgqs` belongs to a different Supabase account or organization, so I couldn't connect to it. To fix this, do one of these:
 
 - Reconnect the Supabase connector while signed in to the account that owns the project.
 - Put the project's Postgres connection string in `backend/.env` as `DATABASE_URL`. Copy it from the Supabase dashboard (Connect → Session pooler). Type it in yourself; don't paste it into chat.
