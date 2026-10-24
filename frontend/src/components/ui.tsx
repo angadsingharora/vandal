@@ -20,7 +20,7 @@ export function Panel({
   bodyClass?: string;
 }) {
   return (
-    <section className={cx("flex h-full min-h-0 flex-col bg-panel", className)}>
+    <section className={cx("flex h-full min-h-0 min-w-0 flex-col bg-panel", className)}>
       <header className="flex h-9 shrink-0 items-center gap-2 border-b border-line px-3">
         {tag}
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-dim">{title}</h2>

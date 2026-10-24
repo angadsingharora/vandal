@@ -35,7 +35,7 @@ export function ChainView() {
       }
       tag={<SideTag side="blue" />}
       actions={showingDiagnosis && <Badge tone="bad">diagnosis</Badge>}
-      className="min-h-[220px]"
+      className="min-h-[220px] lg:max-h-[46vh]"
     >
       {!chain.payment && (
         <Empty>Pick a payment, or diagnose a counterexample, to walk obligation → approval → execution → settlement → books.</Empty>

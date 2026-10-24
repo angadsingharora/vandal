@@ -4,7 +4,7 @@ _Written by the overnight session while the owner slept. Updated after every ite
 
 ## Summary (five lines)
 
-1. **PRs in merge order:** [#25](https://github.com/angadsingharora/vandal/pull/25) `slice/L0-fixes` → [#26](https://github.com/angadsingharora/vandal/pull/26) `slice/L0-recordings` → (next slices listed as they open)
+1. **PRs in merge order:** [#25](https://github.com/angadsingharora/vandal/pull/25) `slice/L0-fixes` → [#26](https://github.com/angadsingharora/vandal/pull/26) `slice/L0-recordings` → [#27](https://github.com/angadsingharora/vandal/pull/27) `slice/demo-e2e` → [#28](https://github.com/angadsingharora/vandal/pull/28) `slice/ui-polish` → (next slices listed as they open)
 2. **Tests before:** fast suite 1 failure (`test_api_war_room.py`, stale since O2). **After:** see each slice below.
 3. **Look at this first:** the stacked PR list below, then `docs/screenshots/` once slice 3 lands.
 4. **Broken:** nothing known yet.
@@ -83,3 +83,18 @@ Every step of DESIGN §13 ran: Reset → Run operations (80 paid, all invariants
 Run it: `cd backend && python -m uv run python scripts/demo_smoke.py` with the API on `:8000`, or `--in-process`.
 
 **Mock fixtures re-recorded** (`frontend/src/mock/fixtures.json`, 605 KiB) from the API after the O1/L0 shape changes, with `cd frontend && python -m uv run --project ../backend python scripts/capture_fixtures.py`. `npm run dev:mock` shows the same loop offline with no backend at all. The mock's synthesis and verify fixtures come from the deterministic sweep (`no_llm: true` in the capture script), so the mock never needs the cache.
+
+## 3b. War-room polish — `slice/ui-polish`
+
+No backend changes. Walked every panel at 1440×900 and 1024×768 against the real API and the mock.
+
+- **Keyboard and focus:** one `:focus-visible` ring for every control (filters, tabs, why?, table rows had none); Escape closes the explanation drawer, which now focuses its question box when it opens (the Modal already handled Escape).
+- **Claude by default** when the server reports a key or playback: the Synthesis panel's "no LLM" and the inject dialog's "read with keywords" start unticked in that case, so the demo shows Claude without a click; both still toggle.
+- **Scorecard:** the per-class rows are introduced by a legend ("attacks that got through, by threat class · succeeded / attempted") and a class with no attempts shows "—" in grey instead of a green `0/0`.
+- **Search panel:** the "N violating traces at this depth" fold belongs to the last search; it no longer shows under a counterexample that came from the inject form.
+- **Layout:** every grid column and panel has `min-w-0`, so long verdict and case lines shrink inside their column instead of pushing it wider. With a diagnosis open, the authorization chain used to take the whole middle column at 1440×900 and the payments table collapsed to zero rows (its why? buttons unreachable); the chain now caps at 46% of the viewport and scrolls, and the twin keeps at least 260 px.
+- **Inbox:** one row per policy version (the newest); a second loop in one server used to list `v1-synth` twice.
+- **Captions on jargon:** the CEGIS heading and each verification check name carry a one-line tooltip (DESIGN §9.3, §10); invariants already had theirs.
+- `frontend/README.md` says what the inject button targets and when Claude is used.
+
+Before/after pairs in `docs/screenshots/`: `03-replay-diagnose-chain.jpg` → `after-03-chain-and-twin.jpg` (the twin's rows stay visible under an open diagnosis), `09-explain-why.jpg` → `after-09-explain-why.jpg`, `11-scorecard.jpg` → `after-11-scorecard.jpg` (per-class legend, neutral empties).

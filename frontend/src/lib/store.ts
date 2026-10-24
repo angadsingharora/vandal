@@ -269,7 +269,9 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         const a = await getApi();
         set({ api: a });
         const [settings, policies] = await Promise.all([a.settings(), a.policies()]);
-        set({ settings, policies });
+        // Ask Claude when it can answer (a key, or recordings in playback); sweep otherwise.
+        const noLlm = !(settings.api_key || settings.playback);
+        set((st) => ({ settings, policies, synth: { ...st.synth, noLlm } }));
         await get().reset("v0");
         set({ ready: true });
       })().finally(() => {

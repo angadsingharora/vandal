@@ -5,6 +5,16 @@ import { useWarRoom } from "@/lib/store";
 import type { LogEntry, ReplayOut, Scorecard } from "@/lib/types";
 import { Badge, Button, Empty, LiveDot, Panel, SideTag, Table, td } from "./ui";
 
+/** What each verification check proves (DESIGN 10), for the tooltip on its name. */
+const CHECK_HELP: Record<string, string> = {
+  replay: "The minimal counterexample, replayed under the new policy, is held or blocked",
+  "re-search": "The whole bounded search space under the new policy finds no violation within k",
+  variants: "Held-out Red content (other vendors, amounts, channels, deepfake confirmations) the synthesizer never saw",
+  regression: "About 25 legitimate cases, including a real bank change verified by callback, all still complete",
+  "legit ops": "All 80 seeded invoices replayed: holds and blocks on legitimate payments",
+  invariants: "Every invariant holds in every legitimate run",
+};
+
 const OUTCOME_TONE: Record<string, "ok" | "bad" | "warn" | "dim"> = {
   survived: "ok",
   counterexample: "bad",
@@ -118,7 +128,11 @@ export function SynthesisPanel() {
 
   return (
     <Panel
-      title="Synthesis · CEGIS"
+      title={
+        <span title="Counterexample-guided inductive synthesis: propose a control from the template library, let search attack it, learn from what beat it, repeat">
+          Synthesis · CEGIS
+        </span>
+      }
       tag={<SideTag side="red" />}
       actions={
         <>
@@ -232,7 +246,9 @@ export function SynthesisPanel() {
                   {verify.checks.map((c) => (
                     <li key={c.number} className="flex gap-2 text-[11px]">
                       <span className={c.passed ? "text-ok" : "text-bad"}>{c.passed ? "✓" : "✗"}</span>
-                      <span className="w-20 shrink-0 text-ink">{c.name}</span>
+                      <span className="w-20 shrink-0 text-ink" title={CHECK_HELP[c.name]}>
+                        {c.name}
+                      </span>
                       <span className="text-dim">{c.detail}</span>
                     </li>
                   ))}

@@ -40,19 +40,20 @@ export function WarRoom() {
         </div>
       )}
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-line lg:grid-cols-[minmax(280px,22%)_minmax(0,1fr)_minmax(320px,26%)] lg:grid-rows-[minmax(0,1fr)_minmax(0,38%)]">
-        <div className="flex min-h-0 flex-col lg:row-span-1">
+        <div className="flex min-h-0 min-w-0 flex-col lg:row-span-1">
           <SearchPanel />
         </div>
-        <div className="grid min-h-0 grid-rows-[minmax(380px,1fr)_auto] gap-px bg-line lg:grid-rows-[minmax(0,1fr)_auto]">
+        {/* The twin keeps at least a few table rows on screen; a tall chain (diagnosis open) scrolls instead. */}
+        <div className="grid min-h-0 min-w-0 grid-rows-[minmax(380px,1fr)_auto] gap-px bg-line lg:grid-rows-[minmax(260px,1fr)_minmax(0,auto)]">
           <TwinPanel />
           <ChainView />
         </div>
-        <div className="grid min-h-0 gap-px bg-line lg:row-span-2 lg:grid-rows-[minmax(0,0.8fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div className="grid min-h-0 min-w-0 gap-px bg-line lg:row-span-2 lg:grid-rows-[minmax(0,0.8fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
           <OperatorPanel />
           <VerdictFeed />
           <ApprovalsInbox />
         </div>
-        <div className="min-h-[360px] lg:col-span-2 lg:min-h-0">
+        <div className="min-h-[360px] min-w-0 lg:col-span-2 lg:min-h-0">
           <SynthesisPanel />
         </div>
       </main>

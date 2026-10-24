@@ -164,7 +164,12 @@ export function ApprovalsInbox() {
   const s = useWarRoom();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const payments = s.approvals.payments;
-  const patches = s.approvals.patches;
+  // One row per policy version, the newest: a second loop in the same server resubmits
+  // v1-synth, and the older applied patch would only repeat it.
+  const patches = useMemo(() => {
+    const seen = new Set<string>();
+    return [...s.approvals.patches].reverse().filter((p) => !seen.has(p.version) && seen.add(p.version));
+  }, [s.approvals.patches]);
 
   const decide = async (runId: string, id: string, who: typeof CONTROLLER, approve: boolean) => {
     const msg = await s.decidePayment(runId, id, who, approve);
