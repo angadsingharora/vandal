@@ -145,6 +145,27 @@ def _change_facts(state: State, action: Action) -> tuple[dict[str, Any], list[st
     return f, cites
 
 
+def _refund_facts(state: State, args: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Where a refund goes, and whether the money behind the customer's credit has cleared
+    (T6)."""
+    from vandal.twin import money_in
+
+    customer = state.customers.get(str(args.get("customer")))
+    if customer is None:
+        return {}, []
+    dest, amount = args.get("destination_account"), int(args.get("amount", 0))
+    sources = money_in.credit_sources(state, customer.id)
+    newest = state.bank_transactions[sources[0].bank_transaction] if sources else None
+    return {
+        "customer.id": customer.id,
+        "refund.amount": amount,
+        "refund.to_source": any(p.source_account == dest for p in sources),
+        "refund.to_verified": dest in customer.accounts_on_file,
+        "refund.funds_cleared": money_in.credit_balance(state, customer.id, True) >= amount,
+        "refund.deposit_age_days": state.day - newest.posted_on if newest else 0,
+    }, [customer.id] + [p.id for p in sources]
+
+
 def _approval_for(state: State, invoice: str):
     found = [a for a in state.approvals.values() if a.subject == invoice]
     return found[-1] if found else None
@@ -159,6 +180,11 @@ def facts(state: State, action: Action) -> tuple[dict[str, Any], list[str]]:
     }
     cites: list[str] = []
     args = action.args
+
+    if action.name == "refunds.issue":
+        refund, refund_cites = _refund_facts(state, args)
+        f |= refund
+        cites += refund_cites
 
     if action.name.startswith(("vendors.", "evidence.")):
         change, change_cites = _change_facts(state, action)

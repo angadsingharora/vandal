@@ -252,6 +252,15 @@ def compile_control(control: Control) -> list[Check]:
                         action="hold",
                     )
                 )
+            if p.cooling_days:
+                checks.append(
+                    Check(
+                        id=f"{tag}.cooling",
+                        stage="refund",
+                        when=_when(("refund.deposit_age_days", "lt", p.cooling_days)),
+                        action="hold",
+                    )
+                )
             return checks
     raise ValueError(f"unknown template {control.template}")
 

@@ -19,6 +19,9 @@ answer:
   confirm  inbound confirmations on every channel the attacker can fake (phone_in with caller-ID
            spoofing, video with voice cloning)
   fault    one per bank fault class (Scenario B), plus the Operator's retry timer firing
+  money in the tenant with the most rent open (Scenario F); an overpayment by the attacker
+           (cleared or provisional) or by the tenant, and a refund request to a new account or
+           back to where the money came from
 
 Nothing here knows which move wins. The search finds that.
 """
@@ -60,6 +63,13 @@ SCENARIOS: dict[str, Scenario] = {
         days=2,
         window_days=1,
         kinds=("fault", "retry"),
+    ),
+    "f": Scenario(
+        name="f",
+        description="Money in: overpayments and refund requests to other accounts",
+        days=2,
+        window_days=1,
+        kinds=("deposit", "refund_request"),
     ),
 }
 
@@ -143,7 +153,30 @@ def build_alphabet(scenario: Scenario, state: State, profile: Profile) -> list[M
             moves += [Move(kind="fault", at=at, params=dict(f)) for f in FAULTS]
         if "retry" in scenario.kinds:
             moves.append(Move(kind="retry", at=at, params={}))
+        for customer in customer_classes(state) if "deposit" in scenario.kinds else ():
+            overpay = {"customer": customer, "amount": "overpay"}
+            moves += [
+                Move(kind="deposit", at=at, params={**overpay, "party": "attacker", "cleared": 0}),
+                Move(kind="deposit", at=at, params={**overpay, "party": "attacker"}),
+                Move(kind="deposit", at=at, params=overpay),
+            ]
+            moves += [
+                Move(
+                    kind="refund_request",
+                    at=at,
+                    params={"customer": customer, "party": "attacker", "dest": dest},
+                )
+                for dest in ("new", "source")
+            ]
     return moves
+
+
+def customer_classes(state: State) -> list[str]:
+    """The tenant with the most rent open: refunds don't depend on which tenant it is."""
+    owed: dict[str, int] = {}
+    for inv in state.customer_invoices.values():
+        owed[inv.customer] = owed.get(inv.customer, 0) + inv.amount - inv.paid
+    return [max(sorted(owed), key=owed.__getitem__)] if owed else []
 
 
 def touches(move: Move) -> str:
@@ -151,6 +184,8 @@ def touches(move: Move) -> str:
     Operator (a batch run) touch everything."""
     if move.kind in ("change_request", "inbound_confirmation", "submit_invoice"):
         return f"vendor:{move.params['vendor']}"
+    if move.kind in ("deposit", "refund_request"):
+        return f"customer:{move.params['customer']}"
     return "*"
 
 

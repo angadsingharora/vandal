@@ -12,6 +12,8 @@ from typing import Literal
 from vandal.contracts.entities import (
     BankAccount,
     Cents,
+    Customer,
+    CustomerInvoice,
     Invoice,
     JournalEntry,
     JournalLine,
@@ -81,6 +83,7 @@ def seed_state(profile: Profile | None = None, seed: int = DEFAULT_SEED) -> Stat
 
     _seed_vendors(state, profile, rng, ids)
     _seed_invoices(state, profile, rng, ids)
+    _seed_customers(state, profile, random.Random(f"{seed}/customers"))
     _seed_opening_entry(state, profile, ids)
 
     assert len(state.invoices) == gen.invoices
@@ -304,11 +307,33 @@ def _add_invoice(
     )
 
 
+AR_CONTROL = "1200"
+
+
+def _seed_customers(state: State, profile: Profile, rng: random.Random) -> None:
+    """Tenants with this month's rent open (money in, R11). Rent is billed before day 0, so it
+    opens as receivables; each tenant pays from one account on file."""
+    n = 0
+    for spec in profile.customers:
+        account = f"{rng.choice(('121000358', '026009593', '322271627'))}:{_digits(rng, 10)}"
+        state.customers[spec.id] = Customer(id=spec.id, name=spec.name, accounts_on_file=[account])
+        for k in range(spec.open_invoices):
+            n += 1
+            iid = f"AR-{1000 + n}"
+            state.customer_invoices[iid] = CustomerInvoice(
+                id=iid, customer=spec.id, amount=spec.rent, due_date=k
+            )
+
+
 def _seed_opening_entry(state: State, profile: Profile, ids: _Ids) -> None:
-    """History is pre-opening: day 0 opens with bank balances against equity, and AP at zero."""
+    """History is pre-opening: day 0 opens with bank balances and open rent against equity,
+    and AP at zero."""
     lines = [JournalLine(account=b.gl_account, debit=b.balance) for b in profile.bank_accounts]
     total = sum(b.balance for b in profile.bank_accounts)
-    lines.append(JournalLine(account=profile.opening_equity_account, credit=total))
+    receivable = sum(i.amount for i in state.customer_invoices.values())
+    if receivable:
+        lines.append(JournalLine(account=AR_CONTROL, debit=receivable))
+    lines.append(JournalLine(account=profile.opening_equity_account, credit=total + receivable))
     state.journal.append(
         JournalEntry(id=ids.next("JE"), posted_on=0, lines=lines, memo="Opening balances")
     )

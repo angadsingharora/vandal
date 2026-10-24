@@ -1,0 +1,10 @@
+{
+  "version": "v3",
+  "parent": "v2",
+  "controls": [
+    {"template": "T1", "params": {"accepted_channels": ["phone_outbound", "portal"], "contact_as_of": "before_request"}},
+    {"template": "T2", "params": {"bound_fields": ["amount", "payee_account"]}},
+    {"template": "T3", "params": {"key_fields": ["invoice"], "on_timeout": "query_status_then_retry"}},
+    {"template": "T6", "params": {"allowed": "source_only", "require_cleared_funds": true}}
+  ]
+}

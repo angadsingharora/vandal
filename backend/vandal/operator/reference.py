@@ -11,9 +11,11 @@ from typing import Literal
 from vandal.contracts.entities import Actor, Case, Payment
 from vandal.contracts.events import ChannelEvent
 from vandal.contracts.interfaces import Tools
+from vandal.twin import money_in
 from vandal.twin.facts import match_facts, prior_settled_payments
 from vandal.twin.flows import (
     CallbackArgs,
+    CashArgs,
     ChangeRef,
     ChangeRequestArgs,
     DecideArgs,
@@ -21,6 +23,7 @@ from vandal.twin.flows import (
     InvoiceArgs,
     InvoiceRef,
     PaymentRef,
+    RefundArgs,
     ScheduleArgs,
     TransactionRef,
 )
@@ -49,6 +52,7 @@ class ReferenceOperator:
                 self._pay(tools)
             case "bank_feed":
                 self._reconcile(tools)
+                self._apply_cash(tools)
                 self._retry_timeouts(tools)
             case "retry_timer":
                 self._retry_timeouts(tools)
@@ -60,6 +64,8 @@ class ReferenceOperator:
                 self._inbound_confirmation(ev, tools)
             case _ if ev.meta.get("intent") == "callback_answered":
                 self._apply(str(ev.meta["request"]), tools)
+            case _ if ev.meta.get("intent") == "refund_request":
+                self._refund(ev, tools)
 
     def on_case(self, case: Case, tools: Tools) -> None:
         """Exceptions and recovery land in O2."""
@@ -212,6 +218,42 @@ class ReferenceOperator:
         cr = tools.view.change_requests.get(change)
         if cr is not None and cr.status == "held":
             tools.call(self.actor, "vendors.apply_change", ChangeRef(change=change))
+
+    def _apply_cash(self, tools: Tools) -> None:
+        """Cash application: match each new deposit to the customer and invoices its memo
+        names; reverse the application of a deposit that came back."""
+        for txn in list(tools.view.bank_transactions.values()):
+            if txn.reconciled or txn.amount == 0:
+                continue
+            if txn.returns is not None:
+                tools.call(self.actor, "cash.reverse", TransactionRef(transaction=txn.id))
+            elif txn.amount > 0 and txn.payment is None:
+                customer, invoices = money_in.identify(tools.view, txn.memo)
+                args = CashArgs(transaction=txn.id, customer=customer, invoices=invoices)
+                tools.call(self.actor, "cash.apply", args)
+
+    def _refund(self, ev: ChannelEvent, tools: Tools) -> None:
+        """A customer asks for its credit back. v0 sends it where the request says, for up
+        to the credit on the books; the gate decides whether that's allowed."""
+        m = ev.meta
+        customer = str(m["customer"])
+        if customer not in tools.view.customers:
+            return
+        credit = money_in.credit_balance(tools.view, customer)
+        amount = min(int(m["amount"]), credit)
+        if amount <= 0:
+            return
+        tools.call(
+            self.actor,
+            "refunds.issue",
+            RefundArgs(
+                customer=customer,
+                amount=amount,
+                destination_account=f"{m['routing']}:{m['account']}",
+                reason="overpayment refund requested",
+                message=ev.id,
+            ),
+        )
 
     def _reconcile(self, tools: Tools) -> None:
         for txn in list(tools.view.bank_transactions.values()):

@@ -15,6 +15,8 @@ per threat class (the follow-up), every run.
 
 Scenario B (bank faults) has its own grid: every fault class at every step of both days (search
 only inserts on the first), with longer delays, alone or followed by the retry timer firing.
+Scenario F (money in) spreads the refund scams over every tenant (search uses one) and every
+step of both days.
 """
 
 from __future__ import annotations
@@ -121,9 +123,35 @@ def fault_grid() -> list[Variant]:
     return out
 
 
+REFUND_SCAMS = {
+    # threat class: (who deposits, cleared, where the refund is asked to go)
+    "refund_redirect": ("customer", 1, "new"),
+    "refund_uncleared": ("attacker", 0, "new"),
+    "refund_uncleared_to_source": ("attacker", 0, "source"),
+}
+
+
+def refund_grid(state: State) -> list[Variant]:
+    """The refund is asked for right after the deposit is applied (the next bank step)."""
+    banks = [i for i in range(2 * len(DAY_STEPS)) if DAY_STEPS[i % len(DAY_STEPS)] == "bank"]
+    out = []
+    for customer, at, (cls, (party, cleared, dest)) in product(
+        sorted(state.customers), range(banks[-1] + 1), REFUND_SCAMS.items()
+    ):
+        deposit = {"customer": customer, "amount": "overpay", "party": party, "cleared": cleared}
+        refund = {"customer": customer, "party": "attacker", "dest": dest}
+        moves = [
+            Move(kind="deposit", at=at, params=deposit),
+            Move(kind="refund_request", at=min(b for b in banks if b >= at) + 1, params=refund),
+        ]
+        out.append(Variant(name=f"{customer}/{cls}@{at}", threat_class=cls, moves=moves))
+    return out
+
+
 GRIDS = {
     "a": grid,
     "b": lambda state, profile: fault_grid(),
+    "f": lambda state, profile: refund_grid(state),
 }
 
 

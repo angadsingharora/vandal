@@ -449,9 +449,86 @@ def _books(state: State, index: EventIndex, inv, pay) -> Link:
     )
 
 
+# --- refunds (R11) --------------------------------------------------------------------------
+
+
+def build_refund_chain(state: State, refund_id: str, index: EventIndex) -> Chain:
+    """credit (obligation) -> destination (approval) -> refund (execution) -> settlement ->
+    books, for a refund instead of a payment."""
+
+    refund = state.refunds[refund_id]
+    sources = [
+        p for p in state.incoming_payments.values() if p.payer == refund.customer and p.credit
+    ]
+    deposits = [p.bank_transaction for p in sources]
+    events = index.find(refund_id, "refund.issued")
+    cleared = sum(p.credit for p in sources if state.bank_transactions[p.bank_transaction].cleared)
+    prior = sum(
+        r.amount
+        for r in state.refunds.values()
+        if r.customer == refund.customer and r.status == "refunded" and r.id < refund_id
+    )
+    links = []
+    if cleared - prior >= refund.amount:
+        links.append(
+            Link(
+                name="obligation",
+                status="covered",
+                entities=[refund.customer, *deposits],
+                reason="a credit backed by cleared deposits",
+            )
+        )
+    else:
+        links.append(
+            Link(
+                name="obligation",
+                status="uncovered",
+                gap="refund_destination",
+                entities=[refund.customer, *deposits],
+                events=[e for d in deposits for e in index.find(d, "bank.deposit")],
+                reason=f"{refund_id} refunds a credit backed by a deposit that hadn't cleared: "
+                "nothing checks the money arrived before sending it back",
+                facts={"cleared_credit": cleared - prior, "refund": refund.amount},
+            )
+        )
+    to_source = any(p.source_account == refund.destination_account for p in sources)
+    if to_source or refund.approval:
+        links.append(
+            Link(
+                name="approval",
+                status="covered",
+                entities=[refund_id],
+                reason="refunded to the account the money came from",
+            )
+        )
+    else:
+        links.append(
+            Link(
+                name="approval",
+                status="uncovered",
+                gap="refund_destination",
+                entities=[refund_id, refund.customer],
+                events=events + index.find(refund.message or "", "channel.received"),
+                reason=f"{refund_id} went to {refund.destination_account}, which is not where "
+                "the money came from, and no person approved it",
+                facts={
+                    "destination": refund.destination_account,
+                    "on_file": refund.destination_account
+                    in state.customers[refund.customer].accounts_on_file,
+                },
+            )
+        )
+    links += [
+        Link(name="execution", status="covered", entities=[refund_id], events=events),
+        Link(name="settlement", status="covered", entities=[refund_id], reason="same day"),
+        Link(name="books", status="covered", entities=[refund_id], reason="posted on issue"),
+    ]
+    return Chain(payment=refund_id, invoice=refund.customer, links=links)
+
+
 # --- diagnosis ------------------------------------------------------------------------------
 
-EXPOSURE_INVARIANTS = ("INV-2", "INV-3", "INV-4", "INV-5", "INV-6")
+EXPOSURE_INVARIANTS = ("INV-2", "INV-3", "INV-4", "INV-5", "INV-6", "INV-11")
 
 
 def diagnose(
@@ -463,11 +540,16 @@ def diagnose(
     exposure: dict[str, Cents] = {}
     violated: dict[str, set[str]] = {}
     for v in violations:
-        if v.invariant in EXPOSURE_INVARIANTS and v.subject in state.payments:
+        if v.invariant in EXPOSURE_INVARIANTS and (
+            v.subject in state.payments or v.subject in state.refunds
+        ):
             exposure[v.subject] = max(exposure.get(v.subject, 0), v.exposure)
             violated.setdefault(v.subject, set()).add(v.invariant)
     for payment in sorted(exposure, key=lambda p: (-exposure[p], p)):
-        chain = build_chain(state, payment, limits, index)
+        if payment in state.refunds:
+            chain = build_refund_chain(state, payment, index)
+        else:
+            chain = build_chain(state, payment, limits, index)
         first = chain.first_uncovered
         if first is None:
             continue

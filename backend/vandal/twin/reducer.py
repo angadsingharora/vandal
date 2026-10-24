@@ -13,14 +13,17 @@ from collections.abc import Callable, Iterable
 from vandal.contracts.entities import (
     Approval,
     ApprovalRequest,
+    BankDeposit,
     BankFault,
     BankSubmission,
     BankTransaction,
     Evidence,
+    IncomingPayment,
     Invoice,
     JournalEntry,
     Payment,
     PaymentInstruction,
+    Refund,
     VendorBankAccount,
     VendorChangeRequest,
     VendorContact,
@@ -265,3 +268,71 @@ def _callback_answered(state: State, event: Event) -> None:
 @handles("invoice.cancelled")
 def _invoice_cancelled(state: State, event: Event) -> None:
     state.update("invoices", event.payload["invoice"], status="cancelled")
+
+
+# --- money in (R11) -------------------------------------------------------------------------
+
+
+def _move_balance(state: State, txn: BankTransaction) -> None:
+    account = state.bank_accounts[txn.bank_account]
+    state.update("bank_accounts", account.id, balance=account.balance + txn.amount)
+
+
+@handles("bank.deposit")
+def _bank_deposit(state: State, event: Event) -> None:
+    txn = BankTransaction.model_validate(event.payload["transaction"])
+    state.put("bank_transactions", txn)
+    _move_balance(state, txn)
+    if pending := event.payload.get("pending"):
+        state.put("bank_deposits", BankDeposit.model_validate(pending))
+
+
+@handles("bank.deposit_cleared")
+def _bank_deposit_cleared(state: State, event: Event) -> None:
+    dep = state.update("bank_deposits", event.payload["deposit"], status="done")
+    state.update("bank_transactions", dep.transaction, cleared=True)
+
+
+@handles("bank.deposit_returned")
+def _bank_deposit_returned(state: State, event: Event) -> None:
+    state.update("bank_deposits", event.payload["deposit"], status="done")
+    txn = BankTransaction.model_validate(event.payload["transaction"])
+    state.put("bank_transactions", txn)
+    _move_balance(state, txn)
+
+
+def _set_paid(state: State, invoice: str, paid: int) -> None:
+    inv = state.customer_invoices[invoice]
+    status = "open" if paid == 0 else "paid" if paid >= inv.amount else "partially_paid"
+    state.update("customer_invoices", invoice, paid=paid, status=status)
+
+
+@handles("cash.applied")
+def _cash_applied(state: State, event: Event) -> None:
+    payment = IncomingPayment.model_validate(event.payload["payment"])
+    state.put("incoming_payments", payment)
+    for invoice, cents in payment.applied.items():
+        _set_paid(state, invoice, state.customer_invoices[invoice].paid + cents)
+    state.update("bank_transactions", payment.bank_transaction, reconciled=True)
+
+
+@handles("cash.reversed")
+def _cash_reversed(state: State, event: Event) -> None:
+    payment = state.update("incoming_payments", event.payload["payment"], returned=True)
+    for invoice, cents in payment.applied.items():
+        _set_paid(state, invoice, state.customer_invoices[invoice].paid - cents)
+    state.update("bank_transactions", event.payload["transaction"], reconciled=True)
+
+
+@handles("refund.issued")
+def _refund_issued(state: State, event: Event) -> None:
+    state.put("refunds", Refund.model_validate(event.payload["refund"]))
+    txn = BankTransaction.model_validate(event.payload["transaction"])
+    state.put("bank_transactions", txn)
+    _move_balance(state, txn)
+
+
+@handles("refund.stopped")
+def _refund_stopped(state: State, event: Event) -> None:
+    """Held for a person, or rejected. Recorded so the request isn't lost."""
+    state.put("refunds", Refund.model_validate(event.payload["refund"]))
