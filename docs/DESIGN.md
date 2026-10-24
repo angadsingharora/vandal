@@ -10,60 +10,77 @@ Authors: Angad Arora, Dhruv Kasarabada (track alignment, [PR #1](https://github.
 ## 1. Product
 
 ### 1.1 In one sentence
-**Vandal is a self-healing AI operator for a company's cash: money in, money out, and the books.** A sandbox copy of the company constantly attacks it. When something breaks, Vandal writes a new control, proves it works, and a human approves it before it protects the live system.
+**Vandal is a red team and a blue team for AI that runs a company's money.** **Red** (the Sandbox) attacks a copy of the company's financial system to find how it can fail. **Blue** (the Guard) checks every financial action an AI agent takes, *before* money moves, against an independent source of truth. Every gap Red finds becomes a control that Blue enforces.
 
-### 1.2 The two halves
-| | **Vandal Operator** | **Vandal Sandbox** |
-|---|---|---|
-| What it is | An autonomous finance agent (Blue) that runs the company's cash in both directions on one shared ledger. **Money out:** invoices, vendor-master changes, payment runs. **Money in:** customer payments applied to open invoices, plus refunds. **Books:** bank reconciliation, corrections, recovery. It reads invoices, remittances, bank-change requests, calls, and counterparty-agent messages, and asks a human when it should | A simulated copy of a company's money flows (the **financial twin**) plus three engines: **adversarial search** (finds sequences of events that break financial invariants), **control synthesis** (generates the control that closes the gap), and **verification** (proves the fix and checks that nothing legitimate breaks) |
-| Job | Do the finance work | Make sure the finance work can't be broken, and prove it |
-| Who wants it | A **finance team** hiring for a seat | **Companies building or deploying finance agents**, as CI for every release |
-| Role at Cal Hacks | **The headline.** It's the system a controller would hire | **The proof and the platform.** Judges see it attack, repair, and verify the operator live |
-| How they connect | The operator is the first agent plugged into the sandbox through the `FinanceOperator` interface (§6). Any other finance agent can plug into the same interface | |
+### 1.2 The three parts
+| | **Red: Vandal Sandbox** | **Blue: Vandal Guard** | **The Operator** (what's protected) |
+|---|---|---|---|
+| What it is | A copy of the company's money system (the **financial twin**), plus **adversarial search** that finds event sequences that break financial invariants, **Red content attacks** (deepfakes, malicious agents, scam documents), **control synthesis**, and **verification** | A **verification layer in the live path**. Every agentic action (pay, change vendor bank details, refund, post an entry, move cash) goes through it. Blue checks the action against the **authorization chain** (obligation → approval → execution → settlement → books), the active controls, and the invariants. It then **allows, holds, or escalates**, records the evidence, and can explain any decision with citations | The finance agent doing the work, across cash in, cash out, and the books. Ours is the reference Operator; **any company's agent** can plug in through the `FinanceOperator` interface (§6) |
+| When it runs | Offline: before deployment and after every change | Online: on every action, in the sandbox and in production | Always |
+| Output | Counterexample → synthesized control → proof | A verdict, the evidence behind it, and an audit trail | The finance work |
+| Who buys it | Finance-AI builders, as CI for every release | Anyone running finance agents, as runtime protection | (reference implementation) |
 
-**Seats the operator fills** at a 12-property real-estate manager:
+**Blue is the source of truth because it never trusts the agent's word.** It checks independent records instead:
+- the approved instruction;
+- verified bank accounts and the contacts on file;
+- the bank feed;
+- the ledger.
+
+It checks **actions, not prompts**, so it works with any agent.
+
+### 1.3 Self-healing loop
+1. **Red** clones the live company and attacks the clone.
+2. Search finds an action that **Blue's current controls let through**. The root cause is computed.
+3. The synthesizer writes a new control and keeps attacking it, until nothing gets through and no legitimate operation breaks.
+4. A human approves the control.
+5. The control is installed in **Blue**, which now enforces it on every live action. Red replays the attack to prove it.
+
+Fixes go into **Blue's controls**, never into the AI itself: no retraining and no prompt edits. The Operator can't skip a control, approve its own work, or talk its way past a hold.
+
+### 1.4 Seats (for Hyphenate's "Would you hire it?")
+At a 12-property real-estate manager:
+
+**The Operator fills:**
 - **AP specialist:** intake, GL coding, payment runs.
 - **Vendor-master clerk:** bank and contact changes.
-- **Treasury and payments analyst:** cash position, transfers between accounts, execution, bank errors.
-- **AR and cash-application clerk:** matching tenant and customer payments to invoices, refunds.
+- **Treasury and payments analyst:** cash position, transfers, execution, bank errors.
+- **AR and cash-application clerk:** applying payments, refunds.
 - **Staff accountant:** reconciliation, corrections, recovery.
 
-It reports to the controller, who approves large payments, all refunds to new destinations, and every change to its own controls.
+**Blue fills:** the **internal-controls reviewer**, the person who checks every payment, refund, and vendor change before release: "Is this allowed, and does it match what was approved?"
 
-**How self-healing works.** Fixes go into the **controls**, the rulebook the operator must obey and can't skip, approve itself, or be talked out of. They never go into the AI itself: no retraining, no prompt edits. The loop:
-1. The sandbox clones the live company and attacks the clone.
-2. Search finds a failure, and the root cause is computed.
-3. The synthesizer writes a control and attacks it until nothing gets through and no legitimate operation breaks.
-4. A human approves the control.
-5. It's installed in the **live operator's** policy, and the same attack is replayed to prove it.
+Both report to the controller, who approves large payments, refunds to new destinations, and every new control.
 
-**Scope:** cash in, cash out, and the books. Payroll, revenue recognition, tax, and financial reporting are roadmap seats on the same ledger, not hackathon work.
+**Scope:** cash in, cash out, and the books. Payroll, revenue recognition, tax, and reporting are roadmap work.
 
-**Pitch:** *Your books can balance perfectly while the money goes to the wrong person. Vandal is an AP operator that lives in an attack sandbox. The sandbox finds the sequence of events that makes that happen, writes the control that stops it, and proves the fix, before a real attacker gets there.*
+**Pitch:** *Your books can balance perfectly while the money goes to the wrong person. Vandal's red team finds how that happens in a sandbox. Its blue team checks every move your financial AI makes before money leaves. Every gap Red finds becomes a rule Blue enforces.*
 
-### 1.3 Objective and goals
-**Hackathon objective:** win the Hyphenate track by showing, live, an autonomous AP operator a controller would actually hire. The evidence that it's trustworthy comes from the sandbox, running in front of the judges.
+### 1.5 Objective and goals
+**Hackathon objective:** win the Hyphenate track by showing, live, an autonomous finance operation a controller would hire. That means the Operator doing the work, Blue verifying every action, and Red proving that Blue's controls hold.
 
-**Success criteria for the demo.** Every one is produced by real runs, never scripted:
-1. The operator processes real work: invoices in, payments out, a balanced ledger, a reconciled bank account.
-2. The sandbox's search finds a failure **by itself**. The headline is a 3-step sequence where every step looks valid, the books balance, and the money goes to the wrong account.
-3. The sandbox computes the root cause and synthesizes a control. At least one candidate control is visibly refuted by a counterexample before the final one passes.
-4. A human approves the control. Replay and re-search come up clean, legitimate payments still go through, and the scorecard shows before and after.
-5. A judge's own scenario runs live through the same loop, and a judge's "why did you do that?" gets an answer with citations.
+**Success criteria for the demo.** Every one comes from real runs, never from a script:
+1. The Operator processes real work through Blue. Every action shows Blue's verdict, and the result is a balanced ledger and a reconciled bank.
+2. Red's search finds, **by itself**, a 3-step sequence that Blue's v0 controls let through. The books balance, and the money goes to the wrong account.
+3. Red computes the root cause and synthesizes a control. At least one candidate is visibly refuted before the final one passes.
+4. A human approves; the control goes live in Blue. Replay and re-search come up clean, legitimate payments still flow, and the scorecard shows before and after.
+5. A judge's own scenario runs live. When a judge asks Blue "why was this held?", the answer comes with citations.
 
-**Venture goal:** the **sandbox** becomes the assurance layer for financial AI, meaning CI for finance agents. Every time an agent or policy changes, Vandal searches for failures, flags regressions, and prepares verified control changes for review. The operator stays as the reference agent and proof of the method.
+**Venture goal:** the **reliability stack for financial AI**:
+- **Blue** is the runtime trust layer. It sits in the money path, works with any agent, and earns recurring revenue.
+- **Red** is the CI that keeps Blue's controls ahead of attackers and regressions.
 
-### 1.4 Why this shape (reasoning)
-- **A sandbox alone loses the track.** Hyphenate asks "Would you hire it? For which seats?" A testing tool doesn't fill a seat, and it looks like a security product entered in the finance track. With no real agent inside it, it also proves nothing about real agents.
-- **An operator alone isn't new.** Hyphenate already builds AP agents. Another invoice-processing agent doesn't answer "Did we see something new?"
-- **Together, each half solves the other's problem.** The sandbox is what earns the operator its seat: limited access, a clean record, controls that get stronger and come with evidence. The operator is what proves the sandbox works on a real agent. One demo shows both.
-- **Synthesis is the core of the sandbox, not detection.** Detecting fraud is a crowded field. Searching for failure *sequences* and generating *verified* fixes is the hard, defensible part, and it's what generic red-teaming tools, social-engineering simulators, and finance benchmarks don't do (§3.3).
-- **Why now:** finance agents now execute payments, not just suggest them. Attackers now have deepfakes, and soon malicious counterparty agents. Controls designed for human clerks have gaps that agents walk straight through, such as reading the vendor's *current* bank account at payment time.
+### 1.6 Why this shape (reasoning)
+- **Red alone is a report.** It finds problems but protects nothing at runtime, and it looks like a security tool.
+- **Blue alone is a static rulebook.** Someone has to guess the rules, and nobody keeps them current.
+- **Together, the rules improve themselves and are enforced live.** That is the self-healing claim.
+- **Keep a real Operator.** Without real finance work flowing through Blue, there's nothing to verify, and "Would you hire it?" gets weaker.
+- **Synthesis is the hard part, not detection.** Searching for failure *sequences* and generating *verified* fixes is what generic red-teaming tools, guardrails, and finance benchmarks don't do (§3.3).
+- **Why now:** finance agents now execute payments. Attackers now have deepfakes and malicious agents. Controls designed for human clerks have gaps agents walk straight through, such as reading the vendor's *current* bank account at payment time.
 
-### 1.5 Non-goals
-Real banks or money. A full ERP. AI rewriting arbitrary code; repairs come from a bounded set of control templates. Claims of mathematical proof beyond what the bounded search actually covers (§18).
+### 1.7 Non-goals
+Real banks or money. A full ERP. AI rewriting arbitrary code; repairs come from a bounded set of control templates. Claims of mathematical proof beyond what the bounded search covers (§18).
 
-Short line for technical judges: **Jepsen for financial agents.** Jepsen tests distributed databases by injecting faults and checking invariants. Vandal does the same for financial workflows, and then **repairs** them.
+Short line for technical judges: **Jepsen for financial agents.** Red injects faults and attacks, and Blue checks the invariants. Vandal then **repairs** the gaps it finds.
 
 ## 2. The question Vandal answers
 
@@ -87,15 +104,15 @@ The money still goes to the wrong person. Vandal models those relationships expl
 ## 3. Why this fits Hyphenate, and why it's a company
 
 ### 3.1 Hyphenate track
-The track asks for "the system a finance team would bring on board." **The operator is the product we present.** It processes invoices, validates obligations, executes payments, posts the ledger, reconciles against the bank, and runs recovery. The search and synthesis engine is how it **earns the seat**: its controls get stronger every time a gap is found, and each change comes with evidence.
+The track asks for "the system a finance team would bring on board." We present **the Operator and Blue together**. The Operator fills the finance seats. Blue fills the internal-controls seat and is why the Operator can be trusted with money. Red is how Blue's controls get stronger every time a gap is found, with evidence for each change.
 
 Hyphenate judges every project on four questions and lists five things that make finance hard. This is where Vandal answers each one:
 
 | Hyphenate asks | Vandal's answer | Where |
 |---|---|---|
 | **Is it real enough?** Realistic data, a messy problem, proof it works | Double-entry books, a bank simulator with faults, a sim clock, messy documents, sources that disagree; a scorecard measured against a hidden answer key | §5, §10.1 |
-| **Would you hire it?** Which seats; limited access, a clean record, knowing when to ask | Five seats across cash in, cash out, and the books (§1.2). Role-checked tools, segregation of duties, an append-only audit log, escalation through the approvals inbox | §1, §6.1 |
-| **Did we see something new?** | An operator that **searches its own workflow for failure sequences and synthesizes verified controls** (CEGIS), rejecting any fix a deepfake could beat | §8, §9 |
+| **Would you hire it?** Which seats; limited access, a clean record, knowing when to ask | Five Operator seats plus Blue as the internal-controls reviewer (§1.4). Role-checked tools, segregation of duties, an append-only audit log, escalation through the approvals inbox | §1, §6.1 |
+| **Did we see something new?** | A blue-team verification layer whose controls are **synthesized and verified by a red team** that searches for failure sequences (CEGIS), rejecting any fix a deepfake could beat | §8, §9 |
 | **The moment:** catches what others missed, recovers, defends a decision | Finds a 3-step approval/execution gap where every step looks valid; recovers in the books; explains any decision with citations, even under pushback | §6, §12, §13 |
 | Sources that disagree | PO vs invoice vs contract rate; bank feed vs ledger; vendor email vs contact on file | §5.6 |
 | Time | Sim clock across months; a control learned in month 1 still holds against a variant in month 4 | §5.4, §5.6 |
@@ -111,7 +128,7 @@ Hyphenate judges every project on four questions and lists five things that make
 - a statement of what's real versus simulated and how we know (§10.2).
 
 ### 3.2 Venture
-- **The product we sell is the Vandal Sandbox.** The operator is the reference agent and the proof.
+- **We sell two products:** Blue (runtime verification, recurring) and Red (CI for every release). The Operator is the reference agent and the proof.
 - **First customer:** companies building AI finance agents, such as AI accounts-payable (AP), autonomous accounting, and spend-management vendors. They plug their agent into the sandbox through the `FinanceOperator` interface. Every time an agent or policy changes, the sandbox runs the search, flags regressions, and prepares validated control changes for review. In other words, it acts as **CI for financial agents**.
 - **Expansion:** payment processors, treasury software, and financial institutions, with an assurance report as the deliverable for auditors and insurers.
 - **Unvalidated hypothesis:** these companies will pay for an independent, finance-specific assurance layer instead of building one in-house.
@@ -125,9 +142,13 @@ Hyphenate judges every project on four questions and lists five things that make
 
 We don't claim the category is new. We claim the **find → repair → prove loop** on financial state.
 
-## 4. Architecture: the Sandbox and the Operator
+## 4. Architecture: Red, Blue, and the Operator
 
-**Vandal Sandbox** = (1) the financial twin + (2) the search engine + (3) the synthesizer + (4) the verification engine. **Vandal Operator** = Blue, which plugs into the twin through the `FinanceOperator` interface. Swapping in a different agent at that seam changes nothing else in the sandbox.
+**Red (Vandal Sandbox)** = (1) the financial twin + (2) the search engine + (3) the synthesizer + (4) the verification engine.
+
+**Blue (Vandal Guard)** = the gate, plus authorization-chain checks, invariant checks, the evidence log, and cited explanations. It sits between the Operator and the tools layer, in the sandbox and in production alike.
+
+**The Operator** plugs in through the `FinanceOperator` interface. Swapping in a different agent at that seam changes nothing in Red or Blue.
 
 ```
                    ┌──────────────────────────────────────────────────────────┐
@@ -139,7 +160,7 @@ We don't claim the category is new. We claim the **find → repair → prove loo
                    └──────▲───────────────────────────────▲───────────────────┘
                           │ tools (validated, gated)      │ events (append-only)
          ┌────────────────┴──────────┐        ┌───────────┴──────────────────────┐
-         │ FINANCE OPERATOR (Blue)   │        │ 2. ADVERSARIAL SEARCH ENGINE     │
+         │ OPERATOR → BLUE GUARD     │        │ 2. ADVERSARIAL SEARCH ENGINE     │
          │ LLM: intake, exceptions,  │        │ bounded exhaustive search over   │
          │ recovery, reconciliation  │        │ event sequences + fault injection│
          │ (system under test)       │        │ + LLM content attacks (Red)      │
@@ -236,17 +257,17 @@ A clean seed makes the operator's job trivial and the company unconvincing. The 
 
 Invoice text may borrow from a public dataset (e.g. the Invoice Sandbox Benchmark listed in the brief). Amounts and keys still come from our seed.
 
-## 6. Vandal Operator (Blue, the system under test)
+## 6. The Operator (the agent Blue protects and Red tests)
 
-**The seam.** The sandbox only ever talks to an operator through this interface, so Blue is one plug-in among many:
+**The seam.** The sandbox only ever talks to an operator through this interface, so our reference Operator is one plug-in among many:
 ```python
 class FinanceOperator(Protocol):
     def on_event(self, ev: ChannelEvent, tools: Tools) -> None: ...  # intake, conversations, operations
     def on_case(self, case: Case, tools: Tools) -> None: ...         # holds, escalations, recovery, explanations
 ```
-Even in the hackathon build, nothing in `twin/`, `search/`, `synth/`, or `verify/` may import from `operator/blue.py`. A test enforces this, so the claim that "any agent can plug in" is literally true of the code.
+Even in the hackathon build, nothing in `twin/`, `search/`, `synth/`, or `verify/` may import from `operator/reference.py`. A test enforces this, so the claim that "any agent can plug in" is literally true of the code.
 
-Blue implements the interface through validated tools. Claude Sonnet runs it.
+Our reference Operator implements the interface. Every tool call it makes passes through Blue. Claude Sonnet runs it.
 
 - **Intake:** classifies documents, emails, calls, and agent messages; extracts fields; matches the vendor and PO; codes the GL; proposes an action.
 - **Operations:** validates obligations, requests approvals, schedules payment runs, and handles bank errors. Retries follow the operator's retry policy, which is a policy parameter the synthesizer can repair.
@@ -263,7 +284,7 @@ Blue implements the interface through validated tools. Claude Sonnet runs it.
 - **Working with approvers:** requests approvals at the right moment, chases them when they're slow, and handles a denial. It records the reason, holds the invoice, and never resubmits the same request unchanged.
 - **Explain any decision.** Anyone can ask "why?" about a payment, hold, rejection, approval request, or policy rule, including one made months earlier in sim time.
   - A deterministic trace builder (the same `caused_by` chain the coverage analysis uses) collects the evidence: source events, extractions, facts evaluated, rules fired, evidence, and approvals.
-  - Blue writes the answer **from that trace only**. Every claim cites an event, rule, or approval id. An answer with citations that don't resolve is rejected and regenerated.
+  - **Blue** writes the answer **from that trace only**. Explanations are part of Blue, because Blue is the source of truth. Every claim cites an event, rule, or approval id. An answer with citations that don't resolve is rejected and regenerated.
   - If someone pushes back ("this vendor is fine, just pay it"), Blue restates which rule and missing evidence block the payment, and points to the inbox. **A conversation never clears a hold.**
 
 **Bring your own agent:**
@@ -275,16 +296,16 @@ No actor both requests and approves the same action. The tools layer enforces th
 
 | Action | Requested by | Approved by | Executed by |
 |---|---|---|---|
-| Pay an invoice under the threshold | Blue | Gate (policy, no human) | Tools layer, after `pre_execute` |
-| Pay an invoice over the threshold | Blue | Human, through the inbox | Tools layer |
-| Change vendor bank or contact details | The inbound event, via Blue's change request | Gate, with accepted evidence | Tools layer |
-| Re-pay a vendor after a misdirected or duplicate payment | Blue | Human, through the inbox, **at any amount** | Tools layer |
-| Refund to the original source account | Blue | Gate | Tools layer |
-| Refund to any other account | Blue | Human, through the inbox, **at any amount** | Tools layer |
-| Policy patch | Synthesizer | Human, through the inbox. Never the synthesizer or Blue | Policy store |
-| Correcting journal entry | Blue | Gate (balance and reversal checks) | Ledger |
+| Pay an invoice under the threshold | Operator | Gate (policy, no human) | Tools layer, after `pre_execute` |
+| Pay an invoice over the threshold | Operator | Human, through the inbox | Tools layer |
+| Change vendor bank or contact details | The inbound event, via the Operator's change request | Gate, with accepted evidence | Tools layer |
+| Re-pay a vendor after a misdirected or duplicate payment | Operator | Human, through the inbox, **at any amount** | Tools layer |
+| Refund to the original source account | Operator | Gate | Tools layer |
+| Refund to any other account | Operator | Human, through the inbox, **at any amount** | Tools layer |
+| Policy patch | Synthesizer | Human, through the inbox. Never the synthesizer or the Operator | Policy store |
+| Correcting journal entry | Operator | Gate (balance and reversal checks) | Ledger |
 
-- Blue has no `approvals.decide` permission.
+- The Operator has no `approvals.decide` permission. Blue enforces every row of this table.
 - The synthesizer can only write candidate controls; it can't apply them.
 - Whoever submits an item in the UI can't approve that same item. In single-user mode, the inbox asks for a second approver.
 
@@ -502,7 +523,7 @@ The "expected" rows are hypotheses. **The UI shows only what the engine actually
 |---|---|
 | **Left: Search** | Live sequence counter, violating traces, the minimal counterexample as a step timeline |
 | **Center: Twin** | Cash, AP, exposure; invoices, payments, ledger, and bank-feed tabs; the **authorization chain** view for the selected payment (obligation → approval → execution → settlement → books) with coverage marks on each link |
-| **Right: Operator + Approvals** | The operator's cases and rationale; the approvals inbox, including policy patches |
+| **Right: Operator + Blue + Approvals** | The Operator's cases; **Blue's verdict feed** (every action: allow / hold / escalate, with evidence); the approvals inbox, including policy patches |
 | **Bottom: Synthesis** | The CEGIS iteration log (candidate → counterexample or pass); a scored candidate table; policy diff; before and after |
 
 ## 15. Persistence and API
@@ -541,7 +562,8 @@ GET  /metrics?policies=v0,v1                         → scorecard (§10.1)
 backend/app/
   main.py  db.py  schemas.py
   twin/{entities,reducer,clock,bank,ledger,gate,facts,profile}.py
-  operator/{interface,blue}.py
+  operator/{interface,reference}.py
+  guard/{gate,chain,explain}.py
   search/{alphabet,bfs,por,minimize,red}.py
   synth/{coverage,templates,lint,cegis,objective}.py
   verify/{invariants,replay,regression,evidence}.py
@@ -556,7 +578,7 @@ backend/tests/   frontend/   docs/
 |---|---|---|
 | **P1: Twin** | entities, reducer, clock, bank sim + faults, ledger, gate, v0, invariants, seed + messy data, persistence | `twin/`, `verify/invariants`, `profiles/` |
 | **P2: Search + synthesis** | alphabet, BFS/POR/minimize, coverage analysis, templates, lints, CEGIS, objective | `search/`, `synth/` |
-| **P3: Operator** | Blue intake (messy formats), exceptions, recovery, approvals behavior, cited explanations, Red content and plain-language inject | `operator/`, `search/red`, `/explain`, `/inject` |
+| **P3: Operator + Blue explain** | Operator intake (messy formats), exceptions, recovery, approvals behavior, cited explanations, Red content and plain-language inject | `operator/`, `search/red`, `/explain`, `/inject` |
 | **P4: Product surface** | war-room UI, SSE, approvals inbox, authorization-chain view, CEGIS log, scorecard, inject form, Reset/playback, video + Devpost | `frontend/`, `verify/evidence`, `/metrics` |
 
 Until M1 lands, P2 and P4 work against P1's entity schemas plus a stub reducer. Freeze the schemas by Sat 2 AM.
@@ -565,7 +587,7 @@ Until M1 lands, P2 and P4 work against P1's entity schemas plus a stub reducer. 
 | Milestone | Contents | Target |
 |---|---|---|
 | **M1: Twin + gap** | Scenario A violates INV-2/4 from a hand-written trace; hand-installed T1 + T2 fix it; deterministic replay; tests | Sat 12 PM |
-| **M2: Search + coverage** | Search finds A's minimal counterexample unaided; coverage diagnosis; **throughput measured**. Blue intake on messy docs. UI shows the run and chain | Sat 4 PM |
+| **M2: Search + coverage** | Search finds A's minimal counterexample unaided; coverage diagnosis; **throughput measured**. Operator intake on messy docs. UI shows the run and chain | Sat 4 PM |
 | **M3: Synthesis + verify** | CEGIS with LLM plus param sweep, verification suite, evidence pack, approval with SoD. `/explain` with citations. Scorecard v0 vs v1 | Sat 9 PM |
 | **M4: Full loop in the UI** | All of the above in the war room, plus Reset, playback, and the inject form (plain language + compose) | Sun 1 AM |
 | **M5: Fault + money-in scenarios** | Scenario B (T3) and Scenario F (T6); cash application is in the seed from M1. If time allows: C, D, and approver delays and escalation | Sun 3 AM |
@@ -599,7 +621,7 @@ Until M1 lands, P2 and P4 work against P1's entity schemas plus a stub reducer. 
 - [ ] The video **opens with the key moment** and fits Devpost's length limit.
 - [ ] Devpost entry on the Hyphenate track, including:
   - the seats line (§1);
-  - the operator, running inside the Vandal Sandbox (§1.2);
+  - the Red / Blue / Operator split (§1.2);
   - real vs simulated;
   - the scorecard.
 - [ ] A full demo run works after Reset, both live and in playback. The inject flow works live with a scenario we've never run before.
