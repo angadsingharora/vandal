@@ -97,11 +97,11 @@ export function CircuitBomb() {
         ))}
       </div>
 
-      <main className="relative min-h-0 flex-1 p-4">
-        <div className="h-full w-full overflow-hidden rounded border border-line bg-panel">
+      <main className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+        <div className="min-h-0 flex-1 overflow-hidden rounded border border-line bg-panel">
           <Board step={step} />
         </div>
-        <div className="pointer-events-none absolute bottom-8 left-1/2 w-[min(640px,80%)] -translate-x-1/2 rounded border border-line bg-bg/92 px-4 py-3 shadow-lg">
+        <div className="shrink-0 rounded border border-line bg-panel px-4 py-3">
           <div className="flex items-baseline gap-2">
             <span className={cx("num text-[11px]", breached ? "text-red" : held ? "text-ok" : "text-blue")}>{String(step).padStart(2, "0")}</span>
             <span className="text-[12px] font-semibold text-ink">{scene.title}</span>
