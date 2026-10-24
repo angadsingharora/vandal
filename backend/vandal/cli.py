@@ -60,11 +60,15 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def cmd_attack(args: argparse.Namespace) -> int:
-    from vandal.sandbox import replay_with_reference
-    from vandal.verify.replay import Trace
+    from functools import partial
+
+    from vandal.sandbox import new_sandbox
+    from vandal.verify.replay import Trace, replay_detailed
 
     trace = Trace.load(args.trace)
-    result = replay_with_reference(trace, args.profile)
+    result, sb, _ = replay_detailed(
+        trace.seed, trace.moves, days=trace.days, sandbox=partial(new_sandbox, args.profile)
+    )
     print(f"trace {trace.name}: {len(trace.moves)} moves, seed {trace.seed}, {trace.days} days")
     for m in trace.moves:
         params = " ".join(f"{k}={v}" for k, v in m.params.items())
@@ -77,6 +81,7 @@ def cmd_attack(args: argparse.Namespace) -> int:
             print(f"  {v.invariant}  {v.message}")
     print(f"exposure    ${result.exposure / 100:,.2f}  ({result.exposure} cents)")
     print(f"state_hash  {result.state_hash}")
+    _print_diagnosis(sb, result.violations)
     return 0
 
 
@@ -126,6 +131,21 @@ def _timeline(state, subjects: set[str]) -> list[str]:
             }[e.kind](e.payload)
             lines.append(f"  day {e.day}  {e.id}  {e.kind:<23} {what}")
     return lines
+
+
+def _print_diagnosis(sb, violations) -> None:
+    from vandal.synth.coverage import diagnose
+    from vandal.verify.invariants import Limits
+
+    d = diagnose(sb.run.state, violations, Limits.from_profile(sb.profile))
+    if d is None:
+        return
+    also = f" (also: {', '.join(d.also)})" if d.also else ""
+    print(f"diagnosis: {d.gap} at the {d.link} link of {d.payment}{also}")
+    print(f"  {d.reason}")
+    for ln in d.chain.links:
+        print(f"  {ln.name:<10} {ln.status:<9} {ln.gap or '':<22} {ln.reason}")
+    print(f"  cites {', '.join(d.cites)}")
 
 
 def cmd_search(args: argparse.Namespace) -> int:
@@ -182,6 +202,7 @@ def cmd_search(args: argparse.Namespace) -> int:
     print("timeline:")
     for line in _timeline(sb.run.state, {v.subject for v in final.violations}):
         print(line)
+    _print_diagnosis(sb, final.violations)
     return 0
 
 
