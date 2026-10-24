@@ -22,12 +22,13 @@ synth/ can't import operator/, so the caller passes `factory_for(policy)`.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
 from vandal.contracts.controls import Control
+from vandal.contracts.entities import OracleLabel
 from vandal.contracts.moves import Move
 from vandal.search.alphabet import SCENARIOS
 from vandal.search.bfs import search
@@ -108,7 +109,11 @@ def cegis(
     per_iteration: int = 4,
     version: str = "v1-synth",
     on_entry: Callable[[LogEntry], None] | None = None,
+    start: list[Move] | None = None,
+    start_labels: Sequence[OracleLabel] = (),
 ) -> CEGISResult:
+    """`start` is a counterexample to repair (an injected threat, R9) instead of the one the
+    parent's own search finds; `start_labels` is that trace's answer key."""
     scenario = SCENARIOS["a"]
     risk = profile.risk_appetite
     log: list[LogEntry] = []
@@ -121,24 +126,41 @@ def cegis(
 
     def counterexample(factory: SandboxFactory, best_moves: list[Move]):
         def violated(moves: list[Move]) -> set[str]:
-            return set(replay(seed, moves, sandbox=factory, days=days).violated)
+            return set(
+                replay(seed, moves, sandbox=factory, days=days, labels=start_labels).violated
+            )
 
         minimal = minimize_trace(best_moves, violated)
-        result, sb, _ = replay_detailed(seed, minimal, sandbox=factory, days=days)
+        result, sb, _ = replay_detailed(
+            seed, minimal, sandbox=factory, days=days, labels=start_labels
+        )
         d = diagnose(sb.run.state, result.violations, Limits.from_profile(sb.profile))
         return minimal, result, (d.model_dump(mode="json") if d else None)
 
     # The parent's counterexample and its root cause start the loop.
     parent_factory = factory_for(parent)
-    found = search(parent_factory, scenario, seed=seed, depth=depth, workers=workers)
-    if found.best is None:
-        return CEGISResult(
-            status="nothing_to_repair",
-            iterations=0,
-            log=log,
-            reason=f"{parent.version} has no violation within depth {depth}",
-        )
-    cx_moves, cx_result, diagnosis = counterexample(parent_factory, found.best.moves)
+    if start is not None:
+        if not replay(
+            seed, start, sandbox=parent_factory, days=days, labels=start_labels
+        ).violations:
+            return CEGISResult(
+                status="nothing_to_repair",
+                iterations=0,
+                log=log,
+                reason=f"the given trace breaks nothing under {parent.version}",
+            )
+        cx_moves, cx_result, diagnosis = counterexample(parent_factory, list(start))
+    else:
+        found = search(parent_factory, scenario, seed=seed, depth=depth, workers=workers)
+        if found.best is None:
+            return CEGISResult(
+                status="nothing_to_repair",
+                iterations=0,
+                log=log,
+                reason=f"{parent.version} has no violation within depth {depth}",
+            )
+        cx_moves, cx_result, diagnosis = counterexample(parent_factory, found.best.moves)
+    injected = cx_moves if start is not None else None  # every candidate must hold against it
     if diagnosis is None:
         return CEGISResult(
             status="cannot_auto_repair",
@@ -246,17 +268,27 @@ def cegis(
                 evaluated.append(_Evaluated(proposal=proposal, entry=entry))
                 continue
 
-            s = search(factory, scenario, seed=seed, depth=depth, workers=workers)
+            s = search(
+                factory, scenario, seed=seed, depth=depth, workers=workers, labels=start_labels
+            )
+            beaten_by = s.best.moves if s.best else None
+            residual, found_cx = sum(f.exposure for f in s.findings), len(s.findings)
+            if beaten_by is None and injected is not None:
+                # Search may not reach the injected threat (its moves can sit outside the
+                # alphabet), so replay it directly.
+                again = replay(seed, injected, sandbox=factory, days=days, labels=start_labels)
+                if again.violations:
+                    beaten_by, residual, found_cx = injected, again.exposure, 1
             m = Measurement(
-                residual_exposure=sum(f.exposure for f in s.findings),
-                counterexamples=len(s.findings),
+                residual_exposure=residual,
+                counterexamples=found_cx,
                 legit_blocked=blocked,
                 legit_failed=len(failed),
                 holds=holds,
                 templates=len(controls),
                 params=_param_count(controls),
             )
-            if s.best is None and failed:
+            if beaten_by is None and failed:
                 # Search can't beat it, but legitimate operations the base already broke are
                 # still broken, and there's no counterexample to diagnose the next step from.
                 entry = record(
@@ -276,7 +308,7 @@ def cegis(
                 )
                 evaluated.append(_Evaluated(proposal=proposal, entry=entry))
                 continue
-            if s.best is None:
+            if beaten_by is None:
                 entry = record(
                     LogEntry(
                         **common,
@@ -290,7 +322,7 @@ def cegis(
                 )
                 evaluated.append(_Evaluated(proposal=proposal, entry=entry))
                 continue
-            moves, result, d = counterexample(factory, s.best.moves)
+            moves, result, d = counterexample(factory, beaten_by)
             entry = record(
                 LogEntry(
                     **common,
@@ -344,6 +376,7 @@ def cegis(
             best_partial.entry.counterexample or [],
             sandbox=factory_for(Policy(version="base", controls=parent.controls + base)),
             days=days,
+            labels=start_labels,
         )
 
     kept = [describe(c) for c in base]
