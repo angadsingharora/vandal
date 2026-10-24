@@ -27,7 +27,7 @@ from vandal.contracts.interfaces import Action, Guard, ToolResult
 from vandal.contracts.verdicts import Verdict
 from vandal.twin import bank, ledger
 from vandal.twin.facts import current_account
-from vandal.twin.state import State
+from vandal.twin.state import State, construct
 from vandal.twin.world import Run
 
 EventSpec = tuple[str, dict[str, Any]]
@@ -606,7 +606,8 @@ class GatedTools:
             raise TypeError(f"{name} takes {spec.args.__name__}, got {type(args).__name__}")
         self.calls += 1
         state = self.run.state
-        action = Action(actor=actor, name=name, args=args.model_dump())
+        # args is an already-validated spec.args model, so don't revalidate its dump (hot path)
+        action = construct(Action, {"actor": actor, "name": name, "args": args.model_dump()})
         verdict = self.guard.check(state, action, spec.stage)
         recorded = self.run.emit(
             "gate.verdict",
