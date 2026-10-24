@@ -19,7 +19,7 @@ from vandal.contracts.events import ChannelEvent
 from vandal.contracts.interfaces import Tools
 from vandal.operator.intake import Extraction, extract
 from vandal.operator.reference import ReferenceOperator, RetryPolicy
-from vandal.twin.flows import InvoiceArgs
+from vandal.twin.flows import CaseOpen, InvoiceArgs
 from vandal.twin.profile import Profile
 from vandal.twin.state import State
 
@@ -74,6 +74,24 @@ class LLMOperator(ReferenceOperator):
                     "account": x.account,
                 }
                 self._change_request(ev.model_copy(update={"meta": meta}), tools)
+            case "vendor_bank_change" if x.vendor:
+                # A partial handoff (DESIGN 5.6): a bank change with no account number in it.
+                # Nothing is applied and no request is raised; a case records why, so a person
+                # can ask the vendor for the details through a verified channel.
+                missing = [f for f in ("routing", "account") if getattr(x, f) is None]
+                tools.call(
+                    self.actor,
+                    "cases.open",
+                    CaseOpen(
+                        subject=ev.id,
+                        kind="exception",
+                        reason=(
+                            f"bank change request from {x.vendor} without "
+                            f"{' and '.join(missing)} number; nothing applied, "
+                            "details to be requested through a verified channel"
+                        ),
+                    ),
+                )
             case "vendor_contact_change" if x.vendor:
                 meta = {
                     "intent": "vendor_contact_change",
