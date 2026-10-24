@@ -164,5 +164,7 @@ def replay(request: Request, body: Replay) -> dict[str, Any]:
         )
         if handle.writer is not None:
             handle.writer.flush()
-    return {"run": summary(handle),
-            "result": {**result.model_dump(mode="json"), "violated": result.violated}}
+    return {
+        "run": summary(handle),
+        "result": {**result.model_dump(mode="json"), "violated": result.violated},
+    }
