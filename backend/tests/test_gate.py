@@ -131,3 +131,20 @@ def test_hold_beats_escalate_at_the_gate(sb) -> None:
     v = verdict(sb, "approvals.request", "pre_approve", invoice="INV-1042")
     assert v.decision == "hold"
     assert set(v.fired) == {"v0.approval.threshold", "test.hold"}
+
+
+def test_gate_fails_closed_on_a_missing_fact() -> None:
+    from vandal.contracts.controls import Check, Condition, Predicate
+    from vandal.guard.gate import Gate
+
+    def check(action: str) -> Check:
+        cond = Condition(fact="no.such.fact", op="eq", value=1)
+        when = Predicate(all=[cond])
+        return Check(id=f"c.{action}", stage="pre_approve", when=when, action=action)
+
+    sb = new_sandbox()
+    act = Action(actor=OP, name="approvals.request", args={"invoice": "INV-1042"})
+    for action, expected in [("escalate", "hold"), ("hold", "hold"), ("block", "block")]:
+        v = Gate([check(action)]).check(sb.run.state, act, "pre_approve")
+        assert v.decision == expected and v.fired == [f"c.{action}"]
+        assert v.facts["gate.missing_facts"] == ["no.such.fact"]
