@@ -17,6 +17,8 @@ import argparse
 import json
 import sys
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 SYNTH = {"id": "U-SYNTH", "role": "synthesizer"}
@@ -32,17 +34,13 @@ PUSHBACK = "I spoke to the vendor myself and they confirmed the new account. Rel
 class Timings(dict[str, float]):
     """`with t("step"):` accumulates wall time per step."""
 
-    def __call__(self, name: str):
-        timings, start = self, time.perf_counter()
-
-        class _Timer:
-            def __enter__(self_):
-                return self_
-
-            def __exit__(self_, *_):
-                timings[name] = timings.get(name, 0.0) + time.perf_counter() - start
-
-        return _Timer()
+    @contextmanager
+    def __call__(self, name: str) -> Iterator[None]:
+        start = time.perf_counter()
+        try:
+            yield
+        finally:
+            self[name] = self.get(name, 0.0) + time.perf_counter() - start
 
 
 def wait(c, job_id: str, timeout: float = 600) -> dict[str, Any]:
