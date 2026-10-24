@@ -22,12 +22,13 @@ synth/ can't import operator/, so the caller passes `factory_for(policy)`.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
 from vandal.contracts.controls import Control
+from vandal.contracts.entities import OracleLabel
 from vandal.contracts.moves import Move
 from vandal.search.alphabet import SCENARIOS
 from vandal.search.bfs import search
@@ -108,7 +109,11 @@ def cegis(
     per_iteration: int = 4,
     version: str = "v1-synth",
     on_entry: Callable[[LogEntry], None] | None = None,
+    start: list[Move] | None = None,
+    start_labels: Sequence[OracleLabel] = (),
 ) -> CEGISResult:
+    """`start` is a counterexample to repair (an injected threat, R9) instead of the one the
+    parent's own search finds; `start_labels` is that trace's answer key."""
     scenario = SCENARIOS["a"]
     risk = profile.risk_appetite
     log: list[LogEntry] = []
@@ -121,24 +126,40 @@ def cegis(
 
     def counterexample(factory: SandboxFactory, best_moves: list[Move]):
         def violated(moves: list[Move]) -> set[str]:
-            return set(replay(seed, moves, sandbox=factory, days=days).violated)
+            return set(
+                replay(seed, moves, sandbox=factory, days=days, labels=start_labels).violated
+            )
 
         minimal = minimize_trace(best_moves, violated)
-        result, sb, _ = replay_detailed(seed, minimal, sandbox=factory, days=days)
+        result, sb, _ = replay_detailed(
+            seed, minimal, sandbox=factory, days=days, labels=start_labels
+        )
         d = diagnose(sb.run.state, result.violations, Limits.from_profile(sb.profile))
         return minimal, result, (d.model_dump(mode="json") if d else None)
 
     # The parent's counterexample and its root cause start the loop.
     parent_factory = factory_for(parent)
-    found = search(parent_factory, scenario, seed=seed, depth=depth, workers=workers)
-    if found.best is None:
-        return CEGISResult(
-            status="nothing_to_repair",
-            iterations=0,
-            log=log,
-            reason=f"{parent.version} has no violation within depth {depth}",
-        )
-    cx_moves, cx_result, diagnosis = counterexample(parent_factory, found.best.moves)
+    if start is not None:
+        if not replay(
+            seed, start, sandbox=parent_factory, days=days, labels=start_labels
+        ).violations:
+            return CEGISResult(
+                status="nothing_to_repair",
+                iterations=0,
+                log=log,
+                reason=f"the given trace breaks nothing under {parent.version}",
+            )
+        cx_moves, cx_result, diagnosis = counterexample(parent_factory, list(start))
+    else:
+        found = search(parent_factory, scenario, seed=seed, depth=depth, workers=workers)
+        if found.best is None:
+            return CEGISResult(
+                status="nothing_to_repair",
+                iterations=0,
+                log=log,
+                reason=f"{parent.version} has no violation within depth {depth}",
+            )
+        cx_moves, cx_result, diagnosis = counterexample(parent_factory, found.best.moves)
     if diagnosis is None:
         return CEGISResult(
             status="cannot_auto_repair",

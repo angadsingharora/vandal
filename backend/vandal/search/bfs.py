@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel, ConfigDict
 
-from vandal.contracts.entities import Cents
+from vandal.contracts.entities import Cents, OracleLabel
 from vandal.contracts.moves import Move
 from vandal.search.alphabet import Scenario, build_alphabet, independent
 from vandal.twin.state import State
@@ -87,6 +87,8 @@ class Runner:
 
     sb: SandboxLike
     scenario: Scenario
+    around: tuple[Move, ...] = ()  # seeded search: moves every run includes (R9)
+    labels: tuple[OracleLabel, ...] = ()  # answer-key facts every run starts with
     base: State = field(init=False)
     limits: Limits = field(init=False)
 
@@ -110,6 +112,7 @@ class Runner:
         """State right after the last move (before World step `pos` runs)."""
         self.sb.run.state = self.base.clone()
         oracle = Oracle()
+        oracle.labels.extend(self.labels)
         pos = 0
         for i, move in enumerate(moves):
             while pos < move.at and pos < len(self.steps):
@@ -125,7 +128,15 @@ class Runner:
         violations = check(self.sb.run.state, oracle, self.limits)
         return key, sorted({v.invariant for v in violations}), exposure(violations)
 
+    def merged(self, moves: Sequence[Move]) -> list[Move]:
+        """The seeded moves plus `moves`, in timing order; seeded moves first at the same `at`."""
+        tagged = [(m.at, 0, i, m) for i, m in enumerate(self.around)]
+        tagged += [(m.at, 1, i, m) for i, m in enumerate(moves)]
+        return [m for *_, m in sorted(tagged, key=lambda t: t[:3])]
+
     def run(self, moves: Sequence[Move]) -> tuple[Key, list[str], Cents]:
+        """One full run of `moves` (plus any seeded moves) from the base state."""
+        moves = self.merged(moves) if self.around else moves
         _, oracle, pos = self._prefix(moves)
         return self._finish(pos, oracle)
 
@@ -163,15 +174,24 @@ def _labels(oracle: Oracle) -> tuple[tuple[str, str, str], ...]:
 _WORKER: tuple[Runner, list[Move]] | None = None
 
 
-def _init_worker(factory: SandboxFactory, seed: int, scenario: Scenario) -> None:
+def _init_worker(
+    factory: SandboxFactory,
+    seed: int,
+    scenario: Scenario,
+    around: tuple[Move, ...] = (),
+    labels: tuple[OracleLabel, ...] = (),
+) -> None:
     global _WORKER
     sb = factory(seed)
-    runner = Runner(sb, scenario)
+    runner = Runner(sb, scenario, around, labels)
     _WORKER = (runner, build_alphabet(scenario, runner.base, sb.profile))
 
 
 def _expand(runner: Runner, alphabet: list[Move], task: tuple[Seq, list[Seq]]):
     parent, children = task
+    if runner.around:
+        # Seeded moves can sit anywhere in time, so children don't share a clean prefix.
+        return [(c, *runner.run([alphabet[j] for j in c])) for c in children]
     results = runner.run_children(
         [alphabet[j] for j in parent], [alphabet[c[-1]] for c in children]
     )
@@ -216,18 +236,27 @@ def search(
     depth: int = 4,
     workers: int = 1,
     exhaustive: bool = False,
+    around: Sequence[Move] = (),
+    labels: Sequence[OracleLabel] = (),
     progress: Callable[[int, int], None] | None = None,
 ) -> SearchResult:
     """Explore every canonical sequence up to `depth`. Without `exhaustive`, stop after the
-    first depth that has violations: those are the minimal counterexamples."""
+    first depth that has violations: those are the minimal counterexamples.
+
+    `around` seeds the search (R9): every sequence includes those moves, and `depth` counts the
+    alphabet moves added around them. Depth 0 is the seeded moves on their own."""
     started = time.perf_counter()
-    local = Runner(factory(seed), scenario)
+    local = Runner(factory(seed), scenario, tuple(around), tuple(labels))
     alphabet = build_alphabet(scenario, local.base, local.sb.profile)
 
     pool = None
     if workers > 1:
         ctx = mp.get_context("spawn")
-        pool = ctx.Pool(workers, initializer=_init_worker, initargs=(factory, seed, scenario))
+        pool = ctx.Pool(
+            workers,
+            initializer=_init_worker,
+            initargs=(factory, seed, scenario, tuple(around), tuple(labels)),
+        )
 
     def run_all(tasks: list[tuple[Seq, list[Seq]]]) -> Iterator[tuple[Seq, Key, list[str], Cents]]:
         """Results in task order, whatever the number of workers."""
@@ -247,7 +276,9 @@ def search(
         root_key, root_violated, root_exposure = local.run([])
         seen.add(root_key)
         if root_violated:
-            findings.append(Finding(moves=[], violated=root_violated, exposure=root_exposure))
+            findings.append(
+                Finding(moves=local.merged([]), violated=root_violated, exposure=root_exposure)
+            )
         frontier: list[Seq] = [()]
         for d in range(1, depth + 1):
             if findings and not exhaustive:
@@ -269,8 +300,13 @@ def search(
                     continue
                 seen.add(key)
                 if violated:
+                    moves = [alphabet[j] for j in seq]
                     findings.append(
-                        Finding(moves=[alphabet[j] for j in seq], violated=violated, exposure=exp)
+                        Finding(
+                            moves=local.merged(moves) if around else moves,
+                            violated=violated,
+                            exposure=exp,
+                        )
                     )
                 else:
                     next_frontier.append(seq)
