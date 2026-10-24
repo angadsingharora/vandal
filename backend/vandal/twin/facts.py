@@ -67,7 +67,84 @@ def _invoice_facts(state: State, inv: Invoice) -> dict[str, Any]:
         "vendor.po_required": vendor.po_required,
         "vendor.prior_payments": prior_settled_payments(state, vendor.id),
         **match_facts(state, inv),
+        **_duplicate_and_window_facts(state, inv),
     }
+
+
+# Windows (business days) that duplicate and aggregate facts are computed over. Templates T4 and
+# T5 may only use these, so their checks always have a fact to read.
+WINDOWS = (5, 10, 30)
+EXECUTED = ("submitted", "acknowledged", "settled", "misdirected")
+
+
+def normalize_number(number: str) -> str:
+    """Invoice numbers as a duplicate check should compare them: no suffix letters, separators,
+    or leading zeros. HAR07-2291A -> HAR072291."""
+    core = number.upper().rstrip("ABCDEFGHIJKLMNOPQRSTUVWXYZ-_ ")
+    return core.replace("-", "").replace(" ", "").lstrip("0")
+
+
+def _executions(state: State, invoice: str, besides: str | None = None) -> int:
+    return sum(
+        1
+        for p in state.payments.values()
+        if p.status in EXECUTED
+        and p.id != besides
+        and state.payment_instructions[p.instruction].invoice == invoice
+    )
+
+
+def _duplicate_and_window_facts(state: State, inv: Invoice) -> dict[str, Any]:
+    """Near-duplicate obligations (T4) and per-vendor totals (T5), per window."""
+    others = [
+        o
+        for o in state.invoices.values()
+        if o.id != inv.id and o.vendor == inv.vendor and o.status != "rejected"
+    ]
+    out: dict[str, Any] = {
+        "dup.normalized_number": any(
+            normalize_number(o.number) == normalize_number(inv.number) for o in others
+        ),
+    }
+    live = ("approved", "scheduled", "paid")
+    for w in WINDOWS:
+        near = [o for o in others if abs(o.received_on - inv.received_on) < w]
+        bps = [abs(o.amount - inv.amount) * 10_000 // max(inv.amount, 1) for o in near]
+        out[f"dup.amount_bps.{w}d"] = min(bps) if bps else 10**9
+        out[f"vendor.window_total.{w}d"] = inv.amount + sum(
+            o.amount for o in near if o.status in live and o.received_on >= 0
+        )
+    return out
+
+
+def _change_facts(state: State, action: Action) -> tuple[dict[str, Any], list[str]]:
+    args = action.args
+    cr = state.change_requests.get(str(args.get("change", "")))
+    vendor_id = cr.vendor if cr else args.get("vendor")
+    if vendor_id not in state.vendors:
+        return {}, []
+    vendor = state.vendors[vendor_id]
+    fields = cr.fields if cr else args.get("fields", "bank")
+    sender = cr.sender if cr else str(args.get("sender", ""))
+    channel = cr.channel if cr else args.get("channel")
+    sender_domain = sender.rpartition("@")[2].lower()
+    f = {
+        "vendor.id": vendor.id,
+        "vendor.status": vendor.status,
+        "change.id": cr.id if cr else None,
+        "change.status": cr.status if cr else "new",
+        "change.fields": [fields],
+        "change.bank": fields == "bank",
+        "change.contact": fields == "contact",
+        "change.channel": channel,
+        "change.sender_domain": sender_domain,
+        "change.sender_matches_vendor": sender_domain == vendor.domain,
+    }
+    cites = [vendor.id] + ([cr.id] if cr else [])
+    message = cr.message if cr else args.get("message")
+    if message:
+        cites.append(message)
+    return f, cites
 
 
 def _approval_for(state: State, invoice: str):
@@ -85,20 +162,10 @@ def facts(state: State, action: Action) -> tuple[dict[str, Any], list[str]]:
     cites: list[str] = []
     args = action.args
 
-    if action.name == "vendors.change_request" and args.get("vendor") in state.vendors:
-        vendor = state.vendors[args["vendor"]]
-        sender_domain = str(args.get("sender", "")).rpartition("@")[2].lower()
-        f |= {
-            "vendor.id": vendor.id,
-            "vendor.status": vendor.status,
-            "change.fields": ["bank"],
-            "change.channel": args.get("channel"),
-            "change.sender_domain": sender_domain,
-            "change.sender_matches_vendor": sender_domain == vendor.domain,
-        }
-        cites.append(vendor.id)
-        if args.get("message"):
-            cites.append(args["message"])
+    if action.name.startswith(("vendors.", "evidence.")):
+        change, change_cites = _change_facts(state, action)
+        f |= change
+        cites += change_cites
 
     invoice_id = args.get("invoice")
     if "payment" in args and args["payment"] in state.payments:
@@ -112,6 +179,7 @@ def facts(state: State, action: Action) -> tuple[dict[str, Any], list[str]]:
             "payment.amount": instr.amount,
             "payment.payee_account": instr.payee_account,
             "payment.idempotency_key": instr.idempotency_key,
+            "invoice.other_executions": _executions(state, instr.invoice, besides=pay.id),
         }
         cites += [pay.id, instr.id]
     if "request" in args and args["request"] in state.approval_requests:
@@ -142,8 +210,18 @@ def facts(state: State, action: Action) -> tuple[dict[str, Any], list[str]]:
             f |= {
                 "instruction.amount": inv.amount,
                 "instruction.payee_account": acct.id,
+                "instruction.due_date": inv.due_date,
                 "payee_account.status": acct.status,
+                "payee_account.verified_by": acct.verified_by,
             }
             cites.append(acct.id)
+            if approval := _approval_for(state, inv.id):
+                ai = approval.approved_instruction
+                # T2 compares what is about to execute with what was approved.
+                f |= {
+                    "binding.amount_matches": inv.amount == ai.amount,
+                    "binding.payee_account_matches": acct.id == ai.payee_account,
+                    "binding.due_date_matches": inv.due_date == ai.due_date,
+                }
 
     return f, cites

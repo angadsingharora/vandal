@@ -31,13 +31,35 @@ def cmd_seed(args: argparse.Namespace) -> int:
     return 0
 
 
+def _policy(args: argparse.Namespace):
+    from vandal.synth.templates import V0, Policy
+
+    return Policy.load(args.policy) if args.policy else V0
+
+
+def _lint_policy(policy, profile) -> list[str]:
+    from vandal.synth.lint import lint
+
+    return [
+        f"{f.lint}: {f.message}"
+        for c in policy.controls
+        for f in lint(c, profile.attacker_capabilities)
+    ]
+
+
+def _print_policy(policy) -> None:
+    print(f"policy {policy.version}" + (f" (from {policy.parent})" if policy.parent else ""))
+    for line in policy.diff:
+        print(f"  {line}")
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     from collections import Counter
 
     from vandal.sandbox import new_sandbox
     from vandal.verify.invariants import check
 
-    sb = new_sandbox(args.profile, seed=args.seed).operate(args.days)
+    sb = new_sandbox(args.profile, seed=args.seed, policy=_policy(args)).operate(args.days)
     state = sb.run.state
     verdicts = Counter(
         e.payload["verdict"]["decision"] for e in state.events if e.kind == "gate.verdict"
@@ -66,8 +88,13 @@ def cmd_attack(args: argparse.Namespace) -> int:
     from vandal.verify.replay import Trace, replay_detailed
 
     trace = Trace.load(args.trace)
+    policy = _policy(args)
+    _print_policy(policy)
     result, sb, _ = replay_detailed(
-        trace.seed, trace.moves, days=trace.days, sandbox=partial(new_sandbox, args.profile)
+        trace.seed,
+        trace.moves,
+        days=trace.days,
+        sandbox=partial(new_sandbox, args.profile, policy=policy),
     )
     print(f"trace {trace.name}: {len(trace.moves)} moves, seed {trace.seed}, {trace.days} days")
     for m in trace.moves:
@@ -155,10 +182,19 @@ def cmd_search(args: argparse.Namespace) -> int:
     from vandal.search.alphabet import SCENARIOS
     from vandal.search.bfs import search
     from vandal.search.minimize import minimize_trace
+    from vandal.twin.profile import load_profile
     from vandal.verify.replay import replay, replay_detailed
 
     scenario = SCENARIOS[args.scenario]
-    factory = partial(new_sandbox, args.profile)
+    policy = _policy(args)
+    _print_policy(policy)
+    findings = _lint_policy(policy, load_profile(args.profile))
+    for f in findings:
+        print(f"  lint {f}")
+    if findings and not args.no_lint:
+        print("rejected by lint; pass --no-lint to search it anyway")
+        return 2
+    factory = partial(new_sandbox, args.profile, policy=policy)
     result = search(
         factory,
         scenario,
@@ -224,6 +260,8 @@ def build_parser() -> argparse.ArgumentParser:
         if name in ("seed", "run", "attack", "search"):
             cmd.add_argument("--profile", default="bayline", help="profile name or YAML path")
             cmd.add_argument("--seed", type=int, default=DEFAULT_SEED)
+        if name in ("run", "attack", "search"):
+            cmd.add_argument("--policy", help="policy JSON (policies/*.json); default v0")
         if name == "run":
             cmd.add_argument("--days", type=int, default=5)
         if name == "search":
@@ -233,6 +271,9 @@ def build_parser() -> argparse.ArgumentParser:
             )
             cmd.add_argument(
                 "--workers", type=int, default=int(os.environ.get("SEARCH_WORKERS", 1))
+            )
+            cmd.add_argument(
+                "--no-lint", action="store_true", help="search a policy even if lints reject it"
             )
             cmd.add_argument(
                 "--exhaustive",

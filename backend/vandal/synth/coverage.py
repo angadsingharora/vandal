@@ -24,6 +24,7 @@ from pydantic import BaseModel, ConfigDict
 
 from vandal.contracts.entities import Cents
 from vandal.contracts.events import Event
+from vandal.twin.facts import normalize_number
 from vandal.twin.state import State
 from vandal.verify.invariants import AUTHENTICATED_CHANNELS, EXECUTED, Limits, Violation
 
@@ -139,12 +140,6 @@ def build_chain(
     return Chain(payment=pay.id, invoice=inv.id, links=links)
 
 
-def _normalize(number: str) -> str:
-    """Invoice numbers as a duplicate check should compare them: no suffix letters or padding."""
-    core = number.upper().rstrip("ABCDEFGHIJKLMNOPQRSTUVWXYZ-_ ")
-    return core.replace("-", "").replace(" ", "").lstrip("0")
-
-
 def _paid_invoices(state: State) -> dict[str, list[str]]:
     paid: dict[str, list[str]] = {}
     for p in state.payments.values():
@@ -164,7 +159,7 @@ def _obligation(state: State, index: EventIndex, inv, pay) -> Link:
         and o.vendor == inv.vendor
         and o.id in paid
         and (
-            _normalize(o.number) == _normalize(inv.number)
+            normalize_number(o.number) == normalize_number(inv.number)
             or (o.amount == inv.amount and abs(o.received_on - inv.received_on) <= 30)
         )
     ]

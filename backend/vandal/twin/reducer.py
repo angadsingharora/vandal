@@ -14,12 +14,14 @@ from vandal.contracts.entities import (
     Approval,
     ApprovalRequest,
     BankTransaction,
+    Evidence,
     Invoice,
     JournalEntry,
     Payment,
     PaymentInstruction,
     VendorBankAccount,
     VendorChangeRequest,
+    VendorContact,
 )
 from vandal.contracts.events import Event
 from vandal.twin.state import State
@@ -196,3 +198,34 @@ def _vendor_bank_changed(state: State, event: Event) -> None:
         state.update("vendor_bank_accounts", old, status="superseded")
     state.put("vendor_bank_accounts", VendorBankAccount.model_validate(event.payload["account"]))
     state.update("change_requests", event.payload["request"], status="applied")
+
+
+@handles("vendor.contact_changed")
+def _vendor_contact_changed(state: State, event: Event) -> None:
+    for old in event.payload["ended"]:
+        state.update("vendor_contacts", old, valid_to=state.day)
+    state.put("vendor_contacts", VendorContact.model_validate(event.payload["contact"]))
+    state.update("change_requests", event.payload["request"], status="applied")
+
+
+@handles("change_request.rejected")
+def _change_request_rejected(state: State, event: Event) -> None:
+    state.update("change_requests", event.payload["request"], status="rejected")
+
+
+@handles("evidence.created")
+def _evidence_created(state: State, event: Event) -> None:
+    evidence = Evidence.model_validate(event.payload["evidence"])
+    state.put("evidence", evidence)
+    cr = state.change_requests[evidence.change_request]
+    state.update("change_requests", cr.id, evidence=[*cr.evidence, evidence.id])
+
+
+@handles("callback.answered")
+def _callback_answered(state: State, event: Event) -> None:
+    state.update(
+        "evidence",
+        event.payload["evidence"],
+        status="answered",
+        confirms=bool(event.payload["confirms"]),
+    )

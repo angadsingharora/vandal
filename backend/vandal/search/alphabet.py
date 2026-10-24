@@ -7,10 +7,16 @@ discretized into equivalence classes, so the alphabet stays small without hand-p
 answer:
 
   vendor   one representative per class of exposure in the window: the vendor with the largest
-           open invoice over the approval threshold, the one with the largest open invoice under
-           it, and one with nothing open
-  channel  every change-request channel the attacker profile allows
-  sender   every sender the attacker profile allows
+           open invoice over the approval threshold, and the one with the largest open invoice
+           under it. A vendor with nothing open can't be paid in the window, so it adds no class.
+  fields   bank details, or the contact on file (a contact swap is how an attacker gets the
+           callback number)
+  sender   every sender the attacker profile allows: they differ in facts the gate can see
+           (a lookalike domain vs the vendor's real one)
+  channel  one representative change-request channel: email and agent messages are equally
+           unauthenticated, and no fact or template tells them apart
+  confirm  inbound confirmations on every channel the attacker can fake (phone_in with caller-ID
+           spoofing, video with voice cloning)
 
 Nothing here knows which move wins. The search finds that.
 """
@@ -44,7 +50,7 @@ SCENARIOS: dict[str, Scenario] = {
         description="Identity attacks on money out: vendor-master changes around the payment run",
         days=2,
         window_days=1,
-        kinds=("change_request", "trigger_batch"),
+        kinds=("change_request", "inbound_confirmation", "trigger_batch"),
     ),
 }
 
@@ -62,17 +68,25 @@ def vendor_classes(state: State, profile: Profile) -> list[str]:
         return ranked[0][1] if ranked else None
 
     reps = [largest(lambda a: a > threshold), largest(lambda a: a <= threshold)]
-    reps.append(next((v for v in sorted(state.vendors) if v not in open_by_vendor), None))
     return [v for v in reps if v is not None]
+
+
+def confirmation_channels(profile: Profile) -> list[str]:
+    caps = profile.attacker_capabilities
+    return [
+        ch for ch, able in (("phone_in", caps.spoof_caller_id), ("video", caps.clone_voice)) if able
+    ]
 
 
 def build_alphabet(scenario: Scenario, state: State, profile: Profile) -> list[Move]:
     caps = profile.attacker_capabilities
+    vendors = vendor_classes(state, profile)
+    channel = caps.change_request_channels[0]
     moves: list[Move] = []
     for at in scenario.window:
         if "change_request" in scenario.kinds:
-            for vendor in vendor_classes(state, profile):
-                for channel in caps.change_request_channels:
+            for vendor in vendors:
+                for fields in ("bank", "contact"):
                     for sender in caps.senders:
                         moves.append(
                             Move(
@@ -80,12 +94,26 @@ def build_alphabet(scenario: Scenario, state: State, profile: Profile) -> list[M
                                 at=at,
                                 params={
                                     "vendor": vendor,
-                                    "fields": "bank",
+                                    "fields": fields,
                                     "channel": channel,
                                     "sender": sender,
                                 },
                             )
                         )
+        if "inbound_confirmation" in scenario.kinds:
+            for vendor in vendors:
+                for ch in confirmation_channels(profile):
+                    moves.append(
+                        Move(
+                            kind="inbound_confirmation",
+                            at=at,
+                            params={
+                                "vendor": vendor,
+                                "channel": ch,
+                                "voice_match": 95,
+                            },
+                        )
+                    )
         if "trigger_batch" in scenario.kinds:
             moves.append(Move(kind="trigger_batch", at=at, params={}))
     return moves
@@ -94,7 +122,7 @@ def build_alphabet(scenario: Scenario, state: State, profile: Profile) -> list[M
 def touches(move: Move) -> str:
     """The entity a move reads or writes, for partial-order reduction. Moves that drive the
     Operator (a batch run) touch everything."""
-    if move.kind in ("change_request", "submit_invoice"):
+    if move.kind in ("change_request", "inbound_confirmation", "submit_invoice"):
         return f"vendor:{move.params['vendor']}"
     return "*"
 

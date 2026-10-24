@@ -34,7 +34,7 @@ from vandal.twin.state import State
 from vandal.twin.world import run_step, schedule
 from vandal.verify.invariants import Limits, check, exposure
 from vandal.verify.oracle import Oracle
-from vandal.verify.replay import SandboxFactory, SandboxLike, apply_move
+from vandal.verify.replay import HarnessEnvironment, SandboxFactory, SandboxLike, apply_move
 
 Key = tuple[int, str, tuple[tuple[str, str, str], ...]]
 Seq = tuple[int, ...]
@@ -95,9 +95,16 @@ class Runner:
         self.limits = Limits.from_profile(self.sb.profile)
         self.steps = schedule(self.scenario.days, start_day=self.base.day)
 
-    def _step(self, index: int) -> None:
+    def _step(self, index: int, oracle: Oracle) -> None:
         sb = self.sb
-        run_step(sb.run, sb.tools, self.steps[index], sb.operator, sb.approver)
+        run_step(
+            sb.run,
+            sb.tools,
+            self.steps[index],
+            sb.operator,
+            sb.approver,
+            HarnessEnvironment(oracle),
+        )
 
     def _prefix(self, moves: Sequence[Move]) -> tuple[State, Oracle, int]:
         """State right after the last move (before World step `pos` runs)."""
@@ -106,7 +113,7 @@ class Runner:
         pos = 0
         for i, move in enumerate(moves):
             while pos < move.at and pos < len(self.steps):
-                self._step(pos)
+                self._step(pos, oracle)
                 pos += 1
             apply_move(self.sb, move, i, oracle)
         return self.sb.run.state, oracle, pos
@@ -114,7 +121,7 @@ class Runner:
     def _finish(self, pos: int, oracle: Oracle) -> tuple[Key, list[str], Cents]:
         key = (pos, self.sb.run.state.entity_hash(), _labels(oracle))
         for index in range(pos, len(self.steps)):
-            self._step(index)
+            self._step(index, oracle)
         violations = check(self.sb.run.state, oracle, self.limits)
         return key, sorted({v.invariant for v in violations}), exposure(violations)
 
@@ -133,7 +140,7 @@ class Runner:
         for at in sorted({c.at for c in children}):
             self.sb.run.state = cursor
             while pos < at and pos < len(self.steps):
-                self._step(pos)
+                self._step(pos, oracle)
                 pos += 1
             snapshots[at] = cursor.clone()
         out = []
