@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Vandal · Mission Control",
+  title: "Vandal · Spider Poo",
   description: "Break it. Fix it. Prove it. Red finds the gap, Blue enforces the fix.",
 };
 

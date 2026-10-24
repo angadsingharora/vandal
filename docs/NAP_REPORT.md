@@ -145,9 +145,9 @@ Done smallest first, as the brief says. Two items landed; two were judged over t
 
 Merge top to bottom; after each merge GitHub retargets the next PR to `main`. The worktree at `C:/Users/Angad/vandal-nap` can be removed once the stack is merged (`git worktree remove C:/Users/Angad/vandal-nap`); its only untracked files are a copy of `NAP_PROMPT.md` and `.claude/launch.json`. One more Blue explanation recorded by the smoke runs is committed with this slice.
 
-## 7. A second UI concept, as a skeleton — `slice/ui-spider` (`frontend-v2/`)
+## 7. A second UI concept, as a skeleton — `slice/ui-spider` (`frontend-spider-poo/`, named “Spider Poo” by the owner)
 
-A copy of the frontend, not the original: `frontend-v2/` is a static, self-animating skeleton of the "spider and web" concept (the spider is Red, the web is Blue). No API calls; fixed numbers from the real runs. `cd frontend-v2 && npm install && npm run dev -- -p 3012`.
+A copy of the frontend, not the original: `frontend-spider-poo/` is a static, self-animating skeleton of the "spider and web" concept (the spider is Red, the web is Blue). No API calls; fixed numbers from the real runs. `cd frontend-spider-poo && npm install && npm run dev -- -p 3012`.
 
 - **The Web** replaces the search panel: a radial web, one ring per move of depth, one spoke per move family. Unleash draws strands of silk outward live; dedup snaps a strand onto a seen node; pruned branches fade; the violation is a red tear with the exposure hanging off it; minimization retracts along the shortest red strand; depth 3 collapses to a count until expanded. Click the tear to open the twin's chain as one strand, cut at execution.
 - **The Crawl** replaces intake: a messy forwarded OCR'd invoice; a crawler walks it line by line in about two seconds; recognized spans light up and threads pull each field out to a card; the OCR mangling stays on the page, the repaired reading on the card; Judge view puts the answer key beside each card; "both crawlers" shows the deterministic reader and Claude disagreeing on the property, flagged before Blue sees the tool call.
@@ -155,3 +155,7 @@ A copy of the frontend, not the original: `frontend-v2/` is a static, self-anima
 - The right column keeps the plain record (the gate console with verdicts, alerts, the recovery case).
 
 What wiring it to the backend needs is in the concept note: search jobs streaming nodes (parent hash, move, child hash, pruned/deduped/violated) as one more SSE event; intake returning the character spans it matched; the rest is SVG over the existing store.
+
+## 8. A third UI concept, as a skeleton — `slice/ui-circuit` (`frontend-circuit-bomb/`, “Circuit Bomb”)
+
+A new folder, not a change to either other UI. The company as a programmable circuit board: copper traces are the workflow (intake → 3-way match → approval → payment run → bank, with the ledger off the payment run and the vendor master feeding the payment run the account it reads at execution). Cyan pulses ride the traces as legitimate payments. **Detonate** plays one scene in seven steps: Vandal's red pulse enters through the vendor master (a lookalike change request); the payment run reads the current account and the trace to the bank floods red, $40,000 to BA-0032, the board shakes; the diagnosis dims everything but the approval → execution link and marks it open; Blue solders a T2 BIND gate onto that link and the replayed pulse still gets through, so T2 is refuted on screen; a T1 VERIFY gate goes onto the vendor trace and the next red pulse hits it and stops, HELD; six LEDs light as the checks pass, a human signs, v1-synth is live and the pulses keep flowing. A HUD carries the exposure, policy, sequence and verdict counters, an oscilloscope on the bank line, the gate log, and the six checks. `cd frontend-circuit-bomb && npm install && npm run dev -- -p 3013`.
