@@ -558,10 +558,11 @@ GET  /metrics?policies=v0,v1                         → scorecard (§10.1)
 ```
 
 ## 16. Repo layout
+The canonical, up-to-date layout is [IMPLEMENTATION.md §1](IMPLEMENTATION.md). This is the summary:
 ```
 backend/app/
   main.py  db.py  schemas.py
-  twin/{entities,reducer,clock,bank,ledger,gate,facts,profile}.py
+  twin/{entities,reducer,clock,bank,ledger,facts,profile}.py
   operator/{interface,reference}.py
   guard/{gate,chain,explain}.py
   search/{alphabet,bfs,por,minimize,red}.py
