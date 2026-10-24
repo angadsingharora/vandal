@@ -177,6 +177,7 @@ def facts(state: State, action: Action) -> tuple[dict[str, Any], list[str]]:
         "tool": action.name,
         "actor.id": action.actor.id,
         "actor.role": action.actor.role,
+        "sod.requester_is_actor": False,  # true only when deciding one's own request (below)
     }
     cites: list[str] = []
     args = action.args
@@ -215,6 +216,7 @@ def facts(state: State, action: Action) -> tuple[dict[str, Any], list[str]]:
             "request.id": req.id,
             "request.status": req.status,
             "request.requested_by": req.requested_by,
+            "sod.requester_is_actor": req.requested_by == action.actor.id,
         }
         cites.append(req.id)
 

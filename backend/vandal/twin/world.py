@@ -33,10 +33,17 @@ DAY_STEPS: tuple[StepKind, ...] = ("ops", "approvals", "batch", "bank", "tick")
 class Run:
     """Owns one run's state and its append-only event log."""
 
-    def __init__(self, state: State, sink: Callable[[Event], None] | None = None) -> None:
-        """`sink` sees every event after it's applied (persistence, R12; live streams, A0)."""
+    def __init__(
+        self,
+        state: State,
+        sink: Callable[[Event], None] | None = None,
+        monitor: Callable[[Run, Step], None] | None = None,
+    ) -> None:
+        """`sink` sees every event after it's applied (persistence, R12; live streams, A0).
+        `monitor` runs after every World step (Blue's runtime checks, B2)."""
         self.state = state.clone()
         self.sink = sink
+        self.monitor = monitor
 
     def emit(
         self,
@@ -117,6 +124,8 @@ def run_step(
 ) -> None:
     _run_step(run, tools, step, operator, approver)
     settle(run, tools, operator, env)
+    if run.monitor is not None:
+        run.monitor(run, step)
 
 
 def _run_step(

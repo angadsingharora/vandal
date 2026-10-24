@@ -21,8 +21,30 @@ from typing import Any
 from vandal.api.db import EventWriter, Store
 from vandal.api.sse import Channel
 from vandal.contracts.events import Event
+from vandal.guard.approvals import PolicyInbox
 from vandal.sandbox import Sandbox, new_sandbox
 from vandal.synth.templates import Policy
+
+
+def verdict_summary(ev: Event) -> dict[str, Any]:
+    """What the verdict feed shows: who asked for what, what Blue decided, and why."""
+    v = ev.payload["verdict"]
+    facts = v["facts"]
+    return {
+        "seq": ev.seq,
+        "day": ev.day,
+        "event": ev.id,
+        "actor": ev.actor,
+        "tool": ev.payload["tool"],
+        "stage": ev.payload["stage"],
+        "args": ev.payload["args"],
+        "decision": v["decision"],
+        "fired": v["fired"],
+        "cites": v["cites"],
+        "requires": facts.get("gate.requires", []),
+        "cleared_by": facts.get("gate.cleared_evidence", []),
+        "chain": {k.split(".", 1)[1]: val for k, val in facts.items() if k.startswith("chain.")},
+    }
 
 
 def _id(prefix: str) -> str:
@@ -37,6 +59,7 @@ class RunHandle:
     policy: Policy
     sandbox: Sandbox
     channel: Channel
+    verdicts: Channel = field(default_factory=Channel)  # B4: Blue's feed of decisions
     writer: EventWriter | None = None
     lock: threading.RLock = field(default_factory=threading.RLock)
 
@@ -71,6 +94,8 @@ class Registry:
         self.store = store
         self.runs: dict[str, RunHandle] = {}
         self.jobs: dict[str, Job] = {}
+        self.inbox = PolicyInbox()  # B3: policy patches wait here for a human
+        self.applied: dict[str, Policy] = {}  # policies applied through the inbox
         self.pool = ThreadPoolExecutor(max_workers=threads, thread_name_prefix="vandal-job")
 
     # --- runs -------------------------------------------------------------------------------
@@ -87,13 +112,19 @@ class Registry:
             )
             writer = self.store.writer(run_id)
 
+        verdicts = Channel()
+
         def sink(ev: Event) -> None:
             channel.publish("event", ev.model_dump(mode="json"))
+            if ev.kind == "gate.verdict":
+                verdicts.publish("verdict", verdict_summary(ev))
+            elif ev.kind == "guard.alert":
+                verdicts.publish("alert", {"seq": ev.seq, "day": ev.day, **ev.payload})
             if writer is not None:
                 writer(ev)
 
-        sb = new_sandbox(profile, seed=seed, policy=policy, sink=sink)
-        handle = RunHandle(run_id, profile, seed, policy, sb, channel, writer)
+        sb = new_sandbox(profile, seed=seed, policy=policy, sink=sink, monitor=True)
+        handle = RunHandle(run_id, profile, seed, policy, sb, channel, verdicts, writer)
         self.runs[run_id] = handle
         return handle
 
@@ -103,6 +134,7 @@ class Registry:
     def reset(self) -> None:
         for handle in self.runs.values():
             handle.channel.close()
+            handle.verdicts.close()
             if handle.writer is not None:
                 handle.writer.flush()
         self.runs.clear()

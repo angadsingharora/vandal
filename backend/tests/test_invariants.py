@@ -57,7 +57,7 @@ def add_payment(state, pid: str, invoice: str, amount: int, payee: str, day: int
 
 
 def test_all_invariants_hold_on_legitimate_ops(legit) -> None:
-    assert set(CHECKS) == {f"INV-{n}" for n in (*range(1, 10), 11)}
+    assert set(CHECKS) == {f"INV-{n}" for n in range(1, 12)}
     assert check(legit.run.state) == []
 
 
@@ -242,3 +242,11 @@ def test_inv6_inbox_reviewed_spend_does_not_count(state) -> None:
     )
     add_payment(state, "BIG", "INV-BIG", 3_000_000, instr.payee_account)
     assert check(state, only=("INV-6",)) == []
+
+
+def test_inv10_requester_is_not_approver(state) -> None:
+    approval = next(a for a in state.approvals.values() if a.via == "approvals_inbox")
+    assert check(state, only=("INV-10",)) == []
+    state.update("approvals", approval.id, approver=approval.requested_by)
+    (v,) = check(state, only=("INV-10",))
+    assert v.subject == approval.id

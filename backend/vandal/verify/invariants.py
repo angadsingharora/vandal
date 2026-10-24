@@ -1,6 +1,6 @@
 """R3: invariants as pure functions over (state, oracle) -> list[Violation] (DESIGN 7).
 
-INV-1 through INV-9 and INV-11 live here. INV-10 lands in B3.
+INV-1 through INV-11 live here.
 
 Seeded history is pre-opening (R1): its payments have no approvals or journal entries, so the
 payment invariants look only at payments executed in the run (submitted on day 0 or later).
@@ -461,6 +461,33 @@ def inv11_refunds(c: Ctx) -> list[Violation]:
     return out
 
 
+def inv10_requester_is_not_approver(c: Ctx) -> list[Violation]:
+    """No actor both requests and approves the same action (DESIGN 6.1). Policy patches are
+    held to the same rule in the policy inbox (guard/approvals.py)."""
+    out = []
+    for a in c.state.approvals.values():
+        if a.requested_by == a.approver:
+            out.append(
+                Violation(
+                    invariant="INV-10",
+                    subject=a.id,
+                    cites=[a.id, a.subject],
+                    message=f"{a.approver} requested and approved {a.subject}",
+                )
+            )
+    for r in c.state.approval_requests.values():
+        if r.decided_by is not None and r.decided_by == r.requested_by:
+            out.append(
+                Violation(
+                    invariant="INV-10",
+                    subject=r.id,
+                    cites=[r.id, r.subject],
+                    message=f"{r.decided_by} decided their own request {r.id}",
+                )
+            )
+    return out
+
+
 CHECKS: dict[str, Callable[[Ctx], list[Violation]]] = {
     "INV-1": inv1_entries_balance,
     "INV-2": inv2_executed_equals_approved,
@@ -471,6 +498,7 @@ CHECKS: dict[str, Callable[[Ctx], list[Violation]]] = {
     "INV-7": inv7_cash_and_ap_tie_out,
     "INV-8": inv8_append_only,
     "INV-9": inv9_gated_submission,
+    "INV-10": inv10_requester_is_not_approver,
     "INV-11": inv11_refunds,
 }
 

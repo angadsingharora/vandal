@@ -6,8 +6,7 @@ Runs live in memory (api/registry.py). With DATABASE_URL set, every run's events
 search, synthesis, and evidence pack are also persisted (api/db.py, R12). The war-room frontend
 reads state over JSON and follows runs and jobs over SSE.
 
-Not here yet, because their slices haven't landed: /runs/{id}/inject (plain-language inject,
-R9), /approvals and /policies/{id}/apply (the approvals inbox, B3), /explain (B5).
+Not here yet, because its slice hasn't landed: /runs/{id}/inject (plain-language inject, R9).
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from vandal.api import routes_jobs, routes_policies, routes_runs
+from vandal.api import routes_blue, routes_jobs, routes_policies, routes_runs
 from vandal.api.db import Store
 from vandal.api.registry import Registry
 
@@ -58,6 +57,7 @@ def create_app(store: Store | None = None, persist: bool | None = None) -> FastA
     app.include_router(routes_runs.router)
     app.include_router(routes_jobs.router)
     app.include_router(routes_policies.router)
+    app.include_router(routes_blue.router)
     return app
 
 

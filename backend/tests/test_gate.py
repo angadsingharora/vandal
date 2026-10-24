@@ -91,7 +91,9 @@ def test_operator_cannot_decide_approvals(sb) -> None:
     sb.tools.call(OP, "approvals.request", InvoiceRef(invoice="INV-1042"))
     (req,) = sb.run.state.approval_requests.values()
     result = sb.tools.call(OP, "approvals.decide", DecideArgs(request=req.id, approve=True))
-    assert not result.ok and "cannot decide" in result.data["error"]
+    # Blue's segregation-of-duties check blocks it at the gate, with a recorded verdict.
+    assert not result.ok and result.verdict.decision == "block"
+    assert "sod.role.approvals.decide" in result.verdict.fired
     assert sb.run.state.approval_requests[req.id].status == "pending"
 
 
@@ -148,3 +150,12 @@ def test_gate_fails_closed_on_a_missing_fact() -> None:
         v = Gate([check(action)]).check(sb.run.state, act, "pre_approve")
         assert v.decision == expected and v.fired == [f"c.{action}"]
         assert v.facts["gate.missing_facts"] == ["no.such.fact"]
+
+
+def test_every_tool_has_a_role() -> None:
+    """A tool missing from the segregation-of-duties matrix is blocked for everyone."""
+    from vandal.guard.sod import ROLE_TOOLS
+    from vandal.twin.flows import TOOLS
+
+    known = {t for tools in ROLE_TOOLS.values() for t in tools}
+    assert set(TOOLS) <= known, sorted(set(TOOLS) - known)

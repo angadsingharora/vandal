@@ -336,3 +336,8 @@ def _refund_issued(state: State, event: Event) -> None:
 def _refund_stopped(state: State, event: Event) -> None:
     """Held for a person, or rejected. Recorded so the request isn't lost."""
     state.put("refunds", Refund.model_validate(event.payload["refund"]))
+
+
+@handles("guard.alert")
+def _guard_alert(state: State, event: Event) -> None:
+    """Blue's runtime monitor saw an invariant break (B2). Logged; it changes nothing."""

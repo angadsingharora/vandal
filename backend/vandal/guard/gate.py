@@ -15,6 +15,8 @@ from typing import Any
 from vandal.contracts.controls import DECISION_ORDER, Check, Condition, Stage
 from vandal.contracts.interfaces import Action
 from vandal.contracts.verdicts import Verdict
+from vandal.guard.chain import chain_facts
+from vandal.guard.sod import sod_checks
 from vandal.twin.evidence import satisfying
 from vandal.twin.facts import facts
 from vandal.twin.state import State, construct
@@ -59,8 +61,13 @@ def _cleared_by(state: State, f: dict[str, Any], check: Check) -> list[str]:
 
 
 class Gate:
-    def __init__(self, checks: list[Check]) -> None:
-        self.checks = list(checks)
+    def __init__(self, checks: list[Check], sod: bool = True) -> None:
+        """`checks` is the policy (v0 plus its controls). Blue's segregation-of-duties checks
+        (guard/sod.py) come first and are always on unless `sod=False`."""
+        from vandal.twin.flows import TOOLS
+
+        always = sod_checks({name: spec.stage for name, spec in TOOLS.items()}) if sod else []
+        self.checks = always + list(checks)
 
     def check(self, state: State, action: Action, stage: Stage) -> Verdict:
         f, cites = facts(state, action)
@@ -88,6 +95,8 @@ class Gate:
                     requires.append({"check": c.id, **c.require.model_dump()})
                 fired.append(c.id)
                 decisions.append(c.action)
+        if stage == "pre_execute":
+            f = {**f, **chain_facts(f)}  # B2: the chain as Blue sees it, on every execute
         if missing:
             f = {**f, "gate.missing_facts": sorted(missing)}
         if requires:

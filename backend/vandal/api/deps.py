@@ -28,7 +28,10 @@ def get_job(request: Request, job_id: str) -> Job:
         raise HTTPException(404, f"no job {job_id}") from None
 
 
-def policy(name: str | None) -> Policy:
+def policy(name: str | None, request: Request | None = None) -> Policy:
+    """A policy by name: one applied through the inbox first, then the built-in and files."""
+    if request is not None and name in registry(request).applied:
+        return registry(request).applied[name]
     try:
         return load_policy(name)
     except (FileNotFoundError, ValueError) as err:
