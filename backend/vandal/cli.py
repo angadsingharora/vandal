@@ -707,6 +707,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from vandal.llm import load_env
+
+    load_env()  # backend/.env before the parser reads SEARCH_DEPTH and friends
     args, _rest = build_parser().parse_known_args(argv)
     if args.command in IMPLEMENTED:
         return IMPLEMENTED[args.command](args)

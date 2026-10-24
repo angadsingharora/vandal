@@ -1,11 +1,28 @@
 """Slow tests (full searches, CEGIS, verification packs) are skipped by default so the everyday
-suite stays fast. Run everything with `uv run pytest --slow` (or VANDAL_SLOW=1)."""
+suite stays fast. Run everything with `uv run pytest --slow` (or VANDAL_SLOW=1).
+
+The suite never calls Claude: backend/.env isn't loaded, the API key is cleared, and each test
+gets an empty LLM cache, so every caller takes its deterministic path. The one live check in
+test_llm.py runs only with VANDAL_LIVE_LLM=1."""
 
 from __future__ import annotations
 
 import os
 
 import pytest
+
+# Before any test module imports vandal.api.main, whose module-level app would load backend/.env.
+os.environ["VANDAL_DOTENV"] = "0"
+for _var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "DEMO_PLAYBACK"):
+    os.environ.pop(_var, None)
+
+
+@pytest.fixture(autouse=True)
+def _offline_llm(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    from vandal import llm
+
+    monkeypatch.setenv("LLM_CACHE_DIR", str(tmp_path / "llm_cache"))
+    monkeypatch.setattr(llm, "_client_cache", None)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
