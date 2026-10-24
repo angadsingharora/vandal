@@ -136,6 +136,7 @@ def test_shared_prefix_runs_match_full_runs() -> None:
     assert shared == [runner.run(parent + [c]) for c in children]
 
 
+@pytest.mark.slow
 def test_workers_and_dedup_dont_change_results() -> None:
     one = search(FACTORY, A, depth=2, exhaustive=True)
     two = search(FACTORY, A, depth=2, exhaustive=True, workers=2)

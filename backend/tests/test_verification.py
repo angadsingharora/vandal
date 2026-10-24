@@ -37,6 +37,7 @@ def pack_v0():
     return verify(V0, V0, factory_for, profile="bayline", depth=1)
 
 
+@pytest.mark.slow
 def test_v1_passes_all_six_checks(pack_v1) -> None:
     assert [c.name for c in pack_v1.checks] == [
         "replay",
@@ -53,12 +54,14 @@ def test_v1_passes_all_six_checks(pack_v1) -> None:
     assert pack_v1.diff == V1.diff and len(pack_v1.chosen) == 2
 
 
+@pytest.mark.slow
 def test_v0_reports_its_failures(pack_v0) -> None:
     failed = {c.name for c in pack_v0.checks if not c.passed}
     assert failed == {"replay", "re-search", "variants", "regression", "invariants"}
     assert not pack_v0.approvable
 
 
+@pytest.mark.slow
 def test_scorecard_before_and_after(pack_v1) -> None:
     before, after = pack_v1.metrics["before"], pack_v1.metrics["after"]
     assert (before.policy, after.policy) == ("v0", "v1")
@@ -70,6 +73,7 @@ def test_scorecard_before_and_after(pack_v1) -> None:
     assert after.extraction_accuracy is None and after.notes  # honest about what isn't measured
 
 
+@pytest.mark.slow
 def test_evidence_pack_is_written(pack_v1, tmp_path) -> None:
     path = pack_v1.write(tmp_path)
     assert path.name == "v1.json"
@@ -135,6 +139,7 @@ def test_credit_memo_cancels_only_unpaid_invoices() -> None:
     assert not r.ok and "paid" in r.data["error"]
 
 
+@pytest.mark.slow
 def test_vandal_verify_cli(tmp_path, capsys) -> None:
     args = ["verify", "--depth", "1", "--workers", "1", "--out", str(tmp_path)]
     assert main([*args, "--policy", "v1"]) == 0

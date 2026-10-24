@@ -3,7 +3,8 @@
 This is the build order for [DESIGN.md](DESIGN.md) v0.6. **Red (the Sandbox) comes first**, split into vertical slices. Each slice is runnable, tested, and demoable before the next one starts. Blue, the Operator, the LLM layer, the API, and the frontend follow in the same style.
 
 **Rules for every slice:**
-- It isn't done until its "Done when" test passes (`uv run pytest`) and its CLI or API command works.
+- It isn't done until its "Done when" test passes (`uv run pytest --slow`) and its CLI or API command works.
+  Plain `uv run pytest` (~10 s) skips tests marked `slow` (full searches, CEGIS, verification packs); run `--slow` before a PR.
 - Build the thinnest end-to-end version first, then widen it. For example, get one invoice through end to end before handling all 80.
 
 ---
