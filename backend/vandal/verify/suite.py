@@ -93,7 +93,13 @@ def legit_ops(factory: SandboxFactory, seed: int = 7, days: int = 2) -> list[Leg
             {v.invariant for v in check(final, None, Limits.from_profile(sb.profile))}
         )
         out.append(
-            LegitOp(iid, paid, decisions.count("hold"), decisions.count("block"), violations)
+            LegitOp(
+                iid,
+                paid,
+                decisions.count("hold") + decisions.count("escalate"),  # both wait on someone
+                decisions.count("block"),
+                violations,
+            )
         )
     return out
 
@@ -342,7 +348,10 @@ def verify(
     depth: int = 3,
     workers: int = 1,
     days: int = 2,
+    candidates: list[Candidate] | None = None,
 ) -> EvidencePack:
+    """`candidates` is what synthesis tried (R8's CEGIS log); a hand-written policy is its own
+    single candidate."""
     after_factory = factory_for(policy)
     before_factory = factory_for(parent)
     after = collect(policy, after_factory, seed=seed, depth=depth, workers=workers)
@@ -373,7 +382,8 @@ def verify(
         seed=seed,
         counterexample=cx,
         diagnosis=diagnosis,
-        candidates=[
+        candidates=candidates
+        or [
             Candidate(
                 source="manual",
                 controls=[describe(c) for c in policy.controls],
