@@ -131,7 +131,7 @@ docs/            spec, design, implementation plan, reviews
 
 ## Status
 
-The Sandbox (twin, search, root cause, CEGIS, verification), fault injection, money in, persistence, the API skeleton, the Operator (reference and LLM intake, recovery, approvers), and the war-room frontend (F0–F6) are in. Still in progress: the LLM layer (`vandal/llm.py`; until it lands, callers fall back to deterministic paths such as `--no-llm`). See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the slice plan.
+The Sandbox (twin, search, root cause, CEGIS, verification), fault injection, money in, persistence, the API skeleton, the Operator (reference and LLM intake, recovery, approvers), and the war-room frontend (F0–F6) are in. The LLM layer (L0, `vandal/llm.py`) is in: Claude through one wrapper with structured output and a content-keyed cache under `backend/llm_cache/`. `DEMO_PLAYBACK=true` serves every call from that cache with no API key, and any miss, timeout, or missing key makes the caller take its deterministic path (`--no-llm` forces it). See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the slice plan.
 
 ## Docs
 
