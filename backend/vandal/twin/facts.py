@@ -85,6 +85,21 @@ def facts(state: State, action: Action) -> tuple[dict[str, Any], list[str]]:
     cites: list[str] = []
     args = action.args
 
+    if action.name == "vendors.change_request" and args.get("vendor") in state.vendors:
+        vendor = state.vendors[args["vendor"]]
+        sender_domain = str(args.get("sender", "")).rpartition("@")[2].lower()
+        f |= {
+            "vendor.id": vendor.id,
+            "vendor.status": vendor.status,
+            "change.fields": ["bank"],
+            "change.channel": args.get("channel"),
+            "change.sender_domain": sender_domain,
+            "change.sender_matches_vendor": sender_domain == vendor.domain,
+        }
+        cites.append(vendor.id)
+        if args.get("message"):
+            cites.append(args["message"])
+
     invoice_id = args.get("invoice")
     if "payment" in args and args["payment"] in state.payments:
         pay = state.payments[args["payment"]]

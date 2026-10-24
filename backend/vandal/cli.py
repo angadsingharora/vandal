@@ -54,7 +54,32 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 1 if violations else 0
 
 
-IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {"seed": cmd_seed, "run": cmd_run}
+def cmd_attack(args: argparse.Namespace) -> int:
+    from vandal.sandbox import replay_with_reference
+    from vandal.verify.replay import Trace
+
+    trace = Trace.load(args.trace)
+    result = replay_with_reference(trace, args.profile)
+    print(f"trace {trace.name}: {len(trace.moves)} moves, seed {trace.seed}, {trace.days} days")
+    for m in trace.moves:
+        params = " ".join(f"{k}={v}" for k, v in m.params.items())
+        print(f"  @{m.at:<3} {m.kind} {params}".rstrip())
+    if not result.violations:
+        print("no violations: the controls held")
+    else:
+        print(f"VIOLATED {', '.join(result.violated)}")
+        for v in result.violations:
+            print(f"  {v.invariant}  {v.message}")
+    print(f"exposure    ${result.exposure / 100:,.2f}  ({result.exposure} cents)")
+    print(f"state_hash  {result.state_hash}")
+    return 0
+
+
+IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {
+    "seed": cmd_seed,
+    "run": cmd_run,
+    "attack": cmd_attack,
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -64,11 +89,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="command", required=True)
     for name, (help_text, _slice) in COMMANDS.items():
         cmd = sub.add_parser(name, help=help_text)
-        if name in ("seed", "run"):
+        if name in ("seed", "run", "attack"):
             cmd.add_argument("--profile", default="bayline", help="profile name or YAML path")
             cmd.add_argument("--seed", type=int, default=DEFAULT_SEED)
         if name == "run":
             cmd.add_argument("--days", type=int, default=5)
+        if name == "attack":
+            cmd.add_argument("--trace", required=True, help="path to a trace JSON file")
     return parser
 
 

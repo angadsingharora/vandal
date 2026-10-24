@@ -67,6 +67,7 @@ class VendorBankAccount(Entity):  # BA-…
     status: Literal["verified", "unverified", "superseded", "rejected"]
     source: str
     verified_by: str | None = None
+    verified_on: SimDay | None = None
 
 
 class Evidence(Entity):
@@ -81,6 +82,9 @@ class VendorChangeRequest(Entity):  # CR-…
     vendor: str
     proposed: dict[str, str]
     channel: Literal["email", "portal", "agent_msg"]
+    sender: str
+    message: str | None = None  # the channel message it came from
+    received_on: SimDay
     status: Literal["open", "held", "applied", "rejected"] = "open"
     evidence: list[str] = []
 

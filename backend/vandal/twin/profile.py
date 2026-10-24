@@ -53,6 +53,7 @@ class ApprovalMatrix(_Spec):
     match_tolerance_pct: int
     approvers: list[ApproverSpec]
     min_prior_payments: int
+    aggregate_window_days: int = 5  # INV-6: per-vendor totals in this window count
 
 
 class OperatorSpec(_Spec):

@@ -18,6 +18,8 @@ from vandal.contracts.entities import (
     JournalEntry,
     Payment,
     PaymentInstruction,
+    VendorBankAccount,
+    VendorChangeRequest,
 )
 from vandal.contracts.events import Event
 from vandal.twin.state import State
@@ -175,3 +177,22 @@ def _bank_reconciled(state: State, event: Event) -> None:
 @handles("journal.posted")
 def _journal_posted(state: State, event: Event) -> None:
     state.journal.append(JournalEntry.model_validate(event.payload["entry"]))
+
+
+@handles("channel.received")
+def _channel_received(state: State, event: Event) -> None:
+    """An inbound message (email, call, agent message). Logged so chains can cite it."""
+
+
+@handles("change_request.created")
+def _change_request_created(state: State, event: Event) -> None:
+    state.put("change_requests", VendorChangeRequest.model_validate(event.payload["request"]))
+
+
+@handles("vendor.bank_changed")
+def _vendor_bank_changed(state: State, event: Event) -> None:
+    """Applies a change request to the vendor master: the new account becomes current."""
+    for old in event.payload["superseded"]:
+        state.update("vendor_bank_accounts", old, status="superseded")
+    state.put("vendor_bank_accounts", VendorBankAccount.model_validate(event.payload["account"]))
+    state.update("change_requests", event.payload["request"], status="applied")
