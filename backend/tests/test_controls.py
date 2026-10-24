@@ -24,7 +24,7 @@ from vandal.verify.invariants import check
 from vandal.verify.replay import Trace, replay_detailed
 
 ROOT = Path(__file__).resolve().parents[1]
-V1 = Policy.load(ROOT / "policies" / "v1_manual.json")
+V1 = Policy.load(ROOT / "policies" / "v1.json")
 PHONE_IN = Policy.load(ROOT / "policies" / "t1_phone_in.json")
 A = SCENARIOS["a"]
 CAPS = load_profile().attacker_capabilities
@@ -190,7 +190,7 @@ def test_genuine_change_is_applied_once_the_callback_confirms() -> None:
     op = sb.operator
     ev_args = ChangeRequestArgs(
         vendor="V-004",
-        channel="portal",
+        channel="email",
         sender="ar@greenlinels.com",
         routing="121000358",
         account="5550001111",

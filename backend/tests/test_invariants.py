@@ -211,3 +211,34 @@ def test_exposure_counts_each_payment_once(state) -> None:
     violations = check(state)
     assert {v.invariant for v in violations} >= {"INV-2", "INV-5"}
     assert exposure(violations) == instr.amount + 1
+
+
+def test_inv6_inbox_reviewed_spend_does_not_count(state) -> None:
+    """A human approved the big one in the inbox; a small policy-approved invoice from the same
+    vendor that week isn't a split."""
+    pay, instr = run_payment(state), None
+    instr = state.payment_instructions[pay.instruction]
+    inv = state.invoices[instr.invoice]
+    state.put(
+        "invoices", inv.model_copy(update={"id": "INV-BIG", "number": "BIG", "amount": 3_000_000})
+    )
+    ai = ApprovedInstruction(
+        invoice="INV-BIG",
+        amount=3_000_000,
+        payee_account=instr.payee_account,
+        due_date=inv.due_date,
+    )
+    state.put(
+        "approvals",
+        Approval(
+            id="APR-BIG",
+            subject="INV-BIG",
+            requested_by="OP-1",
+            approver="U-CTRL",
+            via="approvals_inbox",
+            approved_instruction=ai,
+            instruction_hash="x",
+        ),
+    )
+    add_payment(state, "BIG", "INV-BIG", 3_000_000, instr.payee_account)
+    assert check(state, only=("INV-6",)) == []

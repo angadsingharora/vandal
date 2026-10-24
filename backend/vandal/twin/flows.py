@@ -82,6 +82,20 @@ class ChangeRequestArgs(_Args):
     contact_phone: str | None = None
 
 
+class InvoiceArgs(_Args):
+    """An invoice or credit memo as the Operator extracted it from an inbound message."""
+
+    vendor: str
+    number: str
+    amount: int
+    dimension: str
+    due_in_days: int = 5
+    kind: Literal["invoice", "credit_memo"] = "invoice"
+    supersedes: str | None = None  # the invoice a credit memo corrects
+    po: str | None = None
+    message: str | None = None
+
+
 class ChangeRef(_Args):
     change: str  # CR-…
 
@@ -460,6 +474,66 @@ def _record_inbound(ctx: Ctx, args: InboundEvidenceArgs) -> list[EventSpec]:
     return [("evidence.created", {"evidence": evidence})]
 
 
+def _receive_invoice(ctx: Ctx, args: InvoiceArgs) -> list[EventSpec]:
+    """Log an incoming invoice. A credit memo cancels the unpaid invoice it corrects; the
+    corrected invoice, if any, arrives on its own."""
+    state = ctx.state
+    if args.vendor not in state.vendors:
+        raise ToolError(f"unknown vendor {args.vendor}")
+    if args.amount <= 0:
+        raise ToolError("amounts are positive; a credit memo says what it corrects instead")
+    if args.po is not None and args.po not in state.purchase_orders:
+        raise ToolError(f"unknown PO {args.po}")
+    specs: list[EventSpec] = []
+    status = "received"
+    if args.kind == "credit_memo":
+        original = state.invoices.get(args.supersedes or "")
+        if original is None or original.vendor != args.vendor:
+            raise ToolError(f"credit memo must correct an invoice of {args.vendor}")
+        if original.status in ("paid", "cancelled"):
+            raise ToolError(f"{original.id} is {original.status}; nothing left to cancel")
+        status = "applied"
+    numbers = [int(i.id.split("-")[1]) for i in state.invoices.values()]
+    iid = f"INV-{max(numbers, default=1000) + 1}"
+    invoice = {
+        "id": iid,
+        "vendor": args.vendor,
+        "number": args.number,
+        "po": args.po,
+        "amount": args.amount,
+        "dimension": args.dimension,
+        "received_on": state.day,
+        "due_date": state.day + args.due_in_days,
+        "kind": args.kind,
+        "supersedes": args.supersedes,
+        "status": status,
+    }
+    specs.append(("invoice.received", {"invoice": invoice, "message": args.message}))
+    if args.kind == "credit_memo":
+        specs.append(("invoice.cancelled", {"invoice": args.supersedes, "by": iid}))
+    return specs
+
+
+def _record_portal(ctx: Ctx, args: ChangeRef) -> list[EventSpec]:
+    """A change submitted through the authenticated vendor portal carries its own evidence."""
+    state = ctx.state
+    cr = _held_change(state, args.change)
+    if cr.channel != "portal":
+        raise ToolError(f"{cr.id} came by {cr.channel}, not the portal")
+    evidence = {
+        "id": f"EVD-{len(state.evidence) + 1:04d}",
+        "change_request": cr.id,
+        "channel": "portal",
+        "direction": "inbound",
+        "received_on": state.day,
+        "status": "answered",
+        "confirms": True,
+        "authenticated": True,
+        "message": cr.message,
+    }
+    return [("evidence.created", {"evidence": evidence})]
+
+
 @dataclass(frozen=True)
 class ToolSpec:
     stage: Stage
@@ -501,6 +575,8 @@ TOOLS: dict[str, ToolSpec] = {
     "evidence.request_callback": ToolSpec(
         "verification", CallbackArgs, {"allow": _request_callback}
     ),
+    "invoices.receive": ToolSpec("intake", InvoiceArgs, {"allow": _receive_invoice}),
+    "evidence.record_portal": ToolSpec("verification", ChangeRef, {"allow": _record_portal}),
     "evidence.record_inbound": ToolSpec(
         "verification", InboundEvidenceArgs, {"allow": _record_inbound}
     ),

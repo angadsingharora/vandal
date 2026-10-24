@@ -54,7 +54,7 @@ def _invoice_facts(state: State, inv: Invoice) -> dict[str, Any]:
         o.id != inv.id
         and o.vendor == inv.vendor
         and o.number == inv.number
-        and o.status != "rejected"
+        and o.status not in ("rejected", "cancelled", "applied")
         for o in state.invoices.values()
     )
     return {
@@ -99,7 +99,9 @@ def _duplicate_and_window_facts(state: State, inv: Invoice) -> dict[str, Any]:
     others = [
         o
         for o in state.invoices.values()
-        if o.id != inv.id and o.vendor == inv.vendor and o.status != "rejected"
+        if o.id != inv.id
+        and o.vendor == inv.vendor
+        and o.status not in ("rejected", "cancelled", "applied")
     ]
     out: dict[str, Any] = {
         "dup.normalized_number": any(

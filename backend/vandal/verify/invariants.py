@@ -234,16 +234,20 @@ def inv5_verified_payee(c: Ctx) -> list[Violation]:
 
 
 def inv6_threshold_approval(c: Ctx) -> list[Violation]:
-    """Over-threshold payments need an inbox approval. Per-vendor totals within the window count
-    toward the threshold, so splitting an invoice doesn't get around it."""
+    """Over-threshold payments need an inbox approval. Unreviewed spend adds up: per-vendor
+    totals of payments without an inbox approval, within the window, count toward the threshold,
+    so splitting an invoice doesn't get around it. A payment a human approved in the inbox has
+    been reviewed, so it neither needs nor counts toward the aggregate."""
     state, limits = c.state, c.limits
-    run = executed_in_run(state)
+
+    def reviewed(p: Payment) -> bool:
+        approval = _approval(state, _invoice_of(state, p))
+        return approval is not None and approval.via == "approvals_inbox"
+
+    run = [p for p in executed_in_run(state) if not reviewed(p)]
     vendor_of = {p.id: state.invoices[_invoice_of(state, p)].vendor for p in run}
     out = []
     for pay in run:
-        approval = _approval(state, _invoice_of(state, pay))
-        if approval is not None and approval.via == "approvals_inbox":
-            continue
         day = pay.submitted_on or 0
         window = [
             q

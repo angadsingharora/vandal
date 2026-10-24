@@ -117,7 +117,15 @@ class Receipt(Entity):  # RC-…
 
 
 InvoiceStatus = Literal[
-    "received", "validated", "approved", "scheduled", "paid", "held", "rejected"
+    "received",
+    "validated",
+    "approved",
+    "scheduled",
+    "paid",
+    "held",
+    "rejected",
+    "cancelled",  # superseded by a credit memo before it was paid
+    "applied",  # a credit memo, once it has cancelled what it corrects
 ]
 
 

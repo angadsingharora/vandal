@@ -1,5 +1,5 @@
 {
-  "version": "v1-manual",
+  "version": "v1",
   "parent": "v0",
   "controls": [
     {"template": "T1", "params": {"accepted_channels": ["phone_outbound", "portal"], "contact_as_of": "before_request"}},
