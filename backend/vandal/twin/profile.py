@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from vandal.contracts.entities import Cents, SimDay
 
@@ -69,6 +69,14 @@ class AttackerCapabilities(_Spec):
     portal_takeover: bool
     submit_invoices: bool
     deposits: bool
+
+    @model_validator(mode="after")
+    def _portal_needs_takeover(self) -> AttackerCapabilities:
+        # A portal submission is authenticated evidence on its own (twin/flows), so an attacker
+        # can only send one by taking the portal over.
+        if "portal" in self.change_request_channels and not self.portal_takeover:
+            raise ValueError("change_request_channels has portal but portal_takeover is false")
+        return self
 
 
 class RiskAppetite(_Spec):
