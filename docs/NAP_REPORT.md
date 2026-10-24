@@ -4,7 +4,7 @@ _Written by the overnight session while the owner slept. Updated after every ite
 
 ## Summary (five lines)
 
-1. **PRs in merge order:** (filled in as each opens) `slice/L0-fixes` → ...
+1. **PRs in merge order:** [#25](https://github.com/angadsingharora/vandal/pull/25) `slice/L0-fixes` → (next slices listed as they open)
 2. **Tests before:** fast suite 1 failure (`test_api_war_room.py`, stale since O2). **After:** see each slice below.
 3. **Look at this first:** the stacked PR list below, then `docs/screenshots/` once slice 3 lands.
 4. **Broken:** nothing known yet.
@@ -24,3 +24,40 @@ The checkout `C:\Users\Angad\vandal` was being edited by another session (O1 API
 - **READMEs:** the "until L0 lands" lines in `README.md` and `frontend/README.md` now describe the cache and playback as they are.
 
 See it: `python -m uv run pytest` (fast), `python -m uv run pytest --slow`, `python -m uv run ruff check .`; `cd frontend && npm run typecheck && npm test && npm run build`.
+
+## 2. Recordings and playback — `slice/L0-recordings`
+
+**Found while recording, fixed here:** Red's plain-language reader and the CEGIS proposer asked Claude for a free-form `dict` of parameters. Claude's structured output can't fill an open dict, so every move and every candidate came back with `params: {}` and the model wrote the parameters into its notes instead ("the output schema only accepts empty params objects"). Every LLM inject then failed with "nothing in this threat is within the attacker's capabilities", and the LLM synth proposed only default-parameter controls (three identical T3s for Scenario B, which then "cannot auto-repair"). Fix: `_LLMMove.params` and `_LLMCandidate.params` are lists of `{key, value}` pairs folded into the dict in code; prompt versions bumped to `red-v2` and `synth-v2`; duplicate candidates within one iteration are dropped. Intake and explanations were never affected (flat schemas).
+
+**What was recorded with the real key** (`backend/llm_cache/`, committed):
+- `vandal intake`: 24 messy items, all through Claude. **LLM intake: 120/120 fields, 24/24 GL codes**, the same as the deterministic reader. Cost: 24 calls (recorded by PR 23's author; this run served them from cache).
+- `vandal run --days 5 --operator llm`: zero LLM calls. Structured events take the reference path by design (IMPLEMENTATION §0), so this command records nothing.
+- `vandal synth --scenario a` (from v0), `b` (from v1), `f` (from v2): the proposer's calls per iteration. Scenario B from v0 can't pass regression (the suite's bank-change cases need v1's T1), so b and f start from the policy that precedes them, as `backend/policies/` stacks them.
+- `vandal inject` with three threats: the Scenario C shape (cloned-voice callback after a bank change), the Scenario E shape (counterparty agent waives callbacks, asks for other vendors' remittance details), and the CFO airport call.
+- `GET /explain/...` for PAY-0057, INV-1042, CR-0001, and a pushback question, through the API after reset → run → replay Scenario A.
+
+**Keys are content-only:** `tests/test_llm_cache.py` recomputes each file's key from its stored request and checks it matches the file name, validates every response against the caller's schema, and greps for secrets. A prompt with a run id or wall-clock timestamp fails the test.
+
+**Two more crashes fixed in the same slice.** With real parameters, the model sometimes plans a `submit_invoice` move. (1) The twin's attacker-invoice stub raised `NotImplementedError` straight through `vandal inject`; Red's capability filter now drops such a move with a "not modeled" note. (2) A `submit_invoice` without `number`/`amount` was a `KeyError`; it is now an `IllegalMove` like every other half-specified move.
+
+**Known limit found, not fixed (owner, look at this):** `vandal synth --scenario f --policy v2` **cannot auto-repair at the default depth 3**, with the sweep or the LLM. Every T6 variant is beaten by `deposit@3; deposit@3; refund_request@4 → INV-4`: two deposits followed by a refund. The R11 test (`tests/test_money_in.py::test_cegis_lands_on_t6_with_cleared_funds`) runs at depth 2, where T6 survives. Either INV-4 counts a refund of an attacker's own cleared second deposit as a loss (a false positive in the oracle), or T6 needs a parameter the template library lacks. Reproduce: `python -m uv run vandal synth --scenario f --policy v2 --no-llm` (and `--depth 2` to see it pass). The demo script (DESIGN §13) uses Scenarios A and B only, so the demo is not affected.
+
+**Server-side fallback shows up in the cache.** Two Red content calls were answered by a different model than requested (the `server-side-fallback` beta the wrapper opts into). The cache entry stored the answering model as `request.model`, so the key could not be recomputed from the entry. Entries now store the requested model (what the key is made of) plus `served_by`; the two old entries were rewritten the same way.
+
+**Playback proof:** with `DEMO_PLAYBACK=true`, `VANDAL_DOTENV=0` (so no key at all), the whole CLI loop (`intake`, `run --operator llm`, `synth a/b/f`, three `inject`s with repair, the four `/explain` calls) completed with **0** `playback: no recording` / `LLM unavailable` lines. Script: the loop in section 2 above; the war room's clicks were recorded through the API on port 8010 during section 3 and are in the same cache. The three `inject`s and `synth f` exit 1 by design (a violation was found / cannot auto-repair), not from a miss.
+
+**Cache inventory (committed):** 24 intake, 4 Red plans, 4 Red content, 5+2 synth proposals (iterations 1 and 2), 5 Blue explanations. `grep -r sk-ant backend/llm_cache` → nothing.
+
+## 3. The demo loop in the war room — `slice/demo-e2e`
+
+Driven in the browser against the worktree's API (`:8010`) and `next dev` (`:3010`), with the real key so every click's LLM call was recorded. Screenshots of each panel are in `docs/screenshots/` (taken at 1440×900; the overnight pane scales them, so the polish slice retakes them full size).
+
+Every step of DESIGN §13 ran: Reset → Run operations (80 paid, all invariants hold) → Unleash Vandal (65 sequences, 12 violating, 1-move counterexample, $40,000) → Replay on twin (Attack tab, exposure $40k, 3 broken) → Diagnose (execution link broken, `approval_binding`) → Synthesize with Claude (T2 refuted twice, T2+T1 survived, lint caught T1-with-video) → Verify (6/6, approvable) → Submit → Approve as Controller → Apply → Replay under v1-synth (HELD, $0) → inject a never-seen threat (Claude's plan: lookalike bank-change email for Summit Roofing plus a pressure email, with written content) → why? on PAY-0057 (Claude, every claim cited) → push back ("the hold stands") → Scorecard (v0 $300,787 exposure vs v1-synth $0; intake 100%/100%; 0 legit blocked) → Judge view → Playback toggle (server flag flipped, confirmed on `/settings`).
+
+**Bugs found and fixed:**
+- **Inject ran on the wrong run.** The dialog's button says "Run on <focused run's policy>" (e.g. `v1-synth` from the replay tab) but the store always posted to the Live run (v0). So the judge's threat appeared to break `v1-synth` ($9,461.68 to a lookalike) when the API under `v1-synth` actually holds it. `previewInject`/`runInject` now use the focused run, so the label and the policy agree.
+- (backend, in slice 2) the two inject crashes above, found by driving this form with Claude's reader.
+
+**Not reproducible in the UI, covered by the smoke test instead:** "Operator tries to approve" is offered only on pending *payment* approval requests, and the simulated approver clears those within the day, so a 5-day run leaves none pending. Segregation of duties for policy patches is asserted in `scripts/demo_smoke.py` (403 for the Operator).
+
+**UI polish items noted for slice 3b:** Escape does not close the explanation drawer or the scorecard; the right column's Operator/verdict rows extend past 1440 px (long verdict text has no `min-w-0`); the search panel keeps "12 violating traces" from the v0 search after a replay tab under v1-synth is focused; the Scorecard's per-class rows render `0/0` in red/green with no legend.

@@ -1,0 +1,46 @@
+{
+  "cache_key": "synth-v2.synth.propose-1.0097e012ab48db1b3d6f5d06b9b61dc611b2556817bdd94d7935515dd20517a0",
+  "request": {
+    "model": "claude-opus-5-5",
+    "prompt": "{\"catalog\": {\"T1\": {\"name\": \"VerifiedAccountChange\", \"params\": {\"additionalProperties\": false, \"properties\": {\"accepted_channels\": {\"items\": {\"enum\": [\"email\", \"portal\", \"agent_msg\", \"phone_in\", \"phone_outbound\", \"video\"], \"type\": \"string\"}, \"minItems\": 1, \"title\": \"Accepted Channels\", \"type\": \"array\"}, \"contact_as_of\": {\"default\": \"before_request\", \"enum\": [\"current\", \"before_request\"], \"title\": \"Contact As Of\", \"type\": \"string\"}, \"window_days\": {\"default\": 30, \"minimum\": 1, \"title\": \"Window Days\", \"type\": \"integer\"}}, \"required\": [\"accepted_channels\"], \"title\": \"T1Params\", \"type\": \"object\"}}, \"T2\": {\"name\": \"ApprovalBinding\", \"params\": {\"additionalProperties\": false, \"properties\": {\"bound_fields\": {\"items\": {\"enum\": [\"amount\", \"payee_account\", \"due_date\"], \"type\": \"string\"}, \"minItems\": 1, \"title\": \"Bound Fields\", \"type\": \"array\"}, \"on_mismatch\": {\"default\": \"hold\", \"enum\": [\"hold\", \"reapprove\", \"block\"], \"title\": \"On Mismatch\", \"type\": \"string\"}}, \"required\": [\"bound_fields\"], \"title\": \"T2Params\", \"type\": \"object\"}}, \"T3\": {\"name\": \"IdempotentExecution\", \"params\": {\"additionalProperties\": false, \"properties\": {\"key_fields\": {\"default\": [\"invoice\"], \"items\": {\"enum\": [\"invoice\", \"approval\", \"instruction_hash\"], \"type\": \"string\"}, \"title\": \"Key Fields\", \"type\": \"array\"}, \"on_timeout\": {\"default\": \"query_status_then_retry\", \"enum\": [\"query_status_then_retry\", \"retry_with_key\"], \"title\": \"On Timeout\", \"type\": \"string\"}}, \"title\": \"T3Params\", \"type\": \"object\"}}, \"T4\": {\"name\": \"DuplicateObligationGuard\", \"params\": {\"additionalProperties\": false, \"properties\": {\"action\": {\"default\": \"hold\", \"enum\": [\"hold\", \"block\"], \"title\": \"Action\", \"type\": \"string\"}, \"amount_tol_pct\": {\"default\": 0, \"maximum\": 100, \"minimum\": 0, \"title\": \"Amount Tol Pct\", \"type\": \"integer\"}, \"normalize_number\": {\"default\": true, \"title\": \"Normalize Number\", \"type\": \"boolean\"}, \"window_days\": {\"default\": 30, \"title\": \"Window Days\", \"type\": \"integer\"}}, \"title\": \"T4Params\", \"type\": \"object\"}}, \"T5\": {\"name\": \"AggregateApprovalThreshold\", \"params\": {\"additionalProperties\": false, \"properties\": {\"group_by\": {\"const\": \"vendor\", \"default\": \"vendor\", \"title\": \"Group By\", \"type\": \"string\"}, \"threshold\": {\"exclusiveMinimum\": 0, \"title\": \"Threshold\", \"type\": \"integer\"}, \"window_days\": {\"default\": 5, \"title\": \"Window Days\", \"type\": \"integer\"}}, \"required\": [\"threshold\"], \"title\": \"T5Params\", \"type\": \"object\"}}, \"T6\": {\"name\": \"RefundToSource\", \"params\": {\"additionalProperties\": false, \"properties\": {\"allowed\": {\"default\": \"source_only\", \"enum\": [\"source_only\", \"source_or_verified\"], \"title\": \"Allowed\", \"type\": \"string\"}, \"cooling_days\": {\"default\": 0, \"minimum\": 0, \"title\": \"Cooling Days\", \"type\": \"integer\"}, \"require_cleared_funds\": {\"default\": true, \"title\": \"Require Cleared Funds\", \"type\": \"boolean\"}}, \"title\": \"T6Params\", \"type\": \"object\"}}}, \"current_controls\": [], \"diagnosis\": {\"gap\": \"execution_idempotency\", \"link\": \"execution\", \"reason\": \"PAY-0057 settled 2 times (BT-0001, BT-0025): it was resent after a missing ack without an idempotency key or a status check\", \"violated\": [\"INV-3\"]}, \"gap\": \"execution_idempotency\", \"refuted\": [], \"templates_for_gap\": [\"T3\"]}",
+    "system": "You repair financial controls. You may only propose controls from the template catalog, with parameters that fit each template's schema, given as key/value pairs under `params`. A candidate is refuted by a counterexample (an attack search still finds), a false positive (a legitimate operation it breaks), or a lint (it is overfit, spoofable, or blocks where a hold works). Learn from the refutations. Prefer the least restrictive control that closes the gap."
+  },
+  "response": {
+    "candidates": [
+      {
+        "params": [
+          {
+            "key": "key_fields",
+            "value": [
+              "invoice",
+              "approval",
+              "instruction_hash"
+            ]
+          },
+          {
+            "key": "on_timeout",
+            "value": "query_status_then_retry"
+          }
+        ],
+        "rationale": "PAY-0057 was resent after a missing ack, with no idempotency key and no status check, so it settled twice. Keying execution on invoice, approval and instruction hash means the same instruction cannot settle twice. On a timeout, the bank status is queried before any retry, which closes the gap. Splitting legitimate partial payments into separate instructions still works.",
+        "template": "T3"
+      },
+      {
+        "params": [
+          {
+            "key": "key_fields",
+            "value": [
+              "invoice"
+            ]
+          },
+          {
+            "key": "on_timeout",
+            "value": "query_status_then_retry"
+          }
+        ],
+        "rationale": "This is the default, simpler alternative: an invoice-level key plus a status check before retrying. It is narrower in keying, so it is more likely to stop legitimate split payments on the same invoice. It is kept as a fallback if the composite key is judged overfit.",
+        "template": "T3"
+      }
+    ]
+  }
+}

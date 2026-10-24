@@ -31,7 +31,7 @@ from vandal.twin.profile import Profile
 from vandal.twin.state import State
 from vandal.twin.world import DAY_STEPS
 
-PROMPT_VERSION = "red-v1"
+PROMPT_VERSION = "red-v2"  # v2: params as key/value pairs (a free-form dict comes back empty)
 BATCH = DAY_STEPS.index("batch")  # after the day's approvals, before the payment run
 
 
@@ -153,10 +153,17 @@ def dress(plan: ThreatPlan, use_llm: bool = True) -> ThreatPlan:
 # --- reading a description ------------------------------------------------------------------
 
 
+class _LLMParam(BaseModel):
+    key: str
+    value: str | int
+
+
 class _LLMMove(BaseModel):
     kind: MoveKind
     at: int
-    params: dict[str, str | int]
+    # Structured output can't fill a free-form dict (it comes back as {}), so the catalog's
+    # parameters travel as key/value pairs and are folded into Move.params here.
+    params: list[_LLMParam] = Field(default_factory=list)
 
 
 class _LLMPlan(BaseModel):
@@ -169,7 +176,8 @@ PLAN_SYSTEM = (
     "You turn a described threat against a fictional company's finance operations into moves "
     "for a deterministic simulation. Use only the move kinds and parameters in the catalog, "
     "only the vendors, tenants, and approvers listed, and only what the attacker profile "
-    "allows. `at` is a step index in the schedule. If part of the threat can't be expressed "
+    "allows. Give each move's parameters as key/value pairs under `params`. `at` is a step "
+    "index in the schedule. If part of the threat can't be expressed "
     "with these moves, leave it out and say so in notes."
 )
 
@@ -202,6 +210,7 @@ def _read_with_llm(description: str, state: State, profile: Profile) -> ThreatPl
             "threat": description,
             "move_catalog": MOVE_CATALOG,
             "schedule": _schedule(),
+            "scenarios": {k: v.description for k, v in SCENARIOS.items()},
             "vendors": {v.id: v.name for v in state.vendors.values()},
             "tenants": {c.id: c.name for c in state.customers.values()},
             "approvers": [a.name for a in profile.approval_matrix.approvers],
@@ -219,7 +228,10 @@ def _read_with_llm(description: str, state: State, profile: Profile) -> ThreatPl
     )
     return ThreatPlan(
         description=description,
-        moves=[Move(kind=m.kind, at=m.at, params=m.params) for m in reply.moves],
+        moves=[
+            Move(kind=m.kind, at=m.at, params={p.key: p.value for p in m.params})
+            for m in reply.moves
+        ],
         scenario=reply.scenario,
         notes=reply.notes,
         source="llm",
@@ -433,6 +445,9 @@ def plan(description: str, sandbox, seed: int = 7, use_llm: bool = True) -> Thre
             replay(seed, [move], sandbox=sandbox)
         except IllegalMove as err:
             p.notes.append(f"dropped {move.kind}@{move.at}: {err}")
+            continue
+        except NotImplementedError as err:  # a move kind the twin doesn't model yet
+            p.notes.append(f"dropped {move.kind}@{move.at}: not modeled ({err})")
             continue
         kept.append(move)
     if not kept:

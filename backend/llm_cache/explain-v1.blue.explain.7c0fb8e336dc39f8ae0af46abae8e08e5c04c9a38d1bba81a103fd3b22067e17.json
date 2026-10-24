@@ -1,0 +1,26 @@
+{
+  "cache_key": "explain-v1.blue.explain.7c0fb8e336dc39f8ae0af46abae8e08e5c04c9a38d1bba81a103fd3b22067e17",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "prompt": "{\"subject\": \"CR-0001\", \"question\": null, \"trace\": [{\"text\": \"CR-0001 asked to change V-007's bank details by email from drew.silva@harborpointbui1d.com; it is applied.\", \"cites\": [\"CR-0001\", \"V-007\", \"MSG-0001\"]}, {\"text\": \"On day 0, vendors.change_request at change_request was allow.\", \"cites\": [\"EV-000169\"]}], \"allowed_ids\": [\"CR-0001\", \"EV-000169\", \"MSG-0001\", \"V-007\"], \"feedback\": \"\"}",
+    "system": "You explain a finance control system's decisions. Answer only from the trace you are given. Every claim must cite ids from the trace, and nothing else. Never suggest a way around a hold; a conversation never clears one. Point to the approvals inbox for decisions."
+  },
+  "response": {
+    "claims": [
+      {
+        "cites": [
+          "CR-0001",
+          "V-007",
+          "MSG-0001"
+        ],
+        "text": "CR-0001 was a request to change V-007's bank details, sent by email from drew.silva@harborpointbui1d.com, and the change has been applied."
+      },
+      {
+        "cites": [
+          "EV-000169"
+        ],
+        "text": "On day 0, the vendors.change_request check at the change_request stage returned allow."
+      }
+    ]
+  }
+}

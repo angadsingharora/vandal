@@ -259,6 +259,8 @@ def _submit_invoice(sb: SandboxLike, move: Move, index: int, oracle: Oracle) -> 
         raise IllegalMove(f"unknown vendor {vendor_id!r}")
     vendor = state.vendors[vendor_id]
     contact = _current_contact(state, vendor_id)
+    if "number" not in p or "amount" not in p:
+        raise IllegalMove("submit_invoice needs number and amount")
     kind = str(p.get("kind", "invoice"))
     label = "Credit memo" if kind == "credit_memo" else "Invoice"
     meta = {

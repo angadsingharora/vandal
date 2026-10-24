@@ -1,0 +1,59 @@
+{
+  "cache_key": "explain-v1.blue.explain.1a241fbfec94b8dc092d174edac21a8bd58c931063a3fb8b15eb44578ecd5032",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "prompt": "{\"subject\": \"INV-1042\", \"question\": null, \"trace\": [{\"text\": \"INV-1042 from V-007 for $40,000.00 is paid.\", \"cites\": [\"INV-1042\", \"V-007\"]}, {\"text\": \"On day 0, approvals.request at pre_approve was escalate, because v0.approval.threshold fired.\", \"cites\": [\"EV-000048\", \"v0.approval.threshold\"]}, {\"text\": \"On day 0, payments.execute at pre_execute was allow.\", \"cites\": [\"EV-000174\"]}, {\"text\": \"On day 0, approvals.request_repayment at pre_approve was escalate, because blue.repayment_inbox fired.\", \"cites\": [\"EV-000356\", \"blue.repayment_inbox\"]}, {\"text\": \"On day 1, payments.execute at pre_execute was allow.\", \"cites\": [\"EV-000364\"]}, {\"text\": \"It was paid by PAY-0057 (misdirected).\", \"cites\": [\"PAY-0057\", \"PI-0057\"]}, {\"text\": \"It was paid by PAY-0081 (acknowledged).\", \"cites\": [\"PAY-0081\", \"PI-0081\"]}], \"allowed_ids\": [\"EV-000048\", \"EV-000174\", \"EV-000356\", \"EV-000364\", \"INV-1042\", \"PAY-0057\", \"PAY-0081\", \"PI-0057\", \"PI-0081\", \"V-007\", \"blue.repayment_inbox\", \"v0.approval.threshold\"], \"feedback\": \"\"}",
+    "system": "You explain a finance control system's decisions. Answer only from the trace you are given. Every claim must cite ids from the trace, and nothing else. Never suggest a way around a hold; a conversation never clears one. Point to the approvals inbox for decisions."
+  },
+  "response": {
+    "claims": [
+      {
+        "cites": [
+          "INV-1042",
+          "V-007"
+        ],
+        "text": "INV-1042 from vendor V-007 for $40,000.00 is recorded as paid."
+      },
+      {
+        "cites": [
+          "EV-000048",
+          "v0.approval.threshold"
+        ],
+        "text": "On day 0, the approval request at the pre-approve stage was escalated because the approval threshold rule fired. Decisions on escalations belong in the approvals inbox."
+      },
+      {
+        "cites": [
+          "EV-000174"
+        ],
+        "text": "On day 0, payment execution at the pre-execute stage was allowed."
+      },
+      {
+        "cites": [
+          "EV-000356",
+          "blue.repayment_inbox"
+        ],
+        "text": "On day 0, the repayment approval request at the pre-approve stage was escalated because the repayment inbox rule fired. Decisions on this escalation belong in the approvals inbox."
+      },
+      {
+        "cites": [
+          "EV-000364"
+        ],
+        "text": "On day 1, payment execution at the pre-execute stage was allowed."
+      },
+      {
+        "cites": [
+          "PAY-0057",
+          "PI-0057"
+        ],
+        "text": "The invoice was paid by PAY-0057, which is marked as misdirected."
+      },
+      {
+        "cites": [
+          "PAY-0081",
+          "PI-0081"
+        ],
+        "text": "The invoice was also paid by PAY-0081, which is marked as acknowledged."
+      }
+    ]
+  }
+}

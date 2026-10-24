@@ -248,17 +248,20 @@ def test_claude_reads_and_writes_when_l0_answers(monkeypatch) -> None:
                     {
                         "kind": "change_request",
                         "at": 2,
-                        "params": {
-                            "vendor": "V-007",
-                            "fields": "bank",
-                            "channel": "email",
-                            "sender": "lookalike",
-                        },
+                        "params": [
+                            {"key": "vendor", "value": "V-007"},
+                            {"key": "fields", "value": "bank"},
+                            {"key": "channel", "value": "email"},
+                            {"key": "sender", "value": "lookalike"},
+                        ],
                     },
                     {
                         "kind": "change_request",
                         "at": 2,
-                        "params": {"vendor": "V-999", "fields": "bank"},
+                        "params": [
+                            {"key": "vendor", "value": "V-999"},
+                            {"key": "fields", "value": "bank"},
+                        ],
                     },
                 ],
                 scenario="a",
