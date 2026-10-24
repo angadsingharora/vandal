@@ -94,6 +94,7 @@ class InvoiceArgs(_Args):
     kind: Literal["invoice", "credit_memo"] = "invoice"
     supersedes: str | None = None  # the invoice a credit memo corrects
     po: str | None = None
+    gl_account: str | None = None  # the expense account the Operator coded; None = vendor default
     message: str | None = None
 
 
@@ -244,7 +245,7 @@ def _grant(
         ledger.next_entry_id(state),
         state.day,
         iid,
-        state.vendors[inv.vendor].gl_account,
+        inv.gl_account or state.vendors[inv.vendor].gl_account,
         inv.amount,
     )
     return [granted, ("journal.posted", {"entry": je.model_dump()})]
@@ -573,6 +574,10 @@ def _receive_invoice(ctx: Ctx, args: InvoiceArgs) -> list[EventSpec]:
         raise ToolError("amounts are positive; a credit memo says what it corrects instead")
     if args.po is not None and args.po not in state.purchase_orders:
         raise ToolError(f"unknown PO {args.po}")
+    if args.gl_account is not None:
+        gl = state.ledger_accounts.get(args.gl_account)
+        if gl is None or gl.kind != "expense":
+            raise ToolError(f"{args.gl_account} is not an expense account")
     specs: list[EventSpec] = []
     status = "received"
     if args.kind == "credit_memo":
@@ -595,6 +600,7 @@ def _receive_invoice(ctx: Ctx, args: InvoiceArgs) -> list[EventSpec]:
         "due_date": state.day + args.due_in_days,
         "kind": args.kind,
         "supersedes": args.supersedes,
+        "gl_account": args.gl_account,
         "status": status,
     }
     specs.append(("invoice.received", {"invoice": invoice, "message": args.message}))
