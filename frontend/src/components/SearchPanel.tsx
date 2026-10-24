@@ -146,7 +146,7 @@ export function SearchPanel() {
                 ))}
               </div>
             </div>
-            {r && r.findings.length > 1 && (
+            {r && attack.source === "search" && r.findings.length > 1 && (
               <details className="text-[11px] text-dim">
                 <summary className="cursor-pointer">{r.findings.length} violating traces at this depth</summary>
                 <ul className="num mt-1 space-y-1">

@@ -46,7 +46,7 @@ export function InjectDialog({ onClose }: { onClose: () => void }) {
   const [rows, setRows] = useState<Row[]>(SCENARIO_A);
   const [labels, setLabels] = useState("");
   const [depth, setDepth] = useState(2);
-  const [noLlm, setNoLlm] = useState(true);
+  const [noLlm, setNoLlm] = useState(() => !(s.settings?.api_key || s.settings?.playback));
   const [formError, setFormError] = useState<string | null>(null);
   const { inject } = s;
   const running = inject.phase === "running";

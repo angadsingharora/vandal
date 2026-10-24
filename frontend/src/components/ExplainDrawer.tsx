@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWarRoom } from "@/lib/store";
 import { Badge, Button, Spinner } from "./ui";
 
@@ -10,6 +10,15 @@ export function ExplainDrawer() {
   const s = useWarRoom();
   const { explanation } = s;
   const [question, setQuestion] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  const open = !!explanation.subject;
+  useEffect(() => {
+    if (!open) return;
+    input.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && s.closeExplanation();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, s.closeExplanation]);
   if (!explanation.subject) return null;
   const d = explanation.data;
   const type = d?.entity_type ?? (explanation.subject.startsWith("PAY") ? "payment" : explanation.subject.startsWith("CR") ? "change_request" : "invoice");
@@ -73,6 +82,7 @@ export function ExplainDrawer() {
         }}
       >
         <input
+          ref={input}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Ask Blue, or push back: “just release it”"

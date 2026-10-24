@@ -35,7 +35,8 @@ Settings (copy `.env.example` to `.env.local`):
 7. **Replay under …** runs the same counterexample under the new policy: HELD, $0, beside the original.
 
 Also included:
-- **Try your own scenario** describes a threat in plain language, or composes moves and labels by hand. You can preview the plan, run it, and send any violation into diagnose → CEGIS.
+- **Try your own scenario** describes a threat in plain language, or composes moves and labels by hand. You can preview the plan, run it, and send any violation into diagnose → CEGIS. It runs on a fresh clone under the focused run's policy (the Live tab's, or a replay tab's), which is what its button names.
+- Claude reads threats and proposes controls by default whenever the server has a key or playback recordings (`/settings`); tick **no LLM** / **Read it with keywords** to use the deterministic paths instead.
 - **Scorecard** compares policies side by side.
 - **why?** next to a payment, invoice, or change request opens Blue's cited explanation. Push back and the hold stands.
 - **Operator tries to approve** in the inbox shows segregation of duties refusing it.

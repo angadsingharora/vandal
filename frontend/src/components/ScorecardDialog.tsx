@@ -68,14 +68,22 @@ export function ScorecardDialog({ onClose }: { onClose: () => void }) {
               ))}
             </tr>
           ))}
+          {classes.length > 0 && (
+            <tr>
+              <td className={cx(td, "text-faint")} colSpan={cards.length + 1}>
+                Attacks that got through, by threat class · succeeded / attempted held-out variants
+              </td>
+            </tr>
+          )}
           {classes.map((k) => (
             <tr key={k}>
-              <td className={cx(td, "text-dim")}>↳ {k}</td>
+              <td className={cx(td, "text-dim")}>↳ {k.replaceAll("_", " ")}</td>
               {cards.map((c) => {
                 const r = c.attack_success[k];
+                const tone = !r || r.attempts === 0 ? "text-faint" : r.succeeded > 0 ? "text-bad" : "text-ok";
                 return (
-                  <td key={c.policy} className={cx(td, "num", r && r.succeeded > 0 ? "text-bad" : "text-ok")}>
-                    {r ? `${r.succeeded}/${r.attempts}` : "—"}
+                  <td key={c.policy} className={cx(td, "num", tone)}>
+                    {r && r.attempts > 0 ? `${r.succeeded}/${r.attempts}` : "—"}
                   </td>
                 );
               })}
