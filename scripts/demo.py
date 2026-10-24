@@ -22,6 +22,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND, FRONTEND = ROOT / "backend", ROOT / "frontend"
+# Each child gets its own process group on Windows, so the CTRL_BREAK_EVENT sent on shutdown
+# reaches it (and the node/uvicorn processes under it) and not this script's console group.
+GROUP = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {}
 
 
 def wait_for(url: str, seconds: float, label: str) -> bool:
@@ -64,7 +67,7 @@ def main() -> int:
             print(f">> API on http://localhost:{args.api_port}{mode}")
             uvicorn = ["uvicorn", "vandal.api.main:app", "--port", str(args.api_port)]
             cmd = [sys.executable, "-m", "uv", "run", *uvicorn]
-            procs.append(subprocess.Popen(cmd, cwd=BACKEND, env=env))
+            procs.append(subprocess.Popen(cmd, cwd=BACKEND, env=env, **GROUP))
             wait_for(f"http://localhost:{args.api_port}/settings", 60, "the API")
 
         web_env = os.environ | {
@@ -73,7 +76,7 @@ def main() -> int:
         }
         print(f">> war room on http://localhost:{args.web_port}{' (mock)' if args.mock else ''}")
         web = [npm, "exec", "--", "next", "dev", "-p", str(args.web_port)]
-        procs.append(subprocess.Popen(web, cwd=FRONTEND, env=web_env))
+        procs.append(subprocess.Popen(web, cwd=FRONTEND, env=web_env, **GROUP))
         if wait_for(f"http://localhost:{args.web_port}/", 120, "the war room"):
             print(f"\nOpen http://localhost:{args.web_port}  (Ctrl+C stops everything)\n")
         while all(p.poll() is None for p in procs):
