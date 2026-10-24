@@ -177,6 +177,8 @@ def facts(state: State, action: Action) -> tuple[dict[str, Any], list[str]]:
             "payment.amount": instr.amount,
             "payment.payee_account": instr.payee_account,
             "payment.idempotency_key": instr.idempotency_key,
+            "payment.bank_status": pay.bank_status,
+            "submit.has_key": args.get("idempotency_key") is not None,
             "invoice.other_executions": _executions(state, instr.invoice, besides=pay.id),
         }
         cites += [pay.id, instr.id]

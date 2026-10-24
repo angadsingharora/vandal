@@ -100,7 +100,7 @@ def test_illegal_and_unbuilt_moves_are_rejected() -> None:
     )
     with pytest.raises(IllegalMove):
         replay(7, [portal], sandbox=lambda s: new_sandbox(seed=s))
-    with pytest.raises(NotImplementedError, match="R10"):
+    with pytest.raises(IllegalMove, match="bank fault"):
         replay(7, [Move(kind="fault", at=0, params={})], sandbox=lambda s: new_sandbox(seed=s))
 
 

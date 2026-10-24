@@ -273,6 +273,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
         seed=args.seed,
         depth=args.depth,
         workers=args.workers,
+        scenarios=args.scenario.split(","),
     )
     print(f"verification of {pack.version} against {parent.version}:")
     for c in pack.checks:
@@ -331,7 +332,8 @@ def cmd_synth(args: argparse.Namespace) -> int:
     parent = load_policy(args.policy)
     proposer = SweepProposer(profile) if args.no_llm else LLMProposer(profile)
     print(
-        f"synthesizing from {parent.version} ({'sweep' if args.no_llm else 'LLM, sweep fallback'}, "
+        f"synthesizing from {parent.version} for scenario {args.scenario} "
+        f"({'sweep' if args.no_llm else 'LLM, sweep fallback'}, "
         f"depth {args.depth}, up to {args.max_iterations} iterations)"
     )
 
@@ -353,6 +355,7 @@ def cmd_synth(args: argparse.Namespace) -> int:
         max_iterations=args.max_iterations,
         version=args.version,
         on_entry=show,
+        scenario=args.scenario,
     )
     for note in result.notes:
         print(f"  note: {note}")
@@ -380,6 +383,7 @@ def cmd_synth(args: argparse.Namespace) -> int:
         depth=args.depth,
         workers=args.workers,
         candidates=candidates,
+        scenarios=sorted({"a", args.scenario}),  # a repair must not reopen Scenario A
     )
     for c in pack.checks:
         print(f"  {'PASS' if c.passed else 'FAIL'}  {c.number} {c.name:<11} {c.detail}")
@@ -426,6 +430,9 @@ def build_parser() -> argparse.ArgumentParser:
             )
         if name == "verify":
             cmd.add_argument("--parent", help="policy to compare against (default: its parent)")
+            cmd.add_argument("--scenario", default="a", help="scenarios to re-search, e.g. a,b")
+        if name == "synth":
+            cmd.add_argument("--scenario", default="a", help="threat family to repair")
         if name == "run":
             cmd.add_argument("--days", type=int, default=5)
         if name == "search":

@@ -111,10 +111,12 @@ def cegis(
     on_entry: Callable[[LogEntry], None] | None = None,
     start: list[Move] | None = None,
     start_labels: Sequence[OracleLabel] = (),
+    scenario: str = "a",
 ) -> CEGISResult:
     """`start` is a counterexample to repair (an injected threat, R9) instead of the one the
-    parent's own search finds; `start_labels` is that trace's answer key."""
-    scenario = SCENARIOS["a"]
+    parent's own search finds; `start_labels` is that trace's answer key. `scenario` picks the
+    search window (search/alphabet.SCENARIOS): the threat family being repaired."""
+    window = SCENARIOS[scenario]
     risk = profile.risk_appetite
     log: list[LogEntry] = []
 
@@ -151,7 +153,7 @@ def cegis(
             )
         cx_moves, cx_result, diagnosis = counterexample(parent_factory, list(start))
     else:
-        found = search(parent_factory, scenario, seed=seed, depth=depth, workers=workers)
+        found = search(parent_factory, window, seed=seed, depth=depth, workers=workers)
         if found.best is None:
             return CEGISResult(
                 status="nothing_to_repair",
@@ -269,7 +271,7 @@ def cegis(
                 continue
 
             s = search(
-                factory, scenario, seed=seed, depth=depth, workers=workers, labels=start_labels
+                factory, window, seed=seed, depth=depth, workers=workers, labels=start_labels
             )
             beaten_by = s.best.moves if s.best else None
             residual, found_cx = sum(f.exposure for f in s.findings), len(s.findings)

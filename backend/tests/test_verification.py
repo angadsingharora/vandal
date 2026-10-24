@@ -110,8 +110,7 @@ def test_regression_suite() -> None:
     v0 = run_suite(factory_for(V0))
     failed = {c.name for c in v0.cases if c.status == "failed"}
     assert "bank_change_email_callback" in failed and "baseline" not in failed
-    skipped = [c for c in v0.cases if c.status == "skipped"]
-    assert [c.name for c in skipped] == ["retry_after_real_failure"]
+    assert not [c for c in v0.cases if c.status == "skipped"]
 
 
 def test_every_seeded_invoice_replays_on_its_own() -> None:

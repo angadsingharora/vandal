@@ -189,6 +189,7 @@ class Payment(Entity):  # PAY-…
     attempts: int = 0
     submitted_on: SimDay | None = None
     settled_on: SimDay | None = None
+    bank_status: Literal["unknown", "processed", "not_found"] = "unknown"  # from a status query
 
 
 class BankAccount(Entity):  # CB-…: the company's own accounts
@@ -202,8 +203,33 @@ class BankTransaction(Entity):  # BT-…
     amount: Cents  # positive in, negative out
     posted_on: SimDay
     payment: str | None = None
+    submission: str | None = None  # the bank submission it settles (BS-…)
     counterparty_account: str | None = None
     reconciled: bool = False
+
+
+# --- Bank internals (R10) -------------------------------------------------------------------
+# What the bank itself knows. The company sees only acks, status answers, and the feed; the
+# Operator reads none of these.
+
+BankFaultKind = Literal["timeout", "drop_ack", "duplicate_ack", "delay", "feed_delay"]
+
+
+class BankFault(Entity):  # BF-…: armed by a fault move, used by the next submission (or feed)
+    kind: BankFaultKind
+    days: int = 0  # delay and feed_delay
+    armed_on: SimDay
+    status: Literal["armed", "used"] = "armed"
+
+
+class BankSubmission(Entity):  # BS-…: one submission the bank processed (and will settle)
+    payment: str
+    amount: Cents
+    payee_account: str
+    idempotency_key: str | None = None
+    submitted_on: SimDay
+    settle_on: SimDay
+    status: Literal["processed", "settled"] = "processed"
 
 
 # --- Money in -------------------------------------------------------------------------------

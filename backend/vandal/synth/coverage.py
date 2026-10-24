@@ -301,6 +301,18 @@ def _execution(state: State, index: EventIndex, inv, pay, instr, approval) -> Li
             )
         )
 
+    settled = [
+        t.id for t in state.bank_transactions.values() if t.payment == pay.id and t.amount < 0
+    ]
+    if len(settled) > 1:
+        gaps.append(
+            (
+                "execution_idempotency",
+                f"{pay.id} settled {len(settled)} times ({', '.join(settled)}): it was resent "
+                "after a missing ack without an idempotency key or a status check",
+                settled,
+            )
+        )
     siblings = _paid_invoices(state).get(inv.id, [])
     if len(siblings) > 1:
         gaps.append(

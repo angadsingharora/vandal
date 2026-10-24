@@ -66,7 +66,7 @@ def run(policy: Policy | None, moves: list[Move]):
     [
         (T1(), {"change_request", "pre_execute"}),
         (T2(), {"pre_execute"}),
-        (Control(template="T3", params={}), {"submit"}),
+        (Control(template="T3", params={}), {"submit", "retry"}),
         (
             Control(template="T4", params={"amount_tol_pct": 1, "window_days": 30}),
             {"invoice.match"},

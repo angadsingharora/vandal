@@ -433,10 +433,15 @@ CASES: list[Case] = [
     ),
     Case(
         "retry_after_real_failure",
-        "The bank times out for real; the retry pays once",
-        lambda s: [],
+        "The bank times out for real (nothing processed); the retry pays once",
+        lambda s: [Move(kind="fault", at=2, params={"kind": "timeout"})],
         pending_paid,
-        requires="R10",
+    ),
+    Case(
+        "duplicate_ack",
+        "The bank acknowledges a payment twice; it is paid once",
+        lambda s: [Move(kind="fault", at=2, params={"kind": "duplicate_ack"})],
+        pending_paid,
     ),
 ]
 

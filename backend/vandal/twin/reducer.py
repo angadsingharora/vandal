@@ -13,6 +13,8 @@ from collections.abc import Callable, Iterable
 from vandal.contracts.entities import (
     Approval,
     ApprovalRequest,
+    BankFault,
+    BankSubmission,
     BankTransaction,
     Evidence,
     Invoice,
@@ -150,7 +152,12 @@ def _instruction_built(state: State, event: Event) -> None:
 def _payment_submitted(state: State, event: Event) -> None:
     pay = state.payments[event.payload["payment"]]
     state.update(
-        "payments", pay.id, status="submitted", attempts=pay.attempts + 1, submitted_on=state.day
+        "payments",
+        pay.id,
+        status="submitted",
+        attempts=pay.attempts + 1,
+        submitted_on=state.day,
+        bank_status="unknown",  # a status answered before this attempt says nothing about it
     )
     invoice = state.payment_instructions[pay.instruction].invoice
     state.update("invoices", invoice, status="paid")
@@ -158,7 +165,29 @@ def _payment_submitted(state: State, event: Event) -> None:
 
 @handles("bank.ack")
 def _bank_ack(state: State, event: Event) -> None:
-    state.update("payments", event.payload["payment"], status="acknowledged")
+    """Only a payment waiting on its ack moves; a late or duplicate ack changes nothing."""
+    if state.payments[event.payload["payment"]].status == "submitted":
+        state.update("payments", event.payload["payment"], status="acknowledged")
+
+
+@handles("bank.processed")
+def _bank_processed(state: State, event: Event) -> None:
+    state.put("bank_submissions", BankSubmission.model_validate(event.payload["submission"]))
+
+
+@handles("bank.fault_armed")
+def _bank_fault_armed(state: State, event: Event) -> None:
+    state.put("bank_faults", BankFault.model_validate(event.payload["fault"]))
+
+
+@handles("bank.fault_used")
+def _bank_fault_used(state: State, event: Event) -> None:
+    state.update("bank_faults", event.payload["fault"], status="used")
+
+
+@handles("bank.status_reported")
+def _bank_status_reported(state: State, event: Event) -> None:
+    state.update("payments", event.payload["payment"], bank_status=event.payload["status"])
 
 
 @handles("bank.settled")
@@ -169,6 +198,8 @@ def _bank_settled(state: State, event: Event) -> None:
     state.update("bank_accounts", account.id, balance=account.balance + txn.amount)
     if txn.payment:
         state.update("payments", txn.payment, status="settled", settled_on=state.day)
+    if txn.submission:
+        state.update("bank_submissions", txn.submission, status="settled")
 
 
 @handles("bank.reconciled")
