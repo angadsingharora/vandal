@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { cx, usd } from "@/lib/format";
 import { CFO, CONTROLLER, OPERATOR, useWarRoom } from "@/lib/store";
-import type { Decision, VerdictItem } from "@/lib/types";
+import type { Decision, ReplayOut, VerdictItem } from "@/lib/types";
 import { IntakePanel } from "./IntakePanel";
 import { Badge, Button, DecisionBadge, Empty, LiveDot, Panel, SideTag } from "./ui";
 
@@ -15,6 +15,47 @@ function argsLine(args: Record<string, unknown>): string {
     .join(" ");
 }
 
+/** Blue's banner controls: which agent a new run gets, and how many days it works. */
+export function RunOperations() {
+  const s = useWarRoom();
+  const [days, setDays] = useState(5);
+  const operating = s.operate.phase === "running";
+  return (
+    <>
+      <label className="sr-only" htmlFor="operator">Operator</label>
+      <select
+        id="operator"
+        value={s.operator}
+        onChange={(e) => s.setOperator(e.target.value as "reference" | "llm")}
+        className="h-7 rounded border border-line bg-raised px-1.5 text-xs"
+        title="The agent Guard protects: the deterministic reference Operator, or the LLM Operator that reads messy documents (O1). Takes effect on Reset demo."
+      >
+        <option value="reference">reference Operator</option>
+        <option value="llm">LLM Operator</option>
+      </select>
+      <label className="sr-only" htmlFor="days">Business days</label>
+      <input
+        id="days"
+        type="number"
+        min={1}
+        max={30}
+        value={days}
+        onChange={(e) => setDays(Math.max(1, Math.min(30, Number(e.target.value) || 1)))}
+        className="num h-7 w-12 rounded border border-line bg-raised px-1.5 text-xs"
+        title="Business days to operate"
+      />
+      <Button tone="blue" onClick={() => s.operateDays(days)} busy={operating} disabled={!s.ready}>
+        Run operations
+      </Button>
+      {operating && s.operate.day != null && (
+        <span className="num text-[11px] text-dim">
+          day {s.operate.day} · {s.operate.events} events
+        </span>
+      )}
+    </>
+  );
+}
+
 export function OperatorPanel() {
   const s = useWarRoom();
   const cases = s.entities?.cases ?? [];
@@ -24,7 +65,7 @@ export function OperatorPanel() {
   );
   return (
     <Panel
-      title="Operator"
+      title="Operator · the finance agent"
       tag={<SideTag side="op" />}
       actions={
         <span className="flex items-center gap-2 text-[11px] text-faint">
@@ -52,7 +93,7 @@ export function OperatorPanel() {
       )}
       {s.summary?.operator === "llm" && <IntakePanel />}
       {activity.length === 0 && cases.length === 0 && s.summary?.operator !== "llm" && (
-        <Empty>Run operations to watch the Operator work.</Empty>
+        <Empty>Run operations to watch the Operator pay invoices. Each of its actions goes through Guard first.</Empty>
       )}
       <ul className="num">
         {activity.map((e) => (
@@ -123,7 +164,7 @@ export function VerdictFeed() {
 
   return (
     <Panel
-      title="Verdict feed"
+      title="Guard verdicts · every action checked"
       tag={<SideTag side="blue" />}
       actions={s.operate.phase === "running" && <LiveDot className="text-blue" />}
       className="min-h-[240px]"
@@ -154,7 +195,7 @@ export function VerdictFeed() {
         </ul>
       )}
       <div className="min-h-0 flex-1 overflow-auto">
-        {rows.length === 0 ? <Empty>Every tool call passes Blue&apos;s gate. Its verdicts stream here.</Empty> : <ul>{rows.map((v) => <VerdictRow key={v.seq} v={v} />)}</ul>}
+        {rows.length === 0 ? <Empty>Every tool call the Operator makes passes Guard first. Its verdicts stream here.</Empty> : <ul>{rows.map((v) => <VerdictRow key={v.seq} v={v} />)}</ul>}
       </div>
     </Panel>
   );
@@ -178,7 +219,7 @@ export function ApprovalsInbox() {
 
   return (
     <Panel
-      title="Approvals inbox"
+      title="Approvals · a human decides"
       tag={<SideTag side="blue" />}
       actions={
         <button onClick={s.loadApprovals} className="text-[11px] text-dim hover:text-ink">
@@ -187,12 +228,14 @@ export function ApprovalsInbox() {
       }
       className="min-h-[160px]"
     >
-      {payments.length === 0 && patches.length === 0 && <Empty>Nothing waiting for a human.</Empty>}
+      {payments.length === 0 && patches.length === 0 && (
+        <Empty>Nothing waiting. Payments Guard escalates and fixes Red sends over show up here.</Empty>
+      )}
       <ul>
         {patches.map((p) => (
           <li key={p.id} className="border-b border-line px-3 py-2">
             <div className="flex items-center gap-2">
-              <Badge tone="esc">policy patch</Badge>
+              <Badge tone="esc">fix from Red</Badge>
               <span className="num text-xs font-semibold">{p.version}</span>
               <Badge tone={p.status === "applied" ? "ok" : p.status === "denied" ? "bad" : p.status === "approved" ? "blue" : "warn"}>
                 {p.status}
@@ -220,7 +263,7 @@ export function ApprovalsInbox() {
               )}
               {p.status === "approved" && s.patch?.id === p.id && (
                 <Button tone="blue" onClick={s.applyPatch}>
-                  Apply {p.version} to Blue
+                  Apply {p.version} to Guard
                 </Button>
               )}
             </div>
@@ -249,6 +292,73 @@ export function ApprovalsInbox() {
           </li>
         ))}
       </ul>
+    </Panel>
+  );
+}
+
+function Replayed({ title, out, policy }: { title: string; out: ReplayOut | null; policy?: string }) {
+  if (!out) {
+    return (
+      <div className="flex-1 rounded border border-dashed border-line p-2 text-[11px] text-faint">
+        {title}: not replayed yet{policy ? ` (${policy})` : ""}
+      </div>
+    );
+  }
+  const held = out.result.violations.length === 0;
+  return (
+    <div className={cx("flex-1 rounded border p-2", held ? "border-ok/40 bg-ok/5" : "border-bad/40 bg-bad/5")}>
+      <div className="flex items-baseline justify-between">
+        <span className="text-[10px] uppercase tracking-wider text-dim">
+          {title} · {out.run.policy}
+        </span>
+        <span className={cx("text-xs font-bold", held ? "text-ok" : "text-bad")}>{held ? "HELD" : "BROKEN"}</span>
+      </div>
+      <div className={cx("num text-lg font-semibold", held ? "text-ok" : "text-bad")}>{usd(out.result.exposure)}</div>
+      <div className="text-[11px] text-dim">
+        {held ? "no invariant broke" : out.result.violated.join(", ")} · payments{" "}
+        {Object.entries(out.run.payments)
+          .map(([k, v]) => `${v} ${k}`)
+          .join(", ")}
+      </div>
+    </div>
+  );
+}
+
+/** What Guard enforces on the live run, and the proof that a fix from Red works: Red's attack,
+ * replayed before and after the policy changed. */
+export function EnforcedPolicy() {
+  const s = useWarRoom();
+  const live = s.tabs.find((t) => t.kind === "live");
+  const version = s.appliedPolicy ?? live?.policy ?? "v0";
+  const info = s.policies.find((p) => p.name === version);
+  const attack = s.attack;
+  return (
+    <Panel title="Enforced policy" tag={<SideTag side="blue" />} className="h-auto" bodyClass="overflow-visible">
+      <div className="space-y-2 p-3">
+        <div className="flex flex-wrap items-baseline gap-2">
+          <span className="num text-sm font-semibold text-ink">{version}</span>
+          {s.appliedPolicy && <Badge tone="ok">applied from Red</Badge>}
+          <span className="text-[11px] text-dim">{info?.controls.length ? info.controls.join(" · ") : "baseline: no extra controls"}</span>
+        </div>
+        {attack ? (
+          <>
+            <div className="flex gap-2">
+              <Replayed title="Before" out={s.replays.before} policy={attack.policy} />
+              <Replayed title="After" out={s.replays.after} policy={s.appliedPolicy ?? undefined} />
+            </div>
+            <Button
+              tone="blue"
+              disabled={!s.appliedPolicy}
+              onClick={() => s.appliedPolicy && s.replayAttack(s.appliedPolicy)}
+              title={!s.appliedPolicy ? "Approve and apply Red's fix first" : "Run Red's counterexample on a fresh clone under the new policy"}
+            >
+              Replay Red&apos;s attack under {s.appliedPolicy ?? "the new policy"}
+            </Button>
+          </>
+        ) : (
+          <p className="text-[11px] text-faint">Once Red finds an attack, its before and after replays show here.</p>
+        )}
+      </div>
     </Panel>
   );
 }

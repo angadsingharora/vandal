@@ -1,6 +1,11 @@
 # Vandal war room
 
-The frontend for Vandal (IMPLEMENTATION §8, slices F0–F6). Next.js, Tailwind, dark. It follows DESIGN §14: Red's search on the left; the twin and its authorization chains in the middle; the Operator, Blue's verdict feed, and the approvals inbox on the right; synthesis along the bottom.
+The frontend for Vandal (IMPLEMENTATION §8, slices F0–F6). Next.js, Tailwind, dark. The war room has two sides, switched in the top bar:
+
+- **Blue · Vandal Guard** is the live path. The Operator (the finance agent) works the books; Guard checks every tool call it makes and allows, holds, or escalates it; humans decide in the approvals inbox. Panels: the Operator, Guard's verdicts, the books, the enforced policy, and approvals.
+- **Red · Vandal Sandbox** is a clone, never the live books. Vandal attacks the twin, diagnoses the broken link, and synthesizes and verifies a fix, which it sends to Blue. Panels: the attack, the verdict (what the books say next to what actually happened), the sandbox twin, the diagnosis chain, and fix & prove.
+
+A strip under the top bar shows the seven steps of the loop, coloured by the side that does each one, with the next thing to click. Click a step to go to its side.
 
 ## Run it
 
@@ -26,13 +31,13 @@ Settings (copy `.env.example` to `.env.local`):
 
 ## The demo loop (DESIGN §13)
 
-1. **Reset demo** seeds the company under the chosen policy. **Run operations** has the Operator work N business days, with every tool call going through Blue's gate. The verdict feed and the twin update live.
-2. **Unleash Vandal** runs a bounded search. The sequence counter updates live, and the minimal counterexample shows as a timeline with its exposure and the invariants it broke.
-3. **Replay on twin** plays the counterexample on a fresh clone and opens it as a run tab. You can see the payment, the attacker's account (switch on **Judge view**), and the books.
-4. **Diagnose** walks the authorization chain and highlights the broken link with the facts Blue evaluated. Click any payment to see its own chain.
-5. **Synthesize a control** streams CEGIS: each candidate, the counterexample that beat it, and the scored table. **Verify** runs the six checks at the same depth and shows the before/after scorecard.
-6. **Submit for approval** puts the policy and its evidence pack in the inbox. Approve it as the Controller (the synthesizer can't approve its own patch), then **Apply** it to Blue.
-7. **Replay under …** runs the same counterexample under the new policy: HELD, $0, beside the original.
+1. **Blue · Operate.** **Reset demo** seeds the company under the chosen policy. **Run operations** has the Operator work N business days, with every tool call going through Guard. The verdicts and the books update live.
+2. **Red · Attack.** **Unleash Vandal** runs a bounded search over the threat you pick. The sequence counter updates live, the minimal counterexample shows as a timeline, and the verdict card above the twin shows the books balancing while the money went to the wrong account. **Replay on twin** plays it on a fresh clone and opens it as a run tab (switch on **Judge view** to see the attacker's account).
+3. **Red · Diagnose** walks the authorization chain and highlights the broken link with the facts Guard evaluated. Click any payment to see its own chain.
+4. **Red · Fix.** **Synthesize a control** streams CEGIS: each candidate, the counterexample that beat it, and the scored table.
+5. **Red · Prove.** **Verify** runs the six checks at the same depth and shows the before/after scorecard. **Send to Blue for approval** puts the policy and its evidence pack in Blue's inbox and switches to Blue.
+6. **Blue · Approve.** Approve it as the Controller (the synthesizer can't approve its own patch), then **Apply** it to Guard.
+7. **Blue · Enforce.** **Replay Red's attack under …** in the enforced-policy card runs the same counterexample under the new policy: HELD, $0, beside the original.
 
 Also included:
 - **Try your own scenario** describes a threat in plain language, or composes moves and labels by hand. You can preview the plan, run it, and send any violation into diagnose → CEGIS. It runs on a fresh clone under the focused run's policy (the Live tab's, or a replay tab's), which is what its button names.
@@ -47,13 +52,15 @@ Also included:
 ```
 src/
   app/            Next.js app router: layout, page, theme
-  components/     one file per war-room area (TopBar, SearchPanel, TwinPanel, ChainView,
-                  BluePanels, SynthesisPanel, InjectDialog, ScorecardDialog, ExplainDrawer)
+  components/     WarRoom (the two sides), TopBar (side switch, loop strip), one file per area
+                  (SearchPanel, AttackVerdict, TwinPanel, ChainView, SynthesisPanel, BluePanels,
+                  InjectDialog, ScorecardDialog, ExplainDrawer)
   lib/
     types.ts      the backend's shapes (contracts/, api/)
     api.ts        VandalApi: HttpApi (fetch + EventSource) or the mock
     store.ts      zustand store: the demo loop's state and actions
     format.ts     integer cents → dollars, move labels, oracle → account mapping
+    loop.ts       the seven loop steps and which one is next
   mock/
     mockApi.ts    the mock API: replays fixtures with the backend's job and SSE semantics
     fixtures.json recorded from the real backend

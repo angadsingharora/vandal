@@ -1,14 +1,14 @@
 "use client";
 
-import { atLabel, INVARIANTS, moveLine, moveTitle, usd } from "@/lib/format";
+import { atLabel, cx, INVARIANTS, moveLine, moveTitle, usd } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
 import type { Move, OracleLabel } from "@/lib/types";
 import { Badge, Button, Empty, LiveDot, Panel, SideTag } from "./ui";
 
 const SCENARIOS = [
-  { id: "a", label: "A · bank change after approval" },
-  { id: "b", label: "B · bank fault, retry" },
-  { id: "f", label: "F · refund redirection" },
+  { id: "a", label: "Bank change after approval", hint: "A vendor's bank details change between approval and the payment run" },
+  { id: "b", label: "Bank fault, retry", hint: "The bank drops an ack, the Operator retries, the vendor is paid twice" },
+  { id: "f", label: "Refund redirection", hint: "An overpayment, then a refund request to a different account" },
 ];
 
 export function MovesTimeline({ moves, labels, judge }: { moves: Move[]; labels?: OracleLabel[]; judge?: boolean }) {
@@ -58,26 +58,36 @@ export function SearchPanel() {
 
   return (
     <Panel
-      title="Adversarial search"
+      title="Attack · adversarial search"
       tag={<SideTag side="red" />}
       className="min-h-[320px]"
       bodyClass="flex flex-col"
     >
       <div className="space-y-2 border-b border-line p-3">
-        <div className="flex gap-1.5">
-          <label className="sr-only" htmlFor="scenario">Scenario</label>
-          <select
-            id="scenario"
-            value={search.scenario}
-            onChange={(e) => s.setSearch({ scenario: e.target.value })}
-            className="h-7 min-w-0 flex-1 rounded border border-line bg-raised px-1.5 text-xs"
-          >
-            {SCENARIOS.map((x) => (
-              <option key={x.id} value={x.id}>
+        <div className="text-[10px] uppercase tracking-wider text-faint">Threat to search</div>
+        <div role="radiogroup" aria-label="Scenario" className="flex flex-col gap-1">
+          {SCENARIOS.map((x) => {
+            const on = search.scenario === x.id;
+            return (
+              <button
+                key={x.id}
+                role="radio"
+                aria-checked={on}
+                onClick={() => s.setSearch({ scenario: x.id })}
+                title={x.hint}
+                className={cx(
+                  "flex items-center gap-2 rounded border px-2 py-1 text-left text-xs transition-colors",
+                  on ? "border-red/70 bg-red/10 text-ink" : "border-line text-dim hover:border-dim hover:text-ink",
+                )}
+              >
+                <span className={cx("num text-[10px] font-bold uppercase", on ? "text-red" : "text-faint")}>{x.id}</span>
                 {x.label}
-              </option>
-            ))}
-          </select>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-dim" title="How many attacker moves or faults per sequence">Moves per sequence</span>
           <label className="sr-only" htmlFor="depth">Depth</label>
           <select
             id="depth"
@@ -123,7 +133,7 @@ export function SearchPanel() {
       <div className="flex-1 p-3">
         {!attack && !running && (
           <Empty>
-            {r ? `No violation within depth ${r.depth} under ${policy}. Bounded claim: not a proof beyond it.` : "Search the attacker and fault alphabet for a sequence that breaks an invariant."}
+            {r ? `No violation within depth ${r.depth} under ${policy}. Bounded claim: not a proof beyond it.` : "Vandal tries every short sequence of attacker moves and bank faults against the twin, looking for one that sends money to the wrong place."}
           </Empty>
         )}
         {attack && (
