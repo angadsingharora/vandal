@@ -77,13 +77,14 @@ class VendorChangeRequest(Entity):  # CR-…
 # --- Obligations ----------------------------------------------------------------------------
 
 
-class PurchaseOrder(Entity):
+class PurchaseOrder(Entity):  # PO-…
     vendor: str
     amount: Cents
     dimension: str
+    issued_on: SimDay
 
 
-class Receipt(Entity):
+class Receipt(Entity):  # RC-…
     po: str
     amount: Cents
     received_on: SimDay
@@ -100,6 +101,7 @@ class Invoice(Entity):  # INV-…
     po: str | None = None
     amount: Cents
     dimension: str
+    received_on: SimDay
     due_date: SimDay
     kind: Literal["invoice", "credit_memo"] = "invoice"
     supersedes: str | None = None
@@ -141,6 +143,13 @@ class Payment(Entity):  # PAY-…
         "scheduled", "submitted", "acknowledged", "settled", "failed", "recalled", "misdirected"
     ] = "scheduled"
     attempts: int = 0
+    settled_on: SimDay | None = None
+
+
+class BankAccount(Entity):  # CB-…: the company's own accounts
+    name: str
+    gl_account: str
+    balance: Cents
 
 
 class BankTransaction(Entity):  # BT-…

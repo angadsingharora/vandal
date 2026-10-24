@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 
 COMMANDS: dict[str, tuple[str, str]] = {
     "seed": ("Print the seeded company summary", "R1"),
@@ -16,16 +17,35 @@ COMMANDS: dict[str, tuple[str, str]] = {
 }
 
 
+def cmd_seed(args: argparse.Namespace) -> int:
+    from vandal.twin.profile import load_profile
+    from vandal.twin.seed import seed_state, summary
+
+    profile = load_profile(args.profile)
+    print(summary(seed_state(profile, seed=args.seed), profile))
+    return 0
+
+
+IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {"seed": cmd_seed}
+
+
 def build_parser() -> argparse.ArgumentParser:
+    from vandal.twin.seed import DEFAULT_SEED
+
     parser = argparse.ArgumentParser(prog="vandal", description="Vandal Sandbox CLI")
     sub = parser.add_subparsers(dest="command", metavar="command", required=True)
     for name, (help_text, _slice) in COMMANDS.items():
-        sub.add_parser(name, help=help_text)
+        cmd = sub.add_parser(name, help=help_text)
+        if name == "seed":
+            cmd.add_argument("--profile", default="bayline", help="profile name or YAML path")
+            cmd.add_argument("--seed", type=int, default=DEFAULT_SEED)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args, _rest = build_parser().parse_known_args(argv)
+    if args.command in IMPLEMENTED:
+        return IMPLEMENTED[args.command](args)
     _help, slice_id = COMMANDS[args.command]
     print(f"vandal {args.command}: not implemented yet (lands in {slice_id})", file=sys.stderr)
     return 2
