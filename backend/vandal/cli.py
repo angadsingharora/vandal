@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from collections.abc import Callable
+
+# Exhaustive depth 4 takes ~75s even with partial-order reduction and 8-10 workers, so the
+# default is 3 (IMPLEMENTATION R4, step 5). --depth 4 still works.
+DEFAULT_DEPTH = 3
 
 COMMANDS: dict[str, tuple[str, str]] = {
     "seed": ("Print the seeded company summary", "R1"),
@@ -75,7 +80,112 @@ def cmd_attack(args: argparse.Namespace) -> int:
     return 0
 
 
+def _timeline(state, subjects: set[str]) -> list[str]:
+    """The events behind the violating payments: approval, change, execution, settlement."""
+    pays = {s for s in subjects if s in state.payments}
+    invoices = {state.payment_instructions[state.payments[p].instruction].invoice for p in pays}
+    accounts = {
+        state.payment_instructions[state.payments[p].instruction].payee_account for p in pays
+    }
+    keep = (
+        "approval.requested",
+        "approval.granted",
+        "channel.received",
+        "change_request.created",
+        "vendor.bank_changed",
+        "instruction.built",
+        "payment.submitted",
+        "bank.settled",
+    )
+    lines = []
+    for e in state.events:
+        if e.kind not in keep:
+            continue
+        blob = str(e.payload)
+        if any(x in blob for x in invoices | pays | accounts) or e.kind == "channel.received":
+            what = {
+                "approval.requested": lambda p: f"{p['request']['subject']} waits in the inbox",
+                "approval.granted": lambda p: (
+                    f"{p['approval']['subject']} approved by {p['approval']['approver']} to "
+                    f"{p['approval']['approved_instruction']['payee_account']}"
+                ),
+                "channel.received": lambda p: (
+                    f"{p['message']['channel']} from {p['message']['sender']}: "
+                    f"{p['message']['subject']}"
+                ),
+                "change_request.created": lambda p: (
+                    f"{p['request']['id']} {p['request']['status']} for {p['request']['vendor']}"
+                ),
+                "vendor.bank_changed": lambda p: f"vendor master now pays {p['account']['id']}",
+                "instruction.built": lambda p: (
+                    f"{p['payment']['id']} built to {p['instruction']['payee_account']} "
+                    f"for {p['instruction']['amount']}"
+                ),
+                "payment.submitted": lambda p: f"{p['payment']} submitted",
+                "bank.settled": lambda p: f"{p['transaction']['payment']} settled",
+            }[e.kind](e.payload)
+            lines.append(f"  day {e.day}  {e.id}  {e.kind:<23} {what}")
+    return lines
+
+
+def cmd_search(args: argparse.Namespace) -> int:
+    from functools import partial
+
+    from vandal.sandbox import new_sandbox
+    from vandal.search.alphabet import SCENARIOS
+    from vandal.search.bfs import search
+    from vandal.search.minimize import minimize_trace
+    from vandal.verify.replay import replay, replay_detailed
+
+    scenario = SCENARIOS[args.scenario]
+    factory = partial(new_sandbox, args.profile)
+    result = search(
+        factory,
+        scenario,
+        seed=args.seed,
+        depth=args.depth,
+        workers=args.workers,
+        exhaustive=args.exhaustive,
+    )
+    print(f"scenario {scenario.name}: {scenario.description}")
+    print(
+        f"  alphabet          {result.alphabet} moves, depth <= {result.depth}, "
+        f"{scenario.days} days, workers {result.workers}"
+    )
+    print(f"  explored          {result.explored} sequences (per depth: {result.levels})")
+    print(
+        f"  deduped           {result.deduped} by state hash, {result.pruned} skipped by "
+        "partial-order reduction"
+    )
+    print(
+        f"  throughput        {result.runs_per_second:,.0f} runs/s, "
+        f"{result.ms_per_run:.2f} ms/run, {result.seconds:.2f}s"
+    )
+    if result.best is None:
+        print(f"no violations within depth {result.depth}")
+        return 0
+    print(f"  violating         {len(result.findings)} sequences at depth {len(result.best.moves)}")
+
+    def violated(moves):
+        return set(replay(args.seed, moves, sandbox=factory, days=scenario.days).violated)
+
+    minimal = minimize_trace(result.best.moves, violated)
+    final, sb, _ = replay_detailed(args.seed, minimal, sandbox=factory, days=scenario.days)
+    print(f"minimal counterexample ({len(minimal)} move{'s' if len(minimal) != 1 else ''}):")
+    for m in minimal:
+        params = " ".join(f"{k}={v}" for k, v in m.params.items())
+        print(f"  @{m.at:<3} {m.kind} {params}".rstrip())
+    print(f"VIOLATED {', '.join(final.violated)}  exposure ${final.exposure / 100:,.2f}")
+    for v in final.violations:
+        print(f"  {v.invariant}  {v.message}")
+    print("timeline:")
+    for line in _timeline(sb.run.state, {v.subject for v in final.violations}):
+        print(line)
+    return 0
+
+
 IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {
+    "search": cmd_search,
     "seed": cmd_seed,
     "run": cmd_run,
     "attack": cmd_attack,
@@ -89,11 +199,24 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="command", required=True)
     for name, (help_text, _slice) in COMMANDS.items():
         cmd = sub.add_parser(name, help=help_text)
-        if name in ("seed", "run", "attack"):
+        if name in ("seed", "run", "attack", "search"):
             cmd.add_argument("--profile", default="bayline", help="profile name or YAML path")
             cmd.add_argument("--seed", type=int, default=DEFAULT_SEED)
         if name == "run":
             cmd.add_argument("--days", type=int, default=5)
+        if name == "search":
+            cmd.add_argument("--scenario", default="a", help="scenario name (search/alphabet.py)")
+            cmd.add_argument(
+                "--depth", type=int, default=int(os.environ.get("SEARCH_DEPTH", DEFAULT_DEPTH))
+            )
+            cmd.add_argument(
+                "--workers", type=int, default=int(os.environ.get("SEARCH_WORKERS", 1))
+            )
+            cmd.add_argument(
+                "--exhaustive",
+                action="store_true",
+                help="explore every depth, not just up to the first violations",
+            )
         if name == "attack":
             cmd.add_argument("--trace", required=True, help="path to a trace JSON file")
     return parser

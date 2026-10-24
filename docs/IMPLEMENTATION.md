@@ -201,7 +201,7 @@ class Verdict(BaseModel):
 **Done when:**
 - With no hints, `vandal search --scenario a --depth 4` finds R3's 3-step counterexample, minimized.
 - It prints the number of sequences explored and the throughput.
-- The ms/run number is recorded here: `____ ms/run at depth __`.
+- The ms/run number is recorded here: `2.8 ms/run per worker at depth 4` (0.36 ms/run wall with 8 workers). Scenario A, exhaustive under v0 (`--exhaustive`): 224,049 runs in ~75–80 s with partial-order reduction and 8–10 workers, over the 60 s budget, so the default depth is 3 (16,765 runs, ~6 s). A non-exhaustive search stops at the first depth with violations: `--depth 4` finds Scenario A at depth 1 in ~0.3 s.
 
 ---
 
