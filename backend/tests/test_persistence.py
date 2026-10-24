@@ -108,3 +108,24 @@ def test_run_persist_and_rebuild_cli(tmp_path, capsys) -> None:
     run_id = next(line.split()[1] for line in out.splitlines() if "persisted" in line)
     assert main(["rebuild", run_id, "--db", db]) == 0
     assert "identical" in capsys.readouterr().out
+
+
+def test_saving_the_same_version_twice_replaces_it(store) -> None:
+    """The demo loop run twice in one server: /verify and /policies/{v}/apply save the same
+    version again, which must replace the row, not fail on the primary key."""
+    from vandal.verify.evidence_pack import EvidencePack
+
+    v = Policy.load("policies/v1.json").model_copy(update={"version": new_id("v1-twice")})
+    store.save_policy(v, approval={"by": "U-CTRL"})
+    store.save_policy(v, approval={"by": "U-CFO"})
+    pack = EvidencePack.model_construct(version=v.version)
+    store.save_evidence_pack(pack, synthesis="synth-1")
+    store.save_evidence_pack(pack, synthesis="synth-2")
+    with store.engine.connect() as conn:
+        n_pol = conn.execute(
+            text("select count(*) from policies where version = :v"), {"v": v.version}
+        ).scalar()
+        syn = conn.execute(
+            text("select synthesis from evidence_packs where id = :v"), {"v": v.version}
+        ).all()
+    assert n_pol == 1 and syn == [("synth-2",)]

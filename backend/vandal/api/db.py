@@ -29,6 +29,7 @@ from sqlalchemy import (
     String,
     Table,
     create_engine,
+    delete,
     event,
     insert,
     select,
@@ -238,7 +239,10 @@ class Store:
     # --- results ----------------------------------------------------------------------------
 
     def save_policy(self, policy, approval: dict | None = None) -> None:
+        # Keyed by version: applying the same synthesized version again after a Reset (the
+        # demo loop run twice in one server) replaces the row instead of failing on the key.
         with self.engine.begin() as conn:
+            conn.execute(delete(policies).where(policies.c.version == policy.version))
             conn.execute(
                 insert(policies).values(
                     version=policy.version,
@@ -286,7 +290,9 @@ class Store:
         return sid
 
     def save_evidence_pack(self, pack, synthesis: str | None = None) -> str:
+        # Same as save_policy: verifying the same version twice replaces the pack.
         with self.engine.begin() as conn:
+            conn.execute(delete(evidence_packs).where(evidence_packs.c.id == pack.version))
             conn.execute(
                 insert(evidence_packs).values(
                     id=pack.version, synthesis=synthesis, contents=pack.model_dump(mode="json")

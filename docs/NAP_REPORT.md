@@ -4,7 +4,7 @@ _Written by the overnight session while the owner slept. Updated after every ite
 
 ## Summary (five lines)
 
-1. **PRs in merge order:** [#25](https://github.com/angadsingharora/vandal/pull/25) `slice/L0-fixes` → (next slices listed as they open)
+1. **PRs in merge order:** [#25](https://github.com/angadsingharora/vandal/pull/25) `slice/L0-fixes` → [#26](https://github.com/angadsingharora/vandal/pull/26) `slice/L0-recordings` → (next slices listed as they open)
 2. **Tests before:** fast suite 1 failure (`test_api_war_room.py`, stale since O2). **After:** see each slice below.
 3. **Look at this first:** the stacked PR list below, then `docs/screenshots/` once slice 3 lands.
 4. **Broken:** nothing known yet.
@@ -61,3 +61,25 @@ Every step of DESIGN §13 ran: Reset → Run operations (80 paid, all invariants
 **Not reproducible in the UI, covered by the smoke test instead:** "Operator tries to approve" is offered only on pending *payment* approval requests, and the simulated approver clears those within the day, so a 5-day run leaves none pending. Segregation of duties for policy patches is asserted in `scripts/demo_smoke.py` (403 for the Operator).
 
 **UI polish items noted for slice 3b:** Escape does not close the explanation drawer or the scorecard; the right column's Operator/verdict rows extend past 1440 px (long verdict text has no `min-w-0`); the search panel keeps "12 violating traces" from the v0 search after a replay tab under v1-synth is focused; the Scorecard's per-class rows render `0/0` in red/green with no legend.
+
+**Demo-killer found by the smoke script, fixed:** with `DATABASE_URL` set (the default `.env` has SQLite), running the loop a second time in the same server process failed at Verify with `UNIQUE constraint failed: evidence_packs.id`, because `save_evidence_pack` and `save_policy` inserted rows keyed by the policy version (`v1-synth`). A judge pressing Reset and running the loop again would have hit it. Both saves now replace the row for that version (`tests/test_persistence.py::test_saving_the_same_version_twice_replaces_it`).
+
+**Reset timing:** 32 ms for a Reset on a warm server; the first Reset after a long session with many runs and SQLite persistence took 2.2 s (dropping runs and flushing event batches). `scripts/demo_smoke.py` reports both and asserts the warm one is under 1 s. Before the demo, do one Reset before the judges arrive.
+
+**`backend/scripts/demo_smoke.py`** drives the whole loop over HTTP (`--base-url`, default `:8000`) or in process (`--in-process`), with Claude or `--no-llm`, and asserts the key numbers: $40,000 under v0, HELD and $0 under the synthesized policy, 0 legitimate payments blocked, every scorecard field non-null, the Operator refused on the patch (403), Blue's claims all cited, the pushback leaves the hold. `tests/test_demo_smoke.py` runs it in process on the deterministic paths as a slow test. Against the live server with Claude (answers from the cache):
+
+| step | time |
+|---|---|
+| Reset (warm) | 32 ms |
+| Run operations, 5 days | 0.2 s |
+| Search, depth 2 | 0.9 s |
+| Replay, diagnose | 0.1 s each |
+| Synthesize (CEGIS, depth 2, Claude) | 47 s |
+| Verify (depth 2) | 25 s |
+| Inject (never-seen threat, depth 2) | 0.8 s |
+| why? + pushback | 20 ms (cached) |
+| Scorecard (depth 1) | 14 s |
+
+Run it: `cd backend && python -m uv run python scripts/demo_smoke.py` with the API on `:8000`, or `--in-process`.
+
+**Mock fixtures re-recorded** (`frontend/src/mock/fixtures.json`, 605 KiB) from the API after the O1/L0 shape changes, with `cd frontend && python -m uv run --project ../backend python scripts/capture_fixtures.py`. `npm run dev:mock` shows the same loop offline with no backend at all. The mock's synthesis and verify fixtures come from the deterministic sweep (`no_llm: true` in the capture script), so the mock never needs the cache.

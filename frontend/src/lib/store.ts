@@ -537,8 +537,11 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       }
     },
 
+    // Inject runs on a fresh clone under the focused run's policy, which is what the dialog's
+    // "Run on <policy>" button names: under v0 from the Live tab, under the synthesized policy
+    // from a replay tab.
     previewInject: guard(async (body: InjectBody) => {
-      const runId = get().liveRunId;
+      const runId = get().focusRunId ?? get().liveRunId;
       if (!runId) return;
       set({ inject: { phase: "running", plan: null, jobId: null, result: null } });
       try {
@@ -552,7 +555,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
 
     runInject: guard(async (body: InjectBody) => {
       const a = api();
-      const runId = get().liveRunId;
+      const runId = get().focusRunId ?? get().liveRunId;
       if (!runId) return;
       set((s) => ({ inject: { ...s.inject, phase: "running", jobId: null, result: null } }));
       const job = await a.inject(runId, { ...body, dry_run: false });
