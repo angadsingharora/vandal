@@ -18,6 +18,7 @@ answer:
            submission is authenticated evidence on its own
   confirm  inbound confirmations on every channel the attacker can fake (phone_in with caller-ID
            spoofing, video with voice cloning)
+  fault    one per bank fault class (Scenario B), plus the Operator's retry timer firing
 
 Nothing here knows which move wins. The search finds that.
 """
@@ -53,7 +54,24 @@ SCENARIOS: dict[str, Scenario] = {
         window_days=1,
         kinds=("change_request", "inbound_confirmation", "trigger_batch"),
     ),
+    "b": Scenario(
+        name="b",
+        description="Bank faults around the payment run: timeouts, lost acks, delays, retries",
+        days=2,
+        window_days=1,
+        kinds=("fault", "retry"),
+    ),
 }
+
+# One move per fault class (twin/bank.py). A one-day delay stands for every delay: longer
+# ones only push settlement further past the window.
+FAULTS: tuple[dict[str, str | int], ...] = (
+    {"kind": "timeout"},
+    {"kind": "drop_ack"},
+    {"kind": "duplicate_ack"},
+    {"kind": "delay", "days": 1},
+    {"kind": "feed_delay", "days": 1},
+)
 
 
 def vendor_classes(state: State, profile: Profile) -> list[str]:
@@ -121,6 +139,10 @@ def build_alphabet(scenario: Scenario, state: State, profile: Profile) -> list[M
                     )
         if "trigger_batch" in scenario.kinds:
             moves.append(Move(kind="trigger_batch", at=at, params={}))
+        if "fault" in scenario.kinds:
+            moves += [Move(kind="fault", at=at, params=dict(f)) for f in FAULTS]
+        if "retry" in scenario.kinds:
+            moves.append(Move(kind="retry", at=at, params={}))
     return moves
 
 

@@ -10,6 +10,7 @@ from vandal.contracts.entities import Cents, JournalEntry, JournalLine, SimDay
 from vandal.twin.state import State
 
 AP_CONTROL = "2000"
+VENDOR_OVERPAYMENT = "1310"
 
 
 def next_entry_id(state: State, offset: int = 0) -> str:
@@ -32,6 +33,19 @@ def invoice_approved(eid: str, day: SimDay, invoice: str, expense: str, amount: 
 def payment_submitted(eid: str, day: SimDay, payment: str, cash: str, amount: Cents):
     """Dr AP / Cr Cash."""
     return entry(eid, day, f"Submit {payment}", {AP_CONTROL: amount}, {cash: amount})
+
+
+def duplicate_settlement(
+    eid: str, day: SimDay, txn: str, payment: str, cash: str, amount: Cents
+) -> JournalEntry:
+    """Dr Vendor Overpayment Receivable / Cr Cash: the second debit the bank feed shows."""
+    return entry(
+        eid,
+        day,
+        f"Duplicate settlement {txn} of {payment}",
+        {VENDOR_OVERPAYMENT: amount},
+        {cash: amount},
+    )
 
 
 def reversal(eid: str, day: SimDay, original: JournalEntry) -> JournalEntry:

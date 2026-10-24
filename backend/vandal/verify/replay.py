@@ -26,6 +26,7 @@ from vandal.contracts.entities import Cents, OracleLabel
 from vandal.contracts.events import ChannelEvent
 from vandal.contracts.interfaces import FinanceOperator, Tools
 from vandal.contracts.moves import Move
+from vandal.twin import bank
 from vandal.twin.facts import current_account
 from vandal.twin.profile import Profile
 from vandal.twin.world import Run, run_step, schedule, settle
@@ -364,6 +365,35 @@ def _trigger_batch(sb: SandboxLike, move: Move, index: int, oracle: Oracle) -> N
     settle(sb.run, sb.tools, sb.operator, HarnessEnvironment(oracle))
 
 
+def _fault(sb: SandboxLike, move: Move, index: int, oracle: Oracle) -> None:
+    """Arm a bank fault (twin/bank.py). Faults are the environment, not the attacker: every
+    profile allows them, and they carry no oracle labels."""
+    kind = str(move.params.get("kind", ""))
+    days = int(move.params.get("days", 0))
+    if kind not in bank.FAULT_KINDS:
+        raise IllegalMove(f"unknown bank fault {kind!r}")
+    if kind in ("delay", "feed_delay") and days < 1:
+        raise IllegalMove(f"{kind} needs days >= 1")
+    kind_, payload = bank.arm(sb.run.state, kind, days)
+    sb.run.emit(kind_, payload, actor="bank")
+
+
+def _retry(sb: SandboxLike, move: Move, index: int, oracle: Oracle) -> None:
+    """The Operator's retry timer fires now: payments still waiting on an ack are retried
+    under its retry policy."""
+    sb.operator.on_event(
+        ChannelEvent(
+            id=f"RETRY-{index:04d}",
+            day=sb.run.state.day,
+            channel="system",
+            sender="scheduler",
+            subject="retry_timer",
+        ),
+        sb.tools,
+    )
+    settle(sb.run, sb.tools, sb.operator, HarnessEnvironment(oracle))
+
+
 def _tick(sb: SandboxLike, move: Move, index: int, oracle: Oracle) -> None:
     sb.run.emit("clock.tick", {"days": int(move.params.get("days", 1))})
 
@@ -374,11 +404,11 @@ MOVES: dict[str, Callable[[SandboxLike, Move, int, Oracle], None]] = {
     "submit_invoice": _submit_invoice,
     "message": _message,
     "trigger_batch": _trigger_batch,
+    "fault": _fault,
+    "retry": _retry,
     "tick": _tick,
 }
 LANDS_IN = {
-    "fault": "R10",
-    "retry": "R10",
     "deposit": "R11",
     "refund_request": "R11",
 }

@@ -6,7 +6,9 @@ Tools.call and reads only Tools.view; it never sees oracle labels.
 
 from __future__ import annotations
 
-from vandal.contracts.entities import Actor, Case
+from typing import Literal
+
+from vandal.contracts.entities import Actor, Case, Payment
 from vandal.contracts.events import ChannelEvent
 from vandal.contracts.interfaces import Tools
 from vandal.twin.facts import match_facts, prior_settled_payments
@@ -24,11 +26,18 @@ from vandal.twin.flows import (
 )
 from vandal.twin.profile import Profile
 
+RetryPolicy = Literal["no_key", "query_first"]
+
 
 class ReferenceOperator:
-    def __init__(self, profile: Profile) -> None:
+    """`retry` is what the Operator does when a submission's ack never comes. v0 resends it
+    with no idempotency key (DESIGN 11, Scenario B). Whatever the policy, it follows a T3 hold:
+    asks the bank first, or resends with a key."""
+
+    def __init__(self, profile: Profile, retry: RetryPolicy = "no_key") -> None:
         self.actor = Actor(id=profile.operator.id, role="operator")
         self.horizon = profile.operator.payment_horizon_days
+        self.retry = retry
 
     def on_event(self, ev: ChannelEvent, tools: Tools) -> None:
         match ev.subject:
@@ -40,6 +49,9 @@ class ReferenceOperator:
                 self._pay(tools)
             case "bank_feed":
                 self._reconcile(tools)
+                self._retry_timeouts(tools)
+            case "retry_timer":
+                self._retry_timeouts(tools)
             case _ if ev.meta.get("intent") in ("vendor_bank_change", "vendor_contact_change"):
                 self._change_request(ev, tools)
             case _ if ev.meta.get("intent") == "invoice":
@@ -75,7 +87,33 @@ class ReferenceOperator:
                 tools.call(self.actor, "payments.execute", InvoiceRef(invoice=inv.id))
         for pay in list(tools.view.payments.values()):
             if pay.status == "scheduled":
-                tools.call(self.actor, "payments.submit", PaymentRef(payment=pay.id))
+                self._send(tools, "payments.submit", pay)
+
+    def _send(self, tools: Tools, tool: str, pay: Payment) -> None:
+        """Submit or retry. If a control holds it for want of an idempotency key, resend with
+        one: the instruction id, the same on every attempt."""
+        result = tools.call(self.actor, tool, PaymentRef(payment=pay.id))
+        if _held_by(result, ".key"):
+            key = PaymentRef(payment=pay.id, idempotency_key=pay.instruction)
+            tools.call(self.actor, tool, key)
+
+    def _retry_timeouts(self, tools: Tools) -> None:
+        """A payment still waiting on its ack at the bank feed timed out."""
+        for pay in list(tools.view.payments.values()):
+            if pay.status != "submitted" or pay.bank_status == "processed":
+                continue
+            if self.retry == "query_first":
+                tools.call(self.actor, "payments.query_status", PaymentRef(payment=pay.id))
+                if tools.view.payments[pay.id].bank_status == "processed":
+                    continue
+            result = tools.call(self.actor, "payments.retry", PaymentRef(payment=pay.id))
+            if _held_by(result, ".query_first"):
+                tools.call(self.actor, "payments.query_status", PaymentRef(payment=pay.id))
+                if tools.view.payments[pay.id].bank_status != "processed":
+                    tools.call(self.actor, "payments.retry", PaymentRef(payment=pay.id))
+            elif _held_by(result, ".key"):
+                key = PaymentRef(payment=pay.id, idempotency_key=pay.instruction)
+                tools.call(self.actor, "payments.retry", key)
 
     def _change_request(self, ev: ChannelEvent, tools: Tools) -> None:
         """Intake of a vendor-master change. The reference Operator reads the structured fields
@@ -179,6 +217,13 @@ class ReferenceOperator:
         for txn in list(tools.view.bank_transactions.values()):
             if not txn.reconciled and txn.payment is not None:
                 tools.call(self.actor, "ledger.reconcile", TransactionRef(transaction=txn.id))
+
+
+def _held_by(result, suffix: str) -> bool:
+    """Did a control with this check (e.g. T3's `.key`) hold the call?"""
+    return result.verdict.decision == "hold" and any(
+        c.endswith(suffix) for c in result.verdict.fired
+    )
 
 
 def _pending_request(tools: Tools, invoice: str) -> bool:

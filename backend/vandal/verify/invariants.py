@@ -172,6 +172,22 @@ def inv3_settled_once(c: Ctx) -> list[Violation]:
                     message=f"{invoice} paid {len(pays)} times ({', '.join(p.id for p in pays)})",
                 )
             )
+    settlements: dict[str, list[str]] = {}
+    for txn in state.bank_transactions.values():
+        if txn.payment is not None and txn.amount < 0:
+            settlements.setdefault(txn.payment, []).append(txn.id)
+    for payment, txns in settlements.items():
+        if len(txns) > 1:
+            pay = state.payments[payment]
+            out.append(
+                Violation(
+                    invariant="INV-3",
+                    subject=payment,
+                    cites=[_invoice_of(state, pay), payment, *txns],
+                    exposure=_amount(state, pay) * (len(txns) - 1),
+                    message=f"{payment} settled {len(txns)} times ({', '.join(txns)})",
+                )
+            )
     run_payments = executed_in_run(state)
     for dup, original in c.oracle.duplicates():
         if dup in by_invoice and original in by_invoice:

@@ -14,7 +14,7 @@ builds a sandbox for a policy with whichever Operator it wants.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from vandal.contracts.moves import Move
@@ -111,10 +111,12 @@ class VariantRun:
     exposure: int
 
 
-def run_variants(factory: SandboxFactory, seed: int = 7, days: int = 2) -> list[VariantRun]:
+def run_variants(
+    factory: SandboxFactory, seed: int = 7, days: int = 2, scenarios: Sequence[str] = ("a",)
+) -> list[VariantRun]:
     template = factory(seed)
     out = []
-    for v in sample(template.run.state, template.profile):
+    for v in sample(template.run.state, template.profile, scenarios=scenarios):
         r = replay(seed, v.moves, sandbox=factory, days=days)
         out.append(VariantRun(v, r.violated, r.exposure))
     return out
@@ -123,19 +125,37 @@ def run_variants(factory: SandboxFactory, seed: int = 7, days: int = 2) -> list[
 @dataclass
 class Runs:
     policy: Policy
-    search: SearchResult
+    searches: list[SearchResult]  # one per scenario
     variants: list[VariantRun]
     regression: SuiteResult
     legit: list[LegitOp]
 
+    @property
+    def findings(self):
+        return [f for s in self.searches for f in s.findings]
+
+    @property
+    def best(self):
+        bests = [s.best for s in self.searches if s.best is not None]
+        return max(bests, key=lambda f: f.exposure) if bests else None
+
 
 def collect(
-    policy: Policy, factory: SandboxFactory, *, seed: int, depth: int, workers: int
+    policy: Policy,
+    factory: SandboxFactory,
+    *,
+    seed: int,
+    depth: int,
+    workers: int,
+    scenarios: Sequence[str] = ("a",),
 ) -> Runs:
     return Runs(
         policy=policy,
-        search=search(factory, SCENARIOS["a"], seed=seed, depth=depth, workers=workers),
-        variants=run_variants(factory, seed),
+        searches=[
+            search(factory, SCENARIOS[s], seed=seed, depth=depth, workers=workers)
+            for s in scenarios
+        ],
+        variants=run_variants(factory, seed, scenarios=scenarios),
         regression=run_suite(factory, seed),
         legit=legit_ops(factory, seed),
     )
@@ -167,12 +187,12 @@ def scorecard(runs: Runs) -> Scorecard:
     )
     attacks = len(runs.variants)
     succeeded = sum(1 for r in runs.variants if _attacked(r))
-    worst = runs.search.best.exposure if runs.search.best else 0
+    worst = runs.best.exposure if runs.best else 0
     return Scorecard(
         policy=runs.policy.version,
-        search_depth=runs.search.depth,
-        sequences_explored=runs.search.explored,
-        violations_found=len(runs.search.findings),
+        search_depth=max(s.depth for s in runs.searches),
+        sequences_explored=sum(s.explored for s in runs.searches),
+        violations_found=len(runs.findings),
         attack_success=classes,
         attack_success_rate=succeeded / attacks if attacks else 0.0,
         exposure=sum(r.exposure for r in runs.variants if _attacked(r)) + worst,
@@ -192,7 +212,7 @@ def scorecard(runs: Runs) -> Scorecard:
 def counterexample(
     parent_runs: Runs, factory: SandboxFactory, seed: int, days: int
 ) -> Counterexample | None:
-    best = parent_runs.search.best
+    best = parent_runs.best
     if best is None:
         return None
 
@@ -239,23 +259,33 @@ def six_checks(
             )
         )
 
-    s = runs.search
+    found = runs.findings
+    explored = sum(s.explored for s in runs.searches)
+    depth = max(s.depth for s in runs.searches)
+    names = ", ".join(s.scenario for s in runs.searches)
     checks.append(
         CheckResult(
             number=2,
             name="re-search",
-            passed=not s.findings,
+            passed=not found,
             detail=(
-                f"no violation within depth {s.depth} ({s.explored:,} sequences)"
-                if not s.findings
-                else f"{len(s.findings)} violating sequences, shortest {len(s.best.moves)} moves"
+                f"no violation within depth {depth} ({explored:,} sequences, scenario {names})"
+                if not found
+                else f"{len(found)} violating sequences, shortest "
+                f"{min(len(f.moves) for f in found)} moves (scenario {names})"
             ),
             data={
-                "depth": s.depth,
-                "explored": s.explored,
-                "levels": s.levels,
-                "seconds": round(s.seconds, 2),
-                "best": s.best.model_dump(mode="json") if s.best else None,
+                "depth": depth,
+                "explored": explored,
+                "scenarios": {
+                    s.scenario: {
+                        "explored": s.explored,
+                        "levels": s.levels,
+                        "seconds": round(s.seconds, 2),
+                        "best": s.best.model_dump(mode="json") if s.best else None,
+                    }
+                    for s in runs.searches
+                },
             },
         )
     )
@@ -349,17 +379,16 @@ def verify(
     workers: int = 1,
     days: int = 2,
     candidates: list[Candidate] | None = None,
+    scenarios: Sequence[str] = ("a",),
 ) -> EvidencePack:
     """`candidates` is what synthesis tried (R8's CEGIS log); a hand-written policy is its own
-    single candidate."""
+    single candidate. `scenarios` are the threat families re-searched and sampled for held-out
+    variants."""
     after_factory = factory_for(policy)
     before_factory = factory_for(parent)
-    after = collect(policy, after_factory, seed=seed, depth=depth, workers=workers)
-    before = (
-        after
-        if parent == policy
-        else collect(parent, before_factory, seed=seed, depth=depth, workers=workers)
-    )
+    opts = {"seed": seed, "depth": depth, "workers": workers, "scenarios": scenarios}
+    after = collect(policy, after_factory, **opts)
+    before = after if parent == policy else collect(parent, before_factory, **opts)
     cx = counterexample(before, before_factory, seed, days)
     diagnosis = None
     if cx is not None:

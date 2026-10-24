@@ -23,6 +23,8 @@ from vandal.contracts.entities import (
     Approval,
     ApprovalRequest,
     BankAccount,
+    BankFault,
+    BankSubmission,
     BankTransaction,
     Case,
     Customer,
@@ -70,6 +72,8 @@ class State(BaseModel):
     payments: dict[str, Payment] = {}
     bank_accounts: dict[str, BankAccount] = {}
     bank_transactions: dict[str, BankTransaction] = {}
+    bank_faults: dict[str, BankFault] = {}  # bank internals (R10): never read by the Operator
+    bank_submissions: dict[str, BankSubmission] = {}
 
     customers: dict[str, Customer] = {}
     customer_invoices: dict[str, CustomerInvoice] = {}

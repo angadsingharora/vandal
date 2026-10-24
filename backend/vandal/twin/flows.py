@@ -55,6 +55,7 @@ class ScheduleArgs(_Args):
 
 class PaymentRef(_Args):
     payment: str
+    idempotency_key: str | None = None  # submit and retry only; the bank dedupes a reused key
 
 
 class DecideArgs(_Args):
@@ -291,7 +292,24 @@ def _submit(ctx: Ctx, args: PaymentRef) -> list[EventSpec]:
     je = ledger.payment_submitted(
         ledger.next_entry_id(state), state.day, pay.id, cash, instr.amount
     )
-    return bank.submit(state, pay.id) + [("journal.posted", {"entry": je.model_dump()})]
+    return bank.submit(state, pay.id, args.idempotency_key) + [
+        ("journal.posted", {"entry": je.model_dump()})
+    ]
+
+
+def _retry(ctx: Ctx, args: PaymentRef) -> list[EventSpec]:
+    """Resubmit a payment whose ack never came. Nothing new is posted: the obligation was
+    already paid in the books when it was first submitted."""
+    pay = ctx.state.payments.get(args.payment)
+    if pay is None or pay.status != "submitted":
+        raise ToolError(f"{args.payment} is not waiting on an ack")
+    return bank.submit(ctx.state, pay.id, args.idempotency_key)
+
+
+def _query_status(ctx: Ctx, args: PaymentRef) -> list[EventSpec]:
+    if args.payment not in ctx.state.payments:
+        raise ToolError(f"unknown payment {args.payment}")
+    return [bank.status(ctx.state, args.payment)]
 
 
 def _reconcile(ctx: Ctx, args: TransactionRef) -> list[EventSpec]:
@@ -300,7 +318,19 @@ def _reconcile(ctx: Ctx, args: TransactionRef) -> list[EventSpec]:
         raise ToolError(f"{args.transaction} is unknown or already reconciled")
     if txn.payment is None or ctx.state.payments[txn.payment].status != "settled":
         raise ToolError(f"{args.transaction} matches no settled payment")
-    return [("bank.reconciled", {"transaction": txn.id, "payment": txn.payment})]
+    specs: list[EventSpec] = [("bank.reconciled", {"transaction": txn.id, "payment": txn.payment})]
+    state = ctx.state
+    if any(
+        t.payment == txn.payment and t.reconciled and t.id != txn.id
+        for t in state.bank_transactions.values()
+    ):
+        # A second debit for one payment (DESIGN 12): the vendor now owes it back.
+        cash = state.bank_accounts[txn.bank_account].gl_account
+        je = ledger.duplicate_settlement(
+            ledger.next_entry_id(state), state.day, txn.id, txn.payment, cash, -txn.amount
+        )
+        specs.append(("journal.posted", {"entry": je.model_dump()}))
+    return specs
 
 
 def _change_request(state: State, args: ChangeRequestArgs, status: str) -> dict[str, Any]:
@@ -558,6 +588,8 @@ TOOLS: dict[str, ToolSpec] = {
     "payments.schedule": ToolSpec("schedule", ScheduleArgs, {"allow": _schedule}),
     "payments.execute": ToolSpec("pre_execute", InvoiceRef, {"allow": _execute}),
     "payments.submit": ToolSpec("submit", PaymentRef, {"allow": _submit}),
+    "payments.retry": ToolSpec("retry", PaymentRef, {"allow": _retry}),
+    "payments.query_status": ToolSpec("retry", PaymentRef, {"allow": _query_status}),
     "ledger.reconcile": ToolSpec("journal", TransactionRef, {"allow": _reconcile}),
     "vendors.change_request": ToolSpec(
         "change_request",

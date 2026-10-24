@@ -156,7 +156,7 @@ def compile_control(control: Control) -> list[Check]:
                 for field in p.bound_fields
             ]
         case T3Params():
-            return [
+            checks = [
                 Check(
                     id=f"{tag}.once",
                     stage="submit",
@@ -164,6 +164,37 @@ def compile_control(control: Control) -> list[Check]:
                     action="block",
                 )
             ]
+            if p.on_timeout == "query_status_then_retry":
+                # Ask the bank before resending; never resend what it already processed.
+                retry = ("tool", "eq", "payments.retry")
+                checks += [
+                    Check(
+                        id=f"{tag}.query_first",
+                        stage="retry",
+                        when=_when(retry, ("payment.bank_status", "eq", "unknown")),
+                        action="hold",
+                    ),
+                    Check(
+                        id=f"{tag}.already_processed",
+                        stage="retry",
+                        when=_when(retry, ("payment.bank_status", "eq", "processed")),
+                        action="block",
+                    ),
+                ]
+            else:  # retry_with_key: every submission carries a key, so the bank dedupes
+                checks += [
+                    Check(
+                        id=f"{tag}.key",
+                        stage=stage,
+                        when=_when(
+                            ("tool", "in", ["payments.submit", "payments.retry"]),
+                            ("submit.has_key", "eq", False),
+                        ),
+                        action="hold",
+                    )
+                    for stage in ("submit", "retry")
+                ]
+            return checks
         case T4Params():
             checks = [
                 Check(
