@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* War room palette: dark, technical, with one meaning per color. */
+@theme {
+  --color-bg: #0a0c10;
+  --color-panel: #10141b;
+  --color-raised: #161b24;
+  --color-line: #232a36;
+  --color-ink: #d7dde8;
+  --color-dim: #8590a3;
+  --color-faint: #566072;
+  --color-red: #ff4d5e;
+  --color-blue: #4da3ff;
+  --color-ok: #3ccf91;
+  --color-warn: #f5b942;
+  --color-esc: #c084fc;
+  --color-bad: #ff4d5e;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.live-dot {
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-dot { animation: none; }
+}

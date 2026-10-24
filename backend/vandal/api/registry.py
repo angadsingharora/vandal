@@ -20,6 +20,7 @@ from typing import Any
 
 from vandal.api.db import EventWriter, Store
 from vandal.api.sse import Channel
+from vandal.contracts.entities import OracleLabel
 from vandal.contracts.events import Event
 from vandal.guard.approvals import PolicyInbox
 from vandal.sandbox import Sandbox, new_sandbox
@@ -61,6 +62,7 @@ class RunHandle:
     channel: Channel
     verdicts: Channel = field(default_factory=Channel)  # B4: Blue's feed of decisions
     writer: EventWriter | None = None
+    labels: list[OracleLabel] = field(default_factory=list)  # answer key of a replayed trace
     lock: threading.RLock = field(default_factory=threading.RLock)
 
     @property

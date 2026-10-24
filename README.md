@@ -75,7 +75,18 @@ cd backend
 uv run uvicorn vandal.api.main:app --reload
 ```
 
-FastAPI app with SSE for live updates. It covers runs (`/demo/reset`, `/runs`, `/runs/{id}/operate`, `/state`, `/ledger`, `/chain/{payment}`, `/events`), jobs (`/search`, `/diagnose`, `/synthesize`, `/verify`, `/jobs/{id}/events`), `/replay`, `/metrics`, and `/policies`. Runs live in memory. When `DATABASE_URL` is set (SQLite, or Postgres/Supabase through the `postgres` extra), runs, events, searches, syntheses, and evidence packs are also persisted. CORS origins come from `VANDAL_CORS_ORIGINS`, which defaults to `http://localhost:3000`.
+FastAPI app with SSE for live updates. It covers runs (`/demo/reset`, `/runs`, `/runs/{id}/operate`, `/state`, `/entities`, `/ledger`, `/chain/{payment}`, `/events`, `/inject`), jobs (`/search`, `/diagnose`, `/synthesize`, `/verify`, `/jobs/{id}/events`), Blue (`/runs/{id}/verdicts`, `/approvals`, `/policies/{version}/apply`, `/explain/{type}/{id}`), `/replay`, `/metrics`, `/policies`, and `/settings`. Runs live in memory. When `DATABASE_URL` is set (SQLite, or Postgres/Supabase through the `postgres` extra), runs, events, searches, syntheses, and evidence packs are also persisted. CORS origins come from `VANDAL_CORS_ORIGINS`, which defaults to `http://localhost:3000`.
+
+## War room
+
+```bash
+cd frontend
+npm install
+npm run dev        # against the API on :8000
+npm run dev:mock   # no backend: a mock API recorded from the real one
+```
+
+See [frontend/README.md](frontend/README.md) for the demo loop.
 
 ## Tests
 
@@ -111,13 +122,13 @@ backend/
   policies/      control policies v1–v3
   scenarios/     hand-written adversary traces
   tests/
-frontend/        war-room UI (in progress)
+frontend/        war-room UI (Next.js): search, twin, chains, verdicts, inbox, CEGIS, inject
 docs/            spec, design, implementation plan, reviews
 ```
 
 ## Status
 
-The Sandbox (twin, search, root cause, CEGIS, verification), fault injection, money in, persistence, and the API skeleton are in. Still in progress: the LLM layer (`vandal/llm.py`; until it lands, callers fall back to deterministic paths such as `--no-llm`), the approvals inbox, cited explanations, and the war-room frontend. See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the slice plan.
+The Sandbox (twin, search, root cause, CEGIS, verification), fault injection, money in, persistence, and the API skeleton are in. The war-room frontend (F0–F6) is in. Still in progress: the LLM layer (`vandal/llm.py`; until it lands, callers fall back to deterministic paths such as `--no-llm`). See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the slice plan.
 
 ## Docs
 
