@@ -39,7 +39,7 @@ Also included:
 - **Scorecard** compares policies side by side.
 - **why?** next to a payment, invoice, or change request opens Blue's cited explanation. Push back and the hold stands.
 - **Operator tries to approve** in the inbox shows segregation of duties refusing it.
-- **Playback** flips `DEMO_PLAYBACK` on the server. LLM calls are served from recordings once `vandal/llm.py` (L0) lands; until then every caller already uses its deterministic path.
+- **Playback** flips `DEMO_PLAYBACK` on the server: every LLM call is served from the recordings in `backend/llm_cache/`, with no API key and no network. A call with no recording falls back to the caller's deterministic path.
 
 ## Layout
 

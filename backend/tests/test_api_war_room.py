@@ -32,7 +32,12 @@ def test_entities_show_the_misdirected_payment_and_the_answer_key(client) -> Non
     pay = next(p for p in t["payments"] if p["id"] == "PAY-0057")
     assert pay["invoice"] == "INV-1042" and pay["amount"] == 4_000_000
     attacker = next(a for a in t["vendor_bank_accounts"] if a["id"] == pay["payee_account"])
-    assert attacker["status"] == "unverified"
+    # The change request planted the account as `unverified`, and v0 paid it. The replay then
+    # runs the trace's remaining days, so O2's recovery (PR 20, DESIGN 12) has already marked the
+    # payment misdirected, reinstated AP, and rejected the bad payee: the war room shows the
+    # account as `rejected`, with the $40k still counted as exposure.
+    assert attacker["status"] == "rejected"
+    assert pay["status"] == "misdirected"
     assert t["labels"] == run["labels"]
     violated = {
         v["invariant"]
