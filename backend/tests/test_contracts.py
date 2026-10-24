@@ -23,11 +23,20 @@ def test_money_is_integer_cents() -> None:
         number="1042",
         amount=4_000_000,
         dimension="P-01",
+        received_on=0,
         due_date=10,
     )
     assert inv.amount == 4_000_000
     with pytest.raises(ValidationError):
-        Invoice(id="INV-1", vendor="V-1", number="1", amount=12.5, dimension="P", due_date=1)
+        Invoice(
+            id="INV-1",
+            vendor="V-1",
+            number="1",
+            amount=12.5,
+            dimension="P",
+            received_on=0,
+            due_date=1,
+        )
 
 
 def test_contracts_reject_unknown_fields() -> None:

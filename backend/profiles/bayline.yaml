@@ -1,0 +1,126 @@
+# Bayline Property Group: the demo company (DESIGN 5.5).
+# All money is integer cents. Days are sim business days; day 0 is the first day of the run,
+# negative days are seeded history.
+
+company:
+  name: Bayline Property Group
+  start_date: 2026-07-01
+  currency: USD
+
+properties:
+  - {id: P-01, name: Bayline Tower}
+  - {id: P-02, name: Harborview Apartments}
+  - {id: P-03, name: Mission Bay Lofts}
+  - {id: P-04, name: Oakridge Commons}
+  - {id: P-05, name: Pier 9 Retail}
+  - {id: P-06, name: Sunset Terrace}
+  - {id: P-07, name: Golden Gate Plaza}
+  - {id: P-08, name: Fremont Business Park}
+  - {id: P-09, name: Redwood Court}
+  - {id: P-10, name: Alameda Point Flats}
+  - {id: P-11, name: Embarcadero Suites}
+  - {id: P-12, name: Presidio Heights}
+
+bank_accounts:
+  - {id: CB-OPER, name: Operating, gl_account: "1000", balance: 180000000}
+  - {id: CB-RSRV, name: Reserve, gl_account: "1010", balance: 20000000}
+
+chart_of_accounts:
+  - {id: "1000", name: Cash - Operating, kind: asset}
+  - {id: "1010", name: Cash - Reserve, kind: asset}
+  - {id: "1200", name: Accounts Receivable, kind: asset}
+  - {id: "1300", name: Misdirected Payment Receivable, kind: asset}
+  - {id: "1310", name: Vendor Overpayment Receivable, kind: asset}
+  - {id: "2000", name: Accounts Payable, kind: liability}
+  - {id: "2100", name: Customer Credits, kind: liability}
+  - {id: "2900", name: Suspense, kind: liability}
+  - {id: "3000", name: Owner's Equity, kind: equity}
+  - {id: "4000", name: Rental Revenue, kind: revenue}
+  - {id: "5100", name: Repairs and Maintenance, kind: expense}
+  - {id: "5200", name: Utilities, kind: expense}
+  - {id: "5300", name: Landscaping and Grounds, kind: expense}
+  - {id: "5400", name: Security, kind: expense}
+  - {id: "5500", name: Janitorial, kind: expense}
+  - {id: "5600", name: Insurance, kind: expense}
+  - {id: "5700", name: Professional Fees, kind: expense}
+  - {id: "5800", name: Capital Improvements, kind: expense}
+  - {id: "5900", name: Software and IT, kind: expense}
+  - {id: "5950", name: Waste Removal, kind: expense}
+  - {id: "6900", name: Fraud Loss, kind: expense}
+
+opening_equity_account: "3000"
+
+approval_matrix:
+  threshold: 2500000            # $25k: above this needs a human approval through the inbox
+  match_tolerance_pct: 2        # v0 3-way match tolerance
+  approvers:
+    - {id: U-CTRL, name: Controller, max_amount: 10000000}
+    - {id: U-CFO, name: CFO, max_amount: null}
+  min_prior_payments: 3         # simulated approver approves known vendors only
+
+operator:
+  id: OP-1
+
+# What the adversary may do (DESIGN 8.1). Search only enumerates legal moves.
+attacker_capabilities:
+  change_request_channels: [email, agent_msg]
+  senders: [lookalike, compromised_mailbox]
+  spoof_caller_id: true
+  clone_voice: true
+  portal_takeover: false
+  submit_invoices: true
+  deposits: true
+
+# Selection objective weights (DESIGN 9.4), in cents.
+risk_appetite:
+  lambda_per_blocked: 500000    # $5,000 per blocked legitimate payment
+  mu_per_hold: 5000             # $50 per hold
+
+generation:
+  invoices: 80                  # total, fixtures included
+  pending_invoices: 24          # unpaid at day 0, fixtures included; the rest is paid history
+  history_days: 60              # history spans days -60..-1
+  prior_contact_rate: 0.3       # share of vendors with a superseded contact
+  prior_account_rate: 0.25      # share of vendors with a superseded bank account
+
+# min/max are per-invoice amount bands in cents. po: whether the vendor bills against POs.
+vendors:
+  - {id: V-001, name: Bayside Plumbing, domain: baysideplumbing.com, gl: "5100", min: 25000, max: 850000, po: true}
+  - {id: V-002, name: Volt Electric Co, domain: voltelectric.co, gl: "5100", min: 30000, max: 1200000, po: true}
+  - {id: V-003, name: Coastal HVAC Services, domain: coastalhvac.com, gl: "5100", min: 40000, max: 1500000, po: true}
+  - {id: V-004, name: Greenline Landscaping, domain: greenlinels.com, gl: "5300", min: 60000, max: 450000, po: true}
+  - {id: V-005, name: Sentinel Security Group, domain: sentinelsg.com, gl: "5400", min: 200000, max: 1100000, po: true}
+  - {id: V-006, name: Brightway Janitorial, domain: brightwayclean.com, gl: "5500", min: 150000, max: 700000, po: true}
+  - {id: V-007, name: Harbor Point Construction, domain: harborpointbuild.com, gl: "5800", min: 500000, max: 2400000, po: true}
+  - {id: V-008, name: Summit Roofing, domain: summitroofing.net, gl: "5100", min: 80000, max: 1800000, po: true}
+  - {id: V-009, name: PestAway Bay Area, domain: pestawaybay.com, gl: "5100", min: 15000, max: 120000, po: true}
+  - {id: V-010, name: Liftwell Elevator, domain: liftwell.com, gl: "5100", min: 90000, max: 950000, po: true}
+  - {id: V-011, name: Pacific Gas Utility, domain: pacificgasutil.com, gl: "5200", min: 120000, max: 900000, po: false}
+  - {id: V-012, name: Bay Water District, domain: baywaterdistrict.org, gl: "5200", min: 50000, max: 400000, po: false}
+  - {id: V-013, name: Keystone Insurance, domain: keystoneins.com, gl: "5600", min: 400000, max: 1600000, po: false}
+  - {id: V-014, name: Morrow and Lee LLP, domain: morrowlee.law, gl: "5700", min: 150000, max: 900000, po: false}
+  - {id: V-015, name: Prism Painting, domain: prismpainting.com, gl: "5100", min: 60000, max: 1300000, po: true}
+  - {id: V-016, name: ApplianceCare Pro, domain: appliancecarepro.com, gl: "5100", min: 20000, max: 300000, po: true}
+  - {id: V-017, name: Recology Waste, domain: recologywaste.com, gl: "5950", min: 80000, max: 350000, po: false}
+  - {id: V-018, name: Lockwise Locksmith, domain: lockwise.com, gl: "5100", min: 10000, max: 90000, po: true}
+  - {id: V-019, name: FireGuard Systems, domain: fireguardsys.com, gl: "5100", min: 50000, max: 800000, po: true}
+  - {id: V-020, name: BlueWave Pool Service, domain: bluewavepools.com, gl: "5300", min: 30000, max: 200000, po: true}
+  - {id: V-021, name: Tidewater Flooring, domain: tidewaterfloors.com, gl: "5800", min: 100000, max: 1900000, po: true}
+  - {id: V-022, name: ClearView Windows, domain: clearviewwin.com, gl: "5100", min: 40000, max: 600000, po: true}
+  - {id: V-023, name: Rentroll Software, domain: rentroll.io, gl: "5900", min: 90000, max: 450000, po: false}
+  - {id: V-024, name: Golden State Glass, domain: gsglass.com, gl: "5100", min: 30000, max: 700000, po: true}
+  - {id: V-025, name: Northbay Masonry, domain: northbaymasonry.com, gl: "5800", min: 120000, max: 1600000, po: true}
+
+# Fixed invoices the scenarios depend on. The generator numbers the rest around them.
+fixtures:
+  invoices:
+    - id: INV-1042           # Scenario A: the $40k contractor invoice
+      vendor: V-007
+      number: HPC-2291
+      amount: 4000000
+      dimension: P-03
+      received_on: -3
+      due_date: 4
+      po: true
+  min_prior_payments:
+    V-007: 4                 # the approver must recognise Harbor Point as a known vendor
