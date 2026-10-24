@@ -17,7 +17,7 @@ from vandal.contracts.interfaces import Action
 from vandal.contracts.verdicts import Verdict
 from vandal.twin.evidence import satisfying
 from vandal.twin.facts import facts
-from vandal.twin.state import State
+from vandal.twin.state import State, construct
 
 _MISSING = object()
 
@@ -96,4 +96,5 @@ class Gate:
             f = {**f, "gate.cleared": cleared, "gate.cleared_evidence": sorted(cleared_evidence)}
             cites = cites + sorted(cleared_evidence)
         decision = max(decisions, key=DECISION_ORDER.__getitem__, default="allow")
-        return Verdict(decision=decision, fired=fired, facts=f, cites=cites)
+        fields = {"decision": decision, "fired": fired, "facts": f, "cites": cites}
+        return construct(Verdict, fields)  # every field built above; skip validation
