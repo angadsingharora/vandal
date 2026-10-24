@@ -11,6 +11,7 @@ from vandal.twin.state import State
 
 AP_CONTROL = "2000"
 VENDOR_OVERPAYMENT = "1310"
+MISDIRECTED_RECEIVABLE = "1300"
 
 
 def next_entry_id(state: State, offset: int = 0) -> str:
@@ -46,6 +47,19 @@ def duplicate_settlement(
         {VENDOR_OVERPAYMENT: amount},
         {cash: amount},
     )
+
+
+def misdirected(eid: str, day: SimDay, payment: str, amount: Cents) -> JournalEntry:
+    """Dr Misdirected Payment Receivable / Cr AP: the money went to the wrong place, so the
+    company is owed it back, and it still owes the vendor (DESIGN 12)."""
+    return entry(
+        eid, day, f"Misdirected {payment}", {MISDIRECTED_RECEIVABLE: amount}, {AP_CONTROL: amount}
+    )
+
+
+def recalled(eid: str, day: SimDay, payment: str, cash: str, amount: Cents) -> JournalEntry:
+    """Dr Cash / Cr Misdirected Payment Receivable: the bank recalled it before it settled."""
+    return entry(eid, day, f"Recalled {payment}", {cash: amount}, {MISDIRECTED_RECEIVABLE: amount})
 
 
 def reversal(eid: str, day: SimDay, original: JournalEntry) -> JournalEntry:

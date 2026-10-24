@@ -70,7 +70,7 @@ def test_scorecard_before_and_after(pack_v1) -> None:
     assert after.false_positive_rate == 0.0 < before.false_positive_rate
     assert after.violations_found == 0 < before.violations_found
     assert set(after.attack_success) == set(THREAT_CLASSES.values())
-    assert after.extraction_accuracy is None and after.notes  # honest about what isn't measured
+    assert after.extraction_accuracy is None and after.notes  # not measured without an intake
 
 
 @pytest.mark.slow

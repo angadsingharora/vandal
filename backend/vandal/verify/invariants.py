@@ -87,7 +87,12 @@ def in_flight(state: State, bank_account: str) -> Cents:
     """Submitted but unsettled payments. Every payment leaves the operating account for now."""
     if bank_account != OPERATING:
         return 0
-    return sum(_amount(state, p) for p in state.payments.values() if p.status in IN_FLIGHT)
+    return sum(
+        _amount(state, p)
+        for p in state.payments.values()
+        # A misdirected payment is still moving until the bank settles (or recalls) it.
+        if p.status in IN_FLIGHT or (p.status == "misdirected" and p.settled_on is None)
+    )
 
 
 def ap_subledger(state: State) -> Cents:
@@ -157,7 +162,9 @@ def inv3_settled_once(c: Ctx) -> list[Violation]:
     state = c.state
     by_invoice: dict[str, list[Payment]] = {}
     for pay in state.payments.values():
-        if pay.status in EXECUTED:
+        # A misdirected payment never settled the obligation: re-paying the vendor isn't double
+        # payment. (INV-2, INV-4, INV-5 still count it.)
+        if pay.status in EXECUTED and pay.status != "misdirected":
             by_invoice.setdefault(_invoice_of(state, pay), []).append(pay)
     out = []
     for invoice, pays in by_invoice.items():

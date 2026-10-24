@@ -37,6 +37,15 @@ ROLE_TOOLS: dict[str, tuple[str, ...]] = {
         "cash.apply",
         "cash.reverse",
         "refunds.issue",
+        "cases.open",
+        "cases.resolve",
+        "payments.mark_misdirected",
+        "payments.recall",
+        "payments.book_recall",
+        "vendors.reject_account",
+        "approvals.request_repayment",
+        "approvals.remind",
+        "approvals.reassign",
     ),
     "approver": ("approvals.decide",),
 }
@@ -63,6 +72,25 @@ def sod_checks(tool_stages: dict[str, str]) -> list[Check]:
                 action="block",
             )
         )
+    # DESIGN 6.1: re-paying a vendor after a misdirected payment needs a human, at any amount.
+    checks.append(
+        Check(
+            id="blue.repayment_inbox",
+            stage="pre_approve",
+            when=_when(("tool", "eq", "approvals.request_repayment")),
+            action="escalate",
+        )
+    )
+    checks.append(
+        Check(
+            id="blue.repayment_before_execute",
+            stage="pre_execute",
+            when=_when(
+                ("invoice.misdirected_payments", "gt", 0), ("approval.kind", "ne", "repayment")
+            ),
+            action="hold",
+        )
+    )
     checks.append(
         Check(
             id="sod.self_approval",

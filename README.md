@@ -43,18 +43,21 @@ uv run vandal synth --no-llm --scenario a                     # diagnose + CEGIS
 
 `synth` writes an evidence pack to `backend/evidence/`.
 
+The Operator's intake (O1) reads messy documents: invoices as email bodies, OCR'd scans with typos, forwarded threads, and line-item tables, each with a hidden answer key. `uv run vandal intake` scores it (the scorecard reports the same numbers), and `uv run vandal run --operator llm` runs the company with the LLM Operator; without a model configured, its deterministic reader does the reading.
+
 ## CLI
 
 | Command | What it does |
 |---|---|
 | `vandal seed` | Print the seeded company summary |
-| `vandal run` | Run legitimate operations for N business days (`--days`, `--persist`) |
+| `vandal run` | Run legitimate operations for N business days (`--days`, `--persist`, `--operator reference\|llm`) |
 | `vandal attack` | Replay a hand-written adversary trace (`--trace`) |
 | `vandal search` | Bounded adversarial search (`--scenario a\|b\|f`, `--depth`, `--workers`, `--exhaustive`) |
 | `vandal synth` | Diagnose and synthesize a control with CEGIS (`--scenario`, `--no-llm`) |
 | `vandal verify` | Run the verification suite against a policy (`--policy`, `--parent`) |
 | `vandal inject` | Run a threat described in plain language, or a composed trace (`--trace`, `--dry-run`) |
 | `vandal rebuild` | Rebuild a persisted run from its events and check its state hash |
+| `vandal intake` | Score the LLM Operator's intake on the messy-document items: field and GL-coding accuracy (`--no-llm`, `--show MSY-003`) |
 
 Most commands take `--profile` (default `bayline`), `--seed`, and `--policy` (`v0`, a name under `backend/policies/`, or a JSON path). Run `uv run vandal <command> --help` for the rest.
 
@@ -128,7 +131,7 @@ docs/            spec, design, implementation plan, reviews
 
 ## Status
 
-The Sandbox (twin, search, root cause, CEGIS, verification), fault injection, money in, persistence, and the API skeleton are in. The war-room frontend (F0–F6) is in. Still in progress: the LLM layer (`vandal/llm.py`; until it lands, callers fall back to deterministic paths such as `--no-llm`). See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the slice plan.
+The Sandbox (twin, search, root cause, CEGIS, verification), fault injection, money in, persistence, the API skeleton, the Operator (reference and LLM intake, recovery, approvers), and the war-room frontend (F0–F6) are in. Still in progress: the LLM layer (`vandal/llm.py`; until it lands, callers fall back to deterministic paths such as `--no-llm`). See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the slice plan.
 
 ## Docs
 

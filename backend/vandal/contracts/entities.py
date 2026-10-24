@@ -139,6 +139,7 @@ class Invoice(Entity):  # INV-…
     due_date: SimDay
     kind: Literal["invoice", "credit_memo"] = "invoice"
     supersedes: str | None = None
+    gl_account: str | None = None  # as the Operator coded it (O1); None = the vendor's default
     status: InvoiceStatus = "received"
     scheduled_for: SimDay | None = None
 
@@ -157,6 +158,10 @@ class ApprovalRequest(Entity):  # AQ-…: waiting in the approvals inbox
     subject: str
     requested_by: str
     instruction: ApprovedInstruction
+    kind: Literal["payment", "repayment"] = "payment"  # repayment: after a misdirected payment
+    requested_on: SimDay = 0
+    assigned_to: str | None = None  # the approver it waits on (escalation reassigns it)
+    reminders: int = 0
     status: Literal["pending", "approved", "denied"] = "pending"
     decided_by: str | None = None
     reason: str = ""
@@ -167,6 +172,7 @@ class Approval(Entity):  # APR-…
     requested_by: str
     approver: str
     via: Literal["approvals_inbox", "policy"] = "approvals_inbox"  # policy = gate, under threshold
+    kind: Literal["payment", "repayment"] = "payment"  # repayment: after a misdirected payment
     approved_instruction: ApprovedInstruction
     instruction_hash: str
 
@@ -190,6 +196,8 @@ class Payment(Entity):  # PAY-…
     submitted_on: SimDay | None = None
     settled_on: SimDay | None = None
     bank_status: Literal["unknown", "processed", "not_found"] = "unknown"  # from a status query
+    recall: Literal["none", "requested", "failed", "succeeded"] = "none"  # O2
+    recall_requested_on: SimDay | None = None
 
 
 class BankAccount(Entity):  # CB-…: the company's own accounts
@@ -240,7 +248,7 @@ class BankSubmission(Entity):  # BS-…: one submission the bank processed (and 
     idempotency_key: str | None = None
     submitted_on: SimDay
     settle_on: SimDay
-    status: Literal["processed", "settled"] = "processed"
+    status: Literal["processed", "settled", "recalled"] = "processed"
 
 
 # --- Money in -------------------------------------------------------------------------------
@@ -307,12 +315,15 @@ class JournalEntry(Entity):  # append-only
 # --- Operations -----------------------------------------------------------------------------
 
 
-class Case(Entity):
+class Case(Entity):  # CASE-…
     kind: Literal["exception", "recovery", "escalation"]
     subject: str
     reason: str
     rationale: str = ""
+    opened_on: SimDay = 0
+    actions: list[str] = []  # what the Operator has done on it, in order
     status: Literal["open", "resolved"] = "open"
+    outcome: str = ""
 
 
 class OracleLabel(BaseModel):
