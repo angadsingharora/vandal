@@ -24,7 +24,7 @@ from vandal.contracts.interfaces import FinanceOperator, Tools
 from vandal.twin import bank
 from vandal.twin.evidence import Environment, LegitEnvironment, answer_callbacks, answered_notice
 from vandal.twin.reducer import apply_in_place
-from vandal.twin.state import State
+from vandal.twin.state import State, construct
 
 StepKind = Literal["ops", "approvals", "batch", "bank", "tick"]
 DAY_STEPS: tuple[StepKind, ...] = ("ops", "approvals", "batch", "bank", "tick")
@@ -44,14 +44,18 @@ class Run:
         caused_by: Iterable[str] = (),
     ) -> Event:
         seq = len(self.state.events)
-        event = Event(
-            id=f"EV-{seq:06d}",
-            seq=seq,
-            day=self.state.day,
-            kind=kind,
-            actor=actor,
-            payload=payload,
-            caused_by=list(caused_by),
+        event = construct(  # the hot path: every field is built here, so skip validation
+            Event,
+            {
+                "id": f"EV-{seq:06d}",
+                "seq": seq,
+                "day": self.state.day,
+                "kind": kind,
+                "actor": actor,
+                "payload": payload,
+                "caused_by": list(caused_by),
+                "corrects": None,
+            },
         )
         apply_in_place(self.state, event)
         return event

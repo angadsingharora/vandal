@@ -8,6 +8,8 @@ Performance model (search runs thousands of these, IMPLEMENTATION R4):
 - A state is changed only through update() / put(), and only by its owner: a fresh clone().
 - entity_hash() covers the entities, not the event log, so two paths that reach the same
   company state dedupe. Each entity's digest is cached on the (immutable) entity.
+- Hot paths build models with construct(), which skips validation and pydantic's own
+  model_construct (most of a run's time otherwise). Only for values built by trusted code.
 """
 
 from __future__ import annotations
@@ -96,8 +98,8 @@ class State(BaseModel):
     def update(self, collection: str, key: str, **changes: Any) -> Entity:
         """Swap in a changed copy of one entity. Call only on a state you own."""
         items = getattr(self, collection)
-        new = items[key].model_copy(update=changes)
-        new._digest = None  # model_copy carries private attrs over; the copy differs
+        old = items[key]
+        new = construct(type(old), {**old.__dict__, **changes})  # unvalidated, like model_copy
         items[key] = new
         return new
 
@@ -134,9 +136,21 @@ _COLLECTIONS = tuple(
 )
 
 
+def construct[M: BaseModel](cls: type[M], fields: dict[str, Any]) -> M:
+    """A model from complete, already-valid field values, without validation. Sets the same
+    instance slots pydantic's model_construct does, with private attrs at their defaults."""
+    private = {k: v.get_default() for k, v in cls.__private_attributes__.items()} or None
+    obj = cls.__new__(cls)
+    object.__setattr__(obj, "__dict__", fields)
+    object.__setattr__(obj, "__pydantic_fields_set__", set(fields))
+    object.__setattr__(obj, "__pydantic_extra__", None)
+    object.__setattr__(obj, "__pydantic_private__", private)
+    return obj
+
+
 def _digest(entity: Entity) -> str:
-    digest = entity._digest
+    private = entity.__pydantic_private__  # direct: pydantic's __getattr__ is slow on this path
+    digest = private["_digest"]
     if digest is None:
-        digest = hashlib.sha256(entity.model_dump_json().encode()).hexdigest()
-        entity._digest = digest
+        digest = private["_digest"] = hashlib.sha256(entity.model_dump_json().encode()).hexdigest()
     return digest
