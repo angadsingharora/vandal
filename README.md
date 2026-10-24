@@ -20,7 +20,19 @@ Every gap Red finds becomes a control that Blue enforces. Fixes go into Blue's c
 4. **Synthesize.** A CEGIS loop proposes controls from a fixed set of templates (T1–T6). Search attacks each candidate. A candidate fails if the attack gets through or if it blocks legitimate payments.
 5. **Verify.** The surviving control has to pass replay, re-search, held-out variants, regression, legitimate-ops impact, and invariant checks. The results go into an evidence pack for a human to approve.
 
-## Quickstart
+## Run the whole demo with one command
+
+Requires Python 3.12 with [uv](https://docs.astral.sh/uv/) (`python -m uv` works when `uv` isn't on PATH) and Node 20+.
+
+```bash
+python scripts/demo.py --playback
+```
+
+That starts the API on `:8000` and the war room on `:3000` (running `npm install` the first time), with **playback** on: every Claude call is served from the recordings in `backend/llm_cache/`, so the demo needs no network and no API key. Drop `--playback` to call Claude live (put `ANTHROPIC_API_KEY` in `backend/.env`), or use `--mock` for the war room alone, replaying fixtures recorded from the backend. The Playback switch in the top bar flips the same flag on a running server.
+
+The loop a judge sees, in order: **Reset demo → Run operations → Unleash Vandal → Replay on twin → Diagnose → Synthesize a control → Verify → Submit for approval → Approve as Controller → Apply → Replay under the new policy**, then **Try your own scenario**, **why?** on any payment, and the **Scorecard**. `backend/scripts/demo_smoke.py` drives the same loop over the API and asserts the numbers below; `uv run pytest --slow` runs it.
+
+## Quickstart (CLI)
 
 Requires Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
@@ -101,12 +113,50 @@ uv run pytest --slow   # adds full searches, CEGIS, and verification packs; run 
 uv run ruff check .
 ```
 
+## Scorecard, from an actual run
+
+`GET /metrics` (the war room's Scorecard dialog) at search depth 1, v0 against the policy CEGIS synthesized in the demo (`v1-synth` = T2 `ApprovalBinding` + T1 `VerifiedAccountChange`). Verification of `v1-synth` at depth 3: 34,676 sequences re-searched with no violation, 0 of 40 held-out variants succeeded, 25 of 25 regression cases passed, all 80 seeded invoices paid with 0 holds and 0 blocks.
+
+| | v0 | v1-synth |
+|---|---|---|
+| Sequences explored (depth 1) | 65 | 65 |
+| Violations found | 12 | 0 |
+| Attack success rate (held-out variants) | 100% | 0% |
+| Exposure | $300,787 | $0 |
+| Legitimate operations run / failed / blocked | 105 / 7 / 0 | 105 / 0 / 0 |
+| Holds on legitimate operations (friction) | 0 | 9 |
+| False-positive rate | 6.7% | 0.0% |
+| Broken invariants in legitimate runs | INV-2, INV-5 | none |
+| Intake: field accuracy (120 fields, 24 messy documents) | 100% | 100% |
+| Intake: GL-coding accuracy (24 documents) | 100% | 100% |
+
+Every number comes from `backend/vandal/verify/` running on fresh clones against the hidden oracle labels; none is typed in. The 7 legitimate failures under v0 are the regression suite's real bank changes, which v0 has no way to verify.
+
+## What's real, what's simulated, and how we know
+
+| Real | Simulated | How we know it works |
+|---|---|---|
+| Double-entry ledger, invariants, policy gate, bounded search, CEGIS verification (deterministic code with tests) | The company, vendors, bank accounts, and money | Hidden oracle labels act as an answer key no agent can read |
+| Claude reading every document, proposing controls, and explaining with citations | Callbacks, deepfakes, and counterparty agents, modeled as channel events with forgeable attributes; no synthetic media | Held-out variants the synthesizer never saw, plus a re-search under the new policy |
+| The synthesizer proposing controls, and search refuting or accepting them | Bank behavior and faults (timeouts, dropped acks, late feeds) | The scorecard: before-and-after rates from actual runs |
+| Replay of any recorded trace | Approvers, when no human is present | Replay-determinism tests in `backend/tests/` |
+
+## What we can and can't claim
+
+| Can claim | Can't claim |
+|---|---|
+| "No violating sequence of length ≤ k within the modeled actions and capabilities" | "Mathematically proven safe" |
+| "The root cause is computed from the authorization chain" | "Finds every possible failure" |
+| "The control was verified by replay, re-search, held-out variants, and regression" | "Works on your real systems today" |
+| "Exposure" | "Losses prevented" |
+| "Synthesizes controls from a bounded template library" | "Rewrites arbitrary financial software" |
+
 ## Design principles
 
 - **Deterministic.** Every run is `fold(seed, events)`, so the same seed and the same events give the same `state_hash`. Time comes only from the sim clock, and money is always integer cents.
 - **Models never change state.** Money math, gating, search, and verification are deterministic code. The AI proposes. Search and verification decide.
 - **Every state change passes Blue's gate**, in search, in verification, and in the live demo.
-- **Bounded claims.** "No violation" means none within the searched depth and alphabet. It is not a proof beyond that.
+- **Bounded claims.** "No violation" means none within the searched depth and alphabet, verified by replay and re-search. It is not a proof beyond that.
 
 ## Repo layout
 
