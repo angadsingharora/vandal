@@ -52,12 +52,49 @@ export interface VandalEvent {
 
 // --- runs ---------------------------------------------------------------------------------
 
+export type OperatorKind = "reference" | "llm";
+
+/** A planted messy document (DESIGN 5.6) the company can receive; the answer key stays server-side. */
+export interface MessyDocument {
+  id: string;
+  format: "email_body" | "ocr_text" | "forwarded_thread" | "line_items";
+  channel: string;
+  sender: string;
+  subject: string;
+  body: string;
+  invoice: string;
+  delivered: boolean;
+}
+
+/** What the LLM Operator's intake read from one unstructured message (O1). */
+export interface IntakeRead {
+  message: string;
+  intent: "invoice" | "credit_memo" | "vendor_bank_change" | "vendor_contact_change" | "payment_inquiry" | "other";
+  vendor: string | null;
+  number: string | null;
+  amount: Cents | null;
+  po: string | null;
+  dimension: string | null;
+  gl_account: string | null;
+  supersedes: string | null;
+  due_in_days: number;
+  source: "llm" | "deterministic" | "mixed";
+}
+
+export interface DeliverOut {
+  document: string;
+  extraction: Omit<IntakeRead, "message"> | null;
+  verdicts: { tool: string; decision: Decision; fired: string[] }[];
+  invoice: Invoice | null;
+}
+
 export interface RunSummary {
   run_id: string;
   company: string;
   profile: string;
   seed: number;
   policy: string;
+  operator?: OperatorKind;
   day: number;
   invoices: Record<string, number>;
   payments: Record<string, number>;

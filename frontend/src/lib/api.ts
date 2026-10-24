@@ -20,6 +20,10 @@ import type {
   PaymentDecisionOut,
   PolicyInfo,
   ReplayOut,
+  DeliverOut,
+  IntakeRead,
+  MessyDocument,
+  OperatorKind,
   RunSummary,
   SearchResult,
   Settings,
@@ -56,9 +60,13 @@ export interface VandalApi {
   setSettings(s: { playback: boolean }): Promise<Settings>;
   policies(): Promise<PolicyInfo[]>;
 
-  reset(policy: string): Promise<RunSummary>;
-  createRun(policy: string): Promise<RunSummary>;
+  reset(policy: string, operator?: OperatorKind): Promise<RunSummary>;
+  createRun(policy: string, operator?: OperatorKind): Promise<RunSummary>;
   state(runId: string): Promise<RunSummary>;
+  /** O1: the planted messy documents, what intake read, and delivering one to the LLM Operator. */
+  documents(runId: string): Promise<MessyDocument[]>;
+  deliver(runId: string, documentId: string): Promise<DeliverOut>;
+  intake(runId: string): Promise<IntakeRead[]>;
   entities(runId: string): Promise<Entities>;
   ledger(runId: string): Promise<JournalEntry[]>;
   chain(runId: string, payment: string): Promise<Chain>;
@@ -138,9 +146,15 @@ export class HttpApi implements VandalApi {
   setSettings = (s: { playback: boolean }) => this.call<Settings>("POST", "/settings", s);
   policies = () => this.call<PolicyInfo[]>("GET", "/policies");
 
-  reset = (policy: string) => this.call<RunSummary>("POST", "/demo/reset", { policy });
-  createRun = (policy: string) => this.call<RunSummary>("POST", "/runs", { policy });
+  reset = (policy: string, operator: OperatorKind = "reference") =>
+    this.call<RunSummary>("POST", "/demo/reset", { policy, operator });
+  createRun = (policy: string, operator: OperatorKind = "reference") =>
+    this.call<RunSummary>("POST", "/runs", { policy, operator });
   state = (runId: string) => this.call<RunSummary>("GET", `/runs/${runId}/state`);
+  documents = (runId: string) => this.call<MessyDocument[]>("GET", `/runs/${runId}/documents`);
+  deliver = (runId: string, documentId: string) =>
+    this.call<DeliverOut>("POST", `/runs/${runId}/documents/${documentId}/deliver`);
+  intake = (runId: string) => this.call<IntakeRead[]>("GET", `/runs/${runId}/intake`);
   entities = (runId: string) => this.call<Entities>("GET", `/runs/${runId}/entities`);
   ledger = (runId: string) => this.call<JournalEntry[]>("GET", `/runs/${runId}/ledger`);
   chain = (runId: string, payment: string) =>

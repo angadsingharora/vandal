@@ -169,3 +169,32 @@ def test_metrics(client) -> None:
     m = client.get("/metrics", params={"policies": "v0,v1", "depth": 1}).json()
     assert m["scorecards"]["v0"]["attack_success_rate"] == 1.0
     assert m["scorecards"]["v1"]["attack_success_rate"] == 0.0
+
+
+def test_llm_operator_reads_a_delivered_document(client) -> None:
+    """O1 in the war room: a run with the LLM Operator lists the planted documents, delivering
+    one makes intake read it and Blue gate the receive, and the reference run refuses."""
+    run = client.post("/runs", json={"policy": "v0", "operator": "llm"}).json()
+    assert run["operator"] == "llm"
+    docs = client.get(f"/runs/{run['run_id']}/documents").json()
+    assert len(docs) == 24 and {d["format"] for d in docs} == {
+        "email_body",
+        "ocr_text",
+        "forwarded_thread",
+        "line_items",
+    }
+    assert not any(d["delivered"] for d in docs)
+    out = client.post(f"/runs/{run['run_id']}/documents/{docs[0]['id']}/deliver").json()
+    assert out["extraction"]["intent"] == "invoice"
+    assert out["extraction"]["number"] in docs[0]["subject"] + docs[0]["body"]
+    assert out["invoice"]["number"] == out["extraction"]["number"]
+    assert [(v["tool"], v["decision"]) for v in out["verdicts"]] == [("invoices.receive", "allow")]
+    reads = client.get(f"/runs/{run['run_id']}/intake").json()
+    assert [r["message"] for r in reads] == [docs[0]["id"]]
+    assert client.get(f"/runs/{run['run_id']}/documents").json()[0]["delivered"]
+    assert (
+        client.post(f"/runs/{run['run_id']}/documents/{docs[0]['id']}/deliver").status_code == 409
+    )
+    ref = client.post("/runs").json()
+    assert ref["operator"] == "reference"
+    assert client.post(f"/runs/{ref['run_id']}/documents/MSY-001/deliver").status_code == 400

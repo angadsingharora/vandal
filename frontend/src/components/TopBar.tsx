@@ -34,7 +34,7 @@ export function TopBar({ onInject, onScorecard }: { onInject: () => void; onScor
 
   const reset = async () => {
     setResetting(true);
-    await s.reset(policy);
+    await s.reset(policy, s.operator);
     setResetting(false);
   };
 
@@ -59,6 +59,17 @@ export function TopBar({ onInject, onScorecard }: { onInject: () => void; onScor
               {p.name}
             </option>
           ))}
+        </select>
+        <label className="sr-only" htmlFor="operator">Operator</label>
+        <select
+          id="operator"
+          value={s.operator}
+          onChange={(e) => s.setOperator(e.target.value as "reference" | "llm")}
+          className="h-7 rounded border border-line bg-raised px-1.5 text-xs"
+          title="The agent Blue protects: the deterministic reference Operator, or the LLM Operator that reads messy documents (O1). Takes effect on Reset demo."
+        >
+          <option value="reference">reference Operator</option>
+          <option value="llm">LLM Operator</option>
         </select>
         <Button onClick={reset} busy={resetting} title="Drop every run and seed the company again">
           Reset demo

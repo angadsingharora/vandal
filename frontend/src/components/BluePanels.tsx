@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { cx, usd } from "@/lib/format";
 import { CFO, CONTROLLER, OPERATOR, useWarRoom } from "@/lib/store";
 import type { Decision, VerdictItem } from "@/lib/types";
+import { IntakePanel } from "./IntakePanel";
 import { Badge, Button, DecisionBadge, Empty, LiveDot, Panel, SideTag } from "./ui";
 
 function argsLine(args: Record<string, unknown>): string {
@@ -25,7 +26,12 @@ export function OperatorPanel() {
     <Panel
       title="Operator"
       tag={<SideTag side="op" />}
-      actions={<span className="text-[11px] text-faint">{cases.filter((c) => c.status === "open").length} open cases</span>}
+      actions={
+        <span className="flex items-center gap-2 text-[11px] text-faint">
+          {s.summary?.operator === "llm" && <Badge tone="esc">LLM Operator</Badge>}
+          {cases.filter((c) => c.status === "open").length} open cases
+        </span>
+      }
       className="min-h-[150px]"
     >
       {cases.length > 0 && (
@@ -44,7 +50,10 @@ export function OperatorPanel() {
           ))}
         </ul>
       )}
-      {activity.length === 0 && cases.length === 0 && <Empty>Run operations to watch the Operator work.</Empty>}
+      {s.summary?.operator === "llm" && <IntakePanel />}
+      {activity.length === 0 && cases.length === 0 && s.summary?.operator !== "llm" && (
+        <Empty>Run operations to watch the Operator work.</Empty>
+      )}
       <ul className="num">
         {activity.map((e) => (
           <li key={e.id} className="flex gap-2 px-3 py-0.5 text-[11px]">

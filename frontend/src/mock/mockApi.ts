@@ -7,9 +7,13 @@ import type {
   Actor,
   Approvals,
   Chain,
+  DeliverOut,
   Entities,
+  IntakeRead,
   Job,
+  MessyDocument,
   Move,
+  OperatorKind,
   OracleLabel,
   PatchRequest,
   ReplayOut,
@@ -168,14 +172,27 @@ export class MockApi implements VandalApi {
 
   // --- runs -------------------------------------------------------------------------------
 
-  async reset(policy: string) {
+  async reset(policy: string, operator: OperatorKind = "reference") {
     this.runs.clear();
-    return this.createRun(policy);
+    return this.createRun(policy, operator);
   }
 
-  async createRun(policy: string) {
-    const run = this.newRun({ ...F.fresh, policy }, F.fresh_entities);
+  async createRun(policy: string, operator: OperatorKind = "reference") {
+    const run = this.newRun({ ...F.fresh, policy, operator }, F.fresh_entities);
     return clone(run.summary);
+  }
+
+  // O1: the mock has no documents recorded; the LLM Operator needs the real backend.
+  async documents(): Promise<MessyDocument[]> {
+    return [];
+  }
+
+  async deliver(): Promise<DeliverOut> {
+    throw new ApiError(400, "the mock has no messy documents; connect the backend for the LLM Operator");
+  }
+
+  async intake(): Promise<IntakeRead[]> {
+    return [];
   }
 
   async state(runId: string) {
