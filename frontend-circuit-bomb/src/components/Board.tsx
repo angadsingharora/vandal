@@ -1,96 +1,121 @@
 "use client";
 
-/* The board. Copper traces are the financial workflow; chips are its stations. Cyan pulses are
-   legitimate payments. Vandal's pulse is red: it enters through the vendor master, rides the
-   trace the payment run reads at execution time, and floods the trace to the bank. Blue solders
-   gates onto the traces; the next red pulse hits a gate and stops. Static scene, SVG + SMIL. */
+/* The board, drawn like a schematic you could read on paper.
+   Nets: INV[0..79] (the invoice bus), APPROVED_INSTR, PAYEE_ACCT, WIRE_OUT, JOURNAL, VENDOR_ID.
+   Copper is the workflow. A pale dot is a legitimate payment moving. Red is Vandal's pulse.
+   Blue parts are the gates Blue solders in. Green is a trace that held. Static scene. */
 
 export type Step = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
-type Chip = { id: string; x: number; y: number; w: number; h: number; label: string; sub: string; tone?: "red" | "blue" | "ok" };
-
-const CHIPS: Chip[] = [
-  { id: "vendor", x: 80, y: 300, w: 170, h: 70, label: "VENDOR MASTER", sub: "contacts · bank accounts" },
-  { id: "intake", x: 330, y: 90, w: 160, h: 70, label: "INTAKE", sub: "Claude reads the document" },
-  { id: "match", x: 560, y: 90, w: 160, h: 70, label: "3-WAY MATCH", sub: "invoice · PO · receipt" },
-  { id: "approval", x: 790, y: 90, w: 160, h: 70, label: "APPROVAL", sub: "controller · $25k threshold" },
-  { id: "payrun", x: 790, y: 330, w: 160, h: 70, label: "PAYMENT RUN", sub: "builds the instruction" },
-  { id: "bank", x: 1020, y: 330, w: 140, h: 70, label: "BANK", sub: "settles T+1" },
-  { id: "ledger", x: 1020, y: 90, w: 140, h: 70, label: "LEDGER", sub: "double entry" },
-];
-
-// traces
-const T = {
-  intake_match: "M490,125 L560,125",
-  match_approval: "M720,125 L790,125",
-  approval_payrun: "M870,160 L870,330",
-  payrun_bank: "M950,365 L1020,365",
-  payrun_ledger: "M950,348 L985,348 L985,125 L1020,125",
-  vendor_payrun: "M250,335 L520,335 L520,365 L790,365",
-  attack_full: "M165,500 L165,370 L165,335 L250,335 L520,335 L520,365 L790,365",
-  attack_to_gate: "M165,500 L165,370 L165,335 L250,335 L440,335",
-  legit_long: "M490,125 L560,125 L720,125 L790,125 L870,125 L870,330 L870,365 L950,365 L1020,365",
+const C = {
+  copper: "#b08358",
+  copperDim: "#5a4a3c",
+  pulse: "#e3e8ee",
+  red: "#d9463f",
+  blue: "#4f7fd1",
+  ok: "#4ea97d",
+  ink: "#e7eaee",
+  dim: "#9099a3",
+  faint: "#5c6670",
+  pad: "#8c6a4a",
+  chip: "#1b1f24",
+  chipLine: "#3a414a",
+  silk: "#6e7781",
 };
 
-function Trace({ d, tone = "copper", width = 4, glow = false, dash, className }: { d: string; tone?: "copper" | "red" | "cyan" | "dim" | "blue"; width?: number; glow?: boolean; dash?: string; className?: string }) {
-  const color = { copper: "#c4833f", red: "#ff2a4a", cyan: "#2ef2ff", dim: "#1a4a40", blue: "#4f8bff" }[tone];
+type IC = { ref: string; name: string; fn: string; x: number; y: number; w: number; h: number; pins: number };
+const ICS: IC[] = [
+  { ref: "U1", name: "INTAKE", fn: "reads the document", x: 250, y: 110, w: 160, h: 80, pins: 6 },
+  { ref: "U2", name: "3-WAY MATCH", fn: "invoice · PO · receipt", x: 470, y: 110, w: 160, h: 80, pins: 6 },
+  { ref: "U3", name: "APPROVAL", fn: "controller, $25k threshold", x: 690, y: 110, w: 160, h: 80, pins: 6 },
+  { ref: "U4", name: "LEDGER", fn: "double entry", x: 950, y: 110, w: 150, h: 80, pins: 6 },
+  { ref: "U5", name: "VENDOR MASTER", fn: "contacts · bank accounts", x: 80, y: 380, w: 170, h: 80, pins: 6 },
+  { ref: "U6", name: "PAYMENT RUN", fn: "builds the instruction", x: 690, y: 380, w: 160, h: 80, pins: 6 },
+  { ref: "U7", name: "BANK", fn: "settles T+1", x: 950, y: 380, w: 150, h: 80, pins: 6 },
+];
+
+// nets, with 45° chamfers where they turn
+const NET = {
+  bus1: (k: number) => `M410,${136 + k * 7} L470,${136 + k * 7}`,
+  bus2: (k: number) => `M630,${136 + k * 7} L690,${136 + k * 7}`,
+  approved: "M770,190 L770,380",
+  wireOut: "M850,420 L950,420",
+  journal: "M850,400 L896,400 L908,388 L908,222 L920,210 L1000,210 L1000,190",
+  payee: "M250,420 L536,420 L556,440 L690,440",
+  vendorId: "M165,380 L165,312 L177,300 L318,300 L330,288 L330,190",
+  inject: "M165,560 L165,460",
+  // paths the moving dots follow
+  legit: "M410,150 L470,150 L630,150 L690,150 L770,150 L770,380 L770,420 L850,420 L950,420",
+  legitJournal: "M850,400 L896,400 L908,388 L908,222 L920,210 L1000,210 L1000,190",
+  attackFull: "M165,560 L165,460 L165,420 L250,420 L536,420 L556,440 L690,440",
+  attackToGate: "M165,560 L165,460 L165,420 L250,420 L378,420",
+};
+
+function Net({ d, color = C.copper, w = 3, dim = false, dash }: { d: string; color?: string; w?: number; dim?: boolean; dash?: string }) {
+  return <path d={d} fill="none" stroke={color} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" opacity={dim ? 0.3 : 1} strokeDasharray={dash} />;
+}
+
+function Via({ x, y }: { x: number; y: number }) {
   return (
     <>
-      {glow && <path d={d} fill="none" stroke={color} strokeWidth={width + 8} strokeOpacity={0.18} strokeLinecap="round" strokeLinejoin="round" filter="url(#blur)" />}
-      <path d={d} fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={dash} className={className} />
+      <circle cx={x} cy={y} r={5} fill={C.pad} />
+      <circle cx={x} cy={y} r={2} fill="#15181c" />
     </>
   );
 }
 
-function Pulse({ path, dur, begin = "0s", tone, r = 5, repeat = true, keyId }: { path: string; dur: string; begin?: string; tone: "cyan" | "red"; r?: number; repeat?: boolean; keyId: string }) {
-  const color = tone === "cyan" ? "#2ef2ff" : "#ff2a4a";
+function TestPoint({ x, y, label, active }: { x: number; y: number; label: string; active?: boolean }) {
   return (
-    <g key={keyId}>
-      <circle r={r + 6} fill={color} opacity={0.25} filter="url(#blur)">
-        <animateMotion dur={dur} begin={begin} repeatCount={repeat ? "indefinite" : "1"} fill="freeze" path={path} />
-      </circle>
-      <circle r={r} fill="#fff" stroke={color} strokeWidth={2}>
-        <animateMotion dur={dur} begin={begin} repeatCount={repeat ? "indefinite" : "1"} fill="freeze" path={path} />
-      </circle>
+    <g>
+      <circle cx={x} cy={y} r={4.5} fill="#15181c" stroke={active ? C.ink : C.silk} strokeWidth={1.5} />
+      <text x={x + 9} y={y - 7} fill={active ? C.ink : C.silk} fontSize="9.5" className="num">{label}</text>
     </g>
   );
 }
 
-function ChipBox({ c, state }: { c: Chip; state: "idle" | "hot" | "dim" | "safe" }) {
-  const stroke = state === "hot" ? "#ff2a4a" : state === "safe" ? "#41ff9a" : state === "dim" ? "#1a4a40" : "#c4833f";
-  const text = state === "dim" ? "#4e6b62" : "#e8fff6";
+function Dot({ path, dur, begin = "0s", color, r = 3.5, once = false, k }: { path: string; dur: string; begin?: string; color: string; r?: number; once?: boolean; k: string }) {
   return (
-    <g className={state === "hot" ? "shake" : undefined}>
-      {/* pins */}
-      {[0, 1, 2, 3].map((i) => (
+    <circle key={k} r={r} fill={color}>
+      <animateMotion dur={dur} begin={begin} repeatCount={once ? "1" : "indefinite"} fill="freeze" path={path} />
+    </circle>
+  );
+}
+
+function Chip({ c, tone }: { c: IC; tone: "idle" | "hot" | "dim" | "ok" }) {
+  const stroke = tone === "hot" ? C.red : tone === "ok" ? C.ok : C.chipLine;
+  const op = tone === "dim" ? 0.35 : 1;
+  const pitch = (c.w - 40) / (c.pins - 1);
+  return (
+    <g opacity={op}>
+      {Array.from({ length: c.pins }, (_, i) => (
         <g key={i}>
-          <rect x={c.x + 18 + i * ((c.w - 36) / 3) - 4} y={c.y - 8} width={8} height={8} fill="#8a5a2b" />
-          <rect x={c.x + 18 + i * ((c.w - 36) / 3) - 4} y={c.y + c.h} width={8} height={8} fill="#8a5a2b" />
+          <rect x={c.x + 20 + i * pitch - 3} y={c.y - 9} width={6} height={9} fill={C.pad} />
+          <rect x={c.x + 20 + i * pitch - 3} y={c.y + c.h} width={6} height={9} fill={C.pad} />
+          <text x={c.x + 20 + i * pitch} y={c.y - 12} textAnchor="middle" fill={C.faint} fontSize="7" className="num">{i + 1}</text>
         </g>
       ))}
-      <rect x={c.x} y={c.y} width={c.w} height={c.h} rx={6} fill="#061a14" stroke={stroke} strokeWidth={state === "hot" || state === "safe" ? 2.5 : 1.5} filter={state === "hot" ? "url(#glowred)" : state === "safe" ? "url(#glowok)" : undefined} />
-      <rect x={c.x + 6} y={c.y + 6} width={c.w - 12} height={c.h - 12} rx={3} fill="none" stroke={stroke} strokeOpacity={0.25} />
-      <text x={c.x + c.w / 2} y={c.y + 32} textAnchor="middle" fill={text} fontSize="15" fontWeight="700" letterSpacing="2">{c.label}</text>
-      <text x={c.x + c.w / 2} y={c.y + 50} textAnchor="middle" fill={state === "dim" ? "#3a544c" : "#86a99c"} fontSize="10" className="num">{c.sub}</text>
-      <circle cx={c.x + c.w - 12} cy={c.y + 12} r={3} fill={state === "hot" ? "#ff2a4a" : state === "safe" ? "#41ff9a" : "#2ef2ff"} className={state === "hot" ? "blink" : "breathe"} />
+      <rect x={c.x} y={c.y} width={c.w} height={c.h} rx={3} fill={C.chip} stroke={stroke} strokeWidth={tone === "idle" || tone === "dim" ? 1.25 : 2} />
+      <circle cx={c.x + 10} cy={c.y + 10} r={3} fill="none" stroke={C.silk} strokeWidth={1} />
+      <text x={c.x + 20} y={c.y + 26} fill={C.silk} fontSize="9" className="num">{c.ref}</text>
+      <text x={c.x + c.w / 2} y={c.y + 46} textAnchor="middle" fill={C.ink} fontSize="13" fontWeight="600" letterSpacing="1.2">{c.name}</text>
+      <text x={c.x + c.w / 2} y={c.y + 63} textAnchor="middle" fill={C.dim} fontSize="9.5">{c.fn}</text>
     </g>
   );
 }
 
-function Gate({ x, y, label, sub, tone, snap, hit }: { x: number; y: number; label: string; sub: string; tone: "blue" | "red"; snap: boolean; hit?: boolean }) {
-  const color = tone === "blue" ? "#4f8bff" : "#ff2a4a";
+/** A fuse footprint inline on a trace: two pads and a body. */
+function Fuse({ x, y, ref_, name, tone, show, held }: { x: number; y: number; ref_: string; name: string; tone: "blue" | "ok"; show: boolean; held?: boolean }) {
+  if (!show) return null;
+  const color = tone === "ok" ? C.ok : C.blue;
   return (
-    <g className={snap ? "snapin" : undefined}>
-      <rect x={x - 52} y={y - 19} width={104} height={38} rx={5} fill="#06110f" stroke={color} strokeWidth={2.5} filter={hit ? "url(#glowblue)" : undefined} />
-      <rect x={x - 46} y={y - 13} width={92} height={26} rx={3} fill="none" stroke={color} strokeOpacity={0.35} />
-      <text x={x} y={y - 1} textAnchor="middle" fill={color} fontSize="12" fontWeight="700" letterSpacing="1.5">{label}</text>
-      <text x={x} y={y + 12} textAnchor="middle" fill="#9dbcff" fontSize="8.5" className="num">{sub}</text>
-      {hit && (
-        <>
-          <circle cx={x - 52} cy={y} r={10} fill="#4f8bff" opacity={0.5} filter="url(#blur)" className="blink" />
-          <text x={x} y={y - 28} textAnchor="middle" fill="#9dbcff" fontSize="12" fontWeight="700" letterSpacing="3" className="neon-blue">HELD</text>
-        </>
-      )}
+    <g className="fade">
+      <rect x={x - 30} y={y - 6} width={12} height={12} fill={C.pad} />
+      <rect x={x + 18} y={y - 6} width={12} height={12} fill={C.pad} />
+      <rect x={x - 20} y={y - 9} width={40} height={18} rx={2} fill={C.chip} stroke={color} strokeWidth={2} />
+      <line x1={x - 12} y1={y} x2={x + 12} y2={y} stroke={color} strokeWidth={2} />
+      <text x={x} y={y - 15} textAnchor="middle" fill={color} fontSize="9.5" fontWeight="600" className="num">{ref_}</text>
+      <text x={x} y={y + 24} textAnchor="middle" fill={C.dim} fontSize="9.5">{name}</text>
+      {held && <text x={x} y={y + 37} textAnchor="middle" fill={C.ok} fontSize="10" fontWeight="600">HELD · callback required</text>}
     </g>
   );
 }
@@ -102,112 +127,158 @@ export function Board({ step }: { step: Step }) {
   const t2 = step >= 4;
   const t1 = step >= 5;
   const held = step >= 5;
-  const proved = step === 6;
+  const dimOthers = diagnosing;
 
-  const chipState = (id: string): "idle" | "hot" | "dim" | "safe" => {
-    if (diagnosing) return id === "approval" || id === "payrun" ? "idle" : "dim";
-    if (breached && (id === "bank" || id === "payrun")) return "hot";
-    if (attacked && !held && id === "vendor") return "hot";
-    if (proved && (id === "bank" || id === "payrun" || id === "vendor")) return "safe";
+  const tone = (ref: string): "idle" | "hot" | "dim" | "ok" => {
+    if (diagnosing) return ref === "U3" || ref === "U6" ? "idle" : "dim";
+    if (breached && (ref === "U7" || ref === "U6")) return "hot";
+    if (attacked && !held && ref === "U5") return "hot";
+    if (step === 6 && (ref === "U7" || ref === "U5")) return "ok";
     return "idle";
   };
 
   return (
-    <svg viewBox="0 0 1200 600" className="h-full w-full" role="img" aria-label="The company as a circuit board; Vandal's red pulse and Blue's gates">
+    <svg viewBox="0 0 1200 680" className="h-full w-full" role="img" aria-label="The company drawn as a circuit board, with Vandal's pulse and Blue's gates">
       <defs>
-        <filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" /></filter>
-        <filter id="glowred" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="0" stdDeviation="8" floodColor="#ff2a4a" floodOpacity="0.8" /></filter>
-        <filter id="glowok" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="0" stdDeviation="8" floodColor="#41ff9a" floodOpacity="0.7" /></filter>
-        <filter id="glowblue" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="#4f8bff" floodOpacity="0.9" /></filter>
-        <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
-          <path d="M24 0H0V24" fill="none" stroke="#0b2a22" strokeWidth="1" />
-        </pattern>
-        <pattern id="vias" width="96" height="96" patternUnits="userSpaceOnUse">
-          <circle cx="12" cy="12" r="2.2" fill="#0f3a30" />
-          <circle cx="60" cy="48" r="2.2" fill="#0f3a30" />
+        <pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="0.8" fill="#262b31" />
         </pattern>
       </defs>
+      <rect width="1200" height="680" fill="#15181c" />
+      <rect width="1200" height="680" fill="url(#dots)" />
+      {/* mounting holes */}
+      {[[24, 24], [1176, 24], [24, 656], [1176, 656]].map(([x, y]) => (
+        <g key={`${x}${y}`}>
+          <circle cx={x} cy={y} r={8} fill="none" stroke={C.silk} strokeWidth={1.5} />
+          <circle cx={x} cy={y} r={3.5} fill="#15181c" stroke={C.silk} />
+        </g>
+      ))}
 
-      {/* substrate */}
-      <rect width="1200" height="600" fill="#041410" />
-      <rect width="1200" height="600" fill="url(#grid)" />
-      <rect width="1200" height="600" fill="url(#vias)" />
-      <text x="24" y="580" fill="#1a4a40" fontSize="11" className="num">BAYLINE PROPERTY GROUP · REV v0 · SEED 7 · 12 PROPERTIES · 25 VENDORS · 80 INVOICES</text>
-      <text x="1176" y="580" textAnchor="end" fill="#1a4a40" fontSize="11" className="num">EVERY TRACE PASSES BLUE'S GATE</text>
-
-      {/* copper */}
-      <g opacity={diagnosing ? 0.25 : 1}>
-        <Trace d={T.intake_match} />
-        <Trace d={T.match_approval} />
-        <Trace d={T.payrun_ledger} />
-        <Trace d={T.payrun_bank} tone={breached ? "red" : proved ? "cyan" : "copper"} glow={breached || proved} className={breached ? "flood" : undefined} />
+      {/* copper nets */}
+      <g opacity={dimOthers ? 0.3 : 1}>
+        {[0, 1, 2, 3].map((k) => (
+          <g key={k}>
+            <Net d={NET.bus1(k)} w={2} />
+            <Net d={NET.bus2(k)} w={2} />
+          </g>
+        ))}
+        <text x="440" y="124" textAnchor="middle" fill={C.silk} fontSize="9" className="num">INV[0..79]</text>
+        <text x="660" y="124" textAnchor="middle" fill={C.silk} fontSize="9" className="num">INV[0..79]</text>
+        <Net d={NET.journal} />
+        <Net d={NET.vendorId} />
+        <Net d={NET.wireOut} color={breached ? C.red : step === 6 ? C.ok : C.copper} w={breached || step === 6 ? 4 : 3} />
       </g>
-      <Trace d={T.approval_payrun} tone={diagnosing ? "cyan" : "copper"} glow={diagnosing} />
-      <Trace d={T.vendor_payrun} tone={diagnosing ? "red" : attacked && !held ? "red" : "copper"} glow={diagnosing || (attacked && !held)} dash={diagnosing ? "10 8" : undefined} />
-      {attacked && <Trace d="M165,500 L165,370" tone="red" glow />}
+      <Net d={NET.approved} color={diagnosing ? C.ink : C.copper} w={diagnosing ? 3.5 : 3} />
+      <Net d={NET.payee} color={diagnosing ? C.red : attacked && !held ? C.red : C.copper} w={diagnosing || (attacked && !held) ? 3.5 : 3} dash={diagnosing ? "8 6" : undefined} />
+      {held && <Net d="M250,420 L378,420" color={C.red} w={3.5} />}
+      {attacked && <Net d={NET.inject} color={C.red} w={3.5} />}
 
-      {/* labels on traces */}
-      <text x="880" y="250" fill={diagnosing ? "#2ef2ff" : "#4e6b62"} fontSize="10.5" className="num">approved instruction</text>
-      <text x="300" y="325" fill={diagnosing || (attacked && !held) ? "#ff7b8e" : "#4e6b62"} fontSize="10.5" className="num">current bank account, read at execution</text>
+      {/* vias and test points */}
+      <Via x={908} y={388} />
+      <Via x={908} y={222} />
+      <Via x={165} y={312} />
+      <Via x={330} y={288} />
+      <Via x={556} y={440} />
+      <TestPoint x={770} y={285} label="TP1 APPROVED_INSTR" active={diagnosing} />
+      <TestPoint x={400} y={420} label="TP2 PAYEE_ACCT · read at execution" active={diagnosing || (attacked && !held)} />
+      <text x="860" y="412" fill={C.silk} fontSize="9" className="num">WIRE_OUT</text>
+      <text x="914" y="300" fill={C.silk} fontSize="9" className="num" transform="rotate(-90 914 300)">JOURNAL</text>
+      <text x="240" y="294" fill={C.silk} fontSize="9" className="num">VENDOR_ID</text>
+
+      {/* diagnosis: the open link */}
       {diagnosing && (
-        <g className="rise">
-          <circle cx="870" cy="330" r="14" fill="none" stroke="#ff2a4a" strokeWidth="2.5" className="blink" />
-          <line x1="860" y1="320" x2="880" y2="340" stroke="#ff2a4a" strokeWidth="2.5" />
-          <line x1="880" y1="320" x2="860" y2="340" stroke="#ff2a4a" strokeWidth="2.5" />
-          <rect x="560" y="420" width="520" height="54" rx="6" fill="#06110f" stroke="#ff2a4a" />
-          <text x="820" y="443" textAnchor="middle" fill="#ff7b8e" fontSize="13" fontWeight="700" letterSpacing="2">APPROVAL_BINDING · EXECUTION LINK OPEN</text>
-          <text x="820" y="462" textAnchor="middle" fill="#86a99c" fontSize="11" className="num">PAY-0057 executed payee BA-0032 ≠ approved BA-0007: nothing binds the instruction to the approval</text>
+        <g className="fade">
+          <rect x="762" y="356" width="16" height="16" fill="#15181c" />
+          <line x1="762" y1="372" x2="778" y2="356" stroke={C.red} strokeWidth="2" />
+          <text x="790" y="368" fill={C.red} fontSize="10.5" fontWeight="600">open: nothing binds U6's instruction to U3's approval</text>
+          <text x="790" y="383" fill={C.dim} fontSize="10">PAY-0057 payee BA-0032 ≠ approved BA-0007 · gap approval_binding · also uncovered: verification_channel</text>
         </g>
       )}
 
-      {/* chips */}
-      {CHIPS.map((c) => <ChipBox key={c.id} c={c} state={chipState(c.id)} />)}
+      {/* decoupling caps and pull-ups: silkscreen detail, no meaning */}
+      {ICS.map((c, i) => (
+        <g key={`c${c.ref}`} opacity={dimOthers ? 0.3 : 0.9}>
+          <rect x={c.x + c.w + 10} y={c.y + 14} width={6} height={10} fill={C.pad} />
+          <rect x={c.x + c.w + 10} y={c.y + 34} width={6} height={10} fill={C.pad} />
+          <rect x={c.x + c.w + 8} y={c.y + 24} width={10} height={10} fill={C.chip} stroke={C.silk} strokeWidth={1} />
+          <text x={c.x + c.w + 22} y={c.y + 33} fill={C.faint} fontSize="7.5" className="num">C{i + 1}</text>
+          <rect x={c.x - 18} y={c.y + c.h - 22} width={10} height={16} rx={1} fill={C.chip} stroke={C.silk} strokeWidth={1} />
+          <text x={c.x - 30} y={c.y + c.h - 10} fill={C.faint} fontSize="7.5" className="num">R{i + 1}</text>
+        </g>
+      ))}
+      {/* parts */}
+      {ICS.map((c) => <Chip key={c.ref} c={c} tone={tone(c.ref)} />)}
+      <Fuse x={770} y={285} ref_="F1" name="T2 ApprovalBinding" tone="blue" show={t2} />
+      <Fuse x={400} y={420} ref_="F2" name="T1 VerifiedAccountChange" tone={held ? "ok" : "blue"} show={t1} held={held} />
+      {t2 && step === 4 && <text x="790" y="300" fill={C.red} fontSize="10" className="fade">F1 alone is beaten: the change arrives before approval, so the approval binds the attacker's account</text>}
 
-      {/* Vandal */}
+      {/* J1: Vandal */}
       {attacked && (
-        <g className="rise">
-          <rect x="80" y="500" width="170" height="60" rx="6" fill="#120408" stroke="#ff2a4a" strokeWidth="2" filter="url(#glowred)" />
-          <text x="165" y="527" textAnchor="middle" fill="#ff2a4a" fontSize="16" fontWeight="700" letterSpacing="4" className="neon-red">VANDAL</text>
-          <text x="165" y="545" textAnchor="middle" fill="#ff7b8e" fontSize="9.5" className="num">change_request · lookalike email · at=2</text>
+        <g className="fade">
+          <rect x="105" y="560" width="120" height="44" rx="3" fill={C.chip} stroke={C.red} strokeWidth="1.5" />
+          {[0, 1, 2, 3, 4].map((i) => <rect key={i} x={118 + i * 20} y={574} width={8} height={16} fill={C.pad} />)}
+          <text x="105" y="552" fill={C.red} fontSize="9.5" className="num">J1 VANDAL · change_request</text>
+          <text x="165" y="622" textAnchor="middle" fill={C.dim} fontSize="9.5">lookalike email · new bank details · at=2</text>
         </g>
       )}
 
-      {/* legitimate pulses */}
+      {/* moving dots */}
       {!diagnosing && (
         <>
-          <Pulse keyId={`l1-${step}`} path={T.legit_long} dur="6s" tone="cyan" r={4} />
-          <Pulse keyId={`l2-${step}`} path={T.legit_long} dur="6s" begin="2s" tone="cyan" r={4} />
-          <Pulse keyId={`l3-${step}`} path={T.legit_long} dur="6s" begin="4s" tone="cyan" r={4} />
-          <Pulse keyId={`l4-${step}`} path={T.payrun_ledger} dur="2.4s" begin="1s" tone="cyan" r={3} />
+          <Dot k={`a${step}`} path={NET.legit} dur="7s" color={C.pulse} />
+          <Dot k={`b${step}`} path={NET.legit} dur="7s" begin="2.3s" color={C.pulse} />
+          <Dot k={`c${step}`} path={NET.legit} dur="7s" begin="4.6s" color={C.pulse} />
+          <Dot k={`d${step}`} path={NET.legitJournal} dur="3s" begin="1s" color={C.pulse} r={2.5} />
         </>
       )}
+      {step === 1 && <Dot k="r1" path={NET.inject} dur="1s" color={C.red} r={4.5} once />}
+      {(step === 2 || step === 4) && <Dot k={`r2${step}`} path={NET.attackFull} dur="1.8s" color={C.red} r={4.5} once />}
+      {step === 5 && <Dot k="r3" path={NET.attackToGate} dur="1.4s" color={C.red} r={4.5} once />}
+      {step === 6 && <Dot k="r4" path={NET.attackToGate} dur="2.4s" color={C.red} r={4.5} />}
 
-      {/* Vandal's pulse */}
-      {step === 1 && <Pulse keyId="a1" path="M165,500 L165,370" dur="0.9s" tone="red" r={6} repeat={false} />}
-      {(step === 2 || step === 4) && <Pulse keyId={`a2-${step}`} path={T.attack_full} dur="1.6s" tone="red" r={6} repeat={false} />}
-      {step === 5 && <Pulse keyId="a3" path={T.attack_to_gate} dur="1.4s" tone="red" r={6} repeat={false} />}
-      {step === 6 && <Pulse keyId="a4" path={T.attack_to_gate} dur="2.2s" tone="red" r={6} />}
-
-      {/* gates */}
-      {t2 && <Gate x={870} y={245} label="T2 · BIND" sub="payee + amount = approved" tone="blue" snap={step === 4} />}
-      {t1 && <Gate x={492} y={335} label="T1 · VERIFY" sub="outbound callback · contact on file" tone="blue" snap={step === 5} hit={held} />}
-
-      {/* the breach */}
+      {/* outcome by the bank */}
       {breached && (
-        <g className="rise">
-          <rect x="960" y="415" width="220" height="60" rx="6" fill="#120408" stroke="#ff2a4a" strokeWidth="1.5" />
-          <text x="1070" y="440" textAnchor="middle" fill="#ff2a4a" fontSize="20" fontWeight="700" className="num neon-red">$40,000.00</text>
-          <text x="1070" y="460" textAnchor="middle" fill="#ff7b8e" fontSize="10" className="num">→ BA-0032 · attacker · INV-2 INV-4 INV-5</text>
-          {step === 4 && <text x="870" y="300" textAnchor="middle" fill="#ff7b8e" fontSize="10.5" className="num rise">T2 refuted: the change arrived before approval</text>}
+        <g className="fade">
+          <text x="1025" y="492" fill={C.red} fontSize="18" fontWeight="600" className="num">$40,000.00</text>
+          <text x="1025" y="508" fill={C.dim} fontSize="10" className="num">to BA-0032 · attacker · INV-2 INV-4 INV-5</text>
         </g>
       )}
       {held && (
-        <g className="rise">
-          <rect x="960" y="415" width="220" height="60" rx="6" fill="#041a10" stroke="#41ff9a" strokeWidth="1.5" />
-          <text x="1070" y="440" textAnchor="middle" fill="#41ff9a" fontSize="20" fontWeight="700" className="num neon-ok">$0.00</text>
-          <text x="1070" y="460" textAnchor="middle" fill="#86a99c" fontSize="10" className="num">held at T1 · BA-0007 paid · every invariant holds</text>
+        <g className="fade">
+          <text x="1025" y="492" fill={C.ok} fontSize="18" fontWeight="600" className="num">$0.00</text>
+          <text x="1025" y="508" fill={C.dim} fontSize="10" className="num">BA-0007 paid · every invariant holds</text>
         </g>
       )}
+
+      {/* legend */}
+      <g>
+        <rect x="40" y="606" width="330" height="58" fill="none" stroke="#343a42" />
+        {[
+          [C.copper, "workflow trace"],
+          [C.pulse, "legitimate payment"],
+          [C.red, "Vandal's pulse"],
+          [C.blue, "gate Blue soldered in"],
+          [C.ok, "held"],
+        ].map(([col, lab], i) => (
+          <g key={lab} transform={`translate(${52 + (i % 3) * 108}, ${624 + Math.floor(i / 3) * 20})`}>
+            <rect width="14" height="4" y="-3" fill={col} />
+            <text x="20" y="2" fill={C.dim} fontSize="9.5">{lab}</text>
+          </g>
+        ))}
+      </g>
+
+      {/* title block */}
+      <g>
+        <rect x="860" y="606" width="300" height="58" fill="none" stroke="#343a42" />
+        <line x1="860" y1="626" x2="1160" y2="626" stroke="#343a42" />
+        <line x1="1010" y1="606" x2="1010" y2="664" stroke="#343a42" />
+        <text x="868" y="620" fill={C.ink} fontSize="10" fontWeight="600">BAYLINE PROPERTY GROUP · AP WORKFLOW</text>
+        <text x="1018" y="620" fill={C.dim} fontSize="9.5" className="num">SHEET 1/1 · SEED 7</text>
+        <text x="868" y="641" fill={C.dim} fontSize="9.5" className="num">REV {step >= 6 ? "v1-synth" : step >= 4 ? "v0 + candidate" : "v0"}</text>
+        <text x="868" y="656" fill={C.dim} fontSize="9.5" className="num">{step >= 6 ? "F1 T2 · F2 T1 fitted" : step >= 5 ? "F1 · F2 under test" : step >= 4 ? "F1 under test" : "no gates beyond v0"}</text>
+        <text x="1018" y="641" fill={C.dim} fontSize="9.5" className="num">80 INV · 25 VENDORS</text>
+        <text x="1018" y="656" fill={C.dim} fontSize="9.5" className="num">every call passes the gate</text>
+      </g>
     </svg>
   );
 }

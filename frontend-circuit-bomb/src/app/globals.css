@@ -1,73 +1,37 @@
 @import "tailwindcss";
 
-/* Circuit Bomb: a company as a programmable circuit board.
-   copper = the workflow, cyan = legitimate pulses, red = Vandal's pulse, blue = Blue's gates. */
+/* Circuit Bomb, quiet version. One color per meaning and nothing else:
+   copper = the workflow, pale = legitimate pulses, red = Vandal, blue = Blue's gates, green = held. */
 @theme {
-  --color-bg: #03070a;
-  --color-board: #061a14;
-  --color-panel: #06110f;
-  --color-raised: #0a1b18;
-  --color-line: #10302a;
-  --color-line2: #1a4a40;
-  --color-copper: #c4833f;
-  --color-copper2: #ffb86b;
-  --color-ink: #e8fff6;
-  --color-dim: #86a99c;
-  --color-faint: #4e6b62;
-  --color-cyan: #2ef2ff;
-  --color-red: #ff2a4a;
-  --color-red2: #ff7b8e;
-  --color-blue: #4f8bff;
-  --color-blue2: #9dbcff;
-  --color-ok: #41ff9a;
-  --color-amber: #ffc24b;
-  --font-sans: "Rajdhani", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --color-bg: #0f1114;
+  --color-panel: #15181c;
+  --color-raised: #1b1f24;
+  --color-line: #262b31;
+  --color-line2: #343a42;
+  --color-ink: #e7eaee;
+  --color-dim: #9099a3;
+  --color-faint: #5c6670;
+  --color-copper: #b08358;
+  --color-pulse: #e3e8ee;
+  --color-red: #d9463f;
+  --color-blue: #4f7fd1;
+  --color-ok: #4ea97d;
+  --color-amber: #c99a4b;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 
 html, body { background: var(--color-bg); color: var(--color-ink); color-scheme: dark; height: 100%; }
-body {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  -webkit-font-smoothing: antialiased;
-  background:
-    radial-gradient(900px 500px at 50% 50%, rgba(46, 242, 255, 0.05), transparent 70%),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 3px),
-    var(--color-bg);
-}
-:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 2px; }
+body { font-family: var(--font-sans); font-size: 14px; -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 2px; }
 * { scrollbar-width: thin; scrollbar-color: var(--color-line2) transparent; }
 
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.hud { letter-spacing: 0.08em; text-transform: uppercase; }
+.hud-label { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-faint); }
 
-.panel {
-  background: linear-gradient(180deg, rgba(10, 27, 24, 0.9), rgba(6, 17, 15, 0.9));
-  border: 1px solid var(--color-line);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 0 0 1px rgba(0, 0, 0, 0.4);
-}
-.neon-cyan { text-shadow: 0 0 8px rgba(46, 242, 255, 0.8), 0 0 24px rgba(46, 242, 255, 0.4); }
-.neon-red { text-shadow: 0 0 8px rgba(255, 42, 74, 0.9), 0 0 28px rgba(255, 42, 74, 0.5); }
-.neon-ok { text-shadow: 0 0 8px rgba(65, 255, 154, 0.9), 0 0 24px rgba(65, 255, 154, 0.4); }
-.neon-blue { text-shadow: 0 0 8px rgba(79, 139, 255, 0.9), 0 0 24px rgba(79, 139, 255, 0.4); }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.fade { animation: fade 0.5s ease-out both; }
+@keyframes soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.soft { animation: soft 1.6s ease-in-out infinite; }
 
-@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.15; } }
-.blink { animation: blink 0.5s steps(2) infinite; }
-@keyframes breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
-.breathe { animation: breathe 2.2s ease-in-out infinite; }
-@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.rise { animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-@keyframes flood { from { stroke-dashoffset: 600; } to { stroke-dashoffset: 0; } }
-.flood { stroke-dasharray: 600; animation: flood 0.9s ease-out forwards; }
-@keyframes shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-2px, 1px); } 50% { transform: translate(2px, -1px); } 75% { transform: translate(-1px, -1px); } }
-.shake { animation: shake 0.35s linear 3; }
-@keyframes snapin { 0% { transform: scale(2.2); opacity: 0; } 70% { transform: scale(0.95); opacity: 1; } 100% { transform: scale(1); } }
-.snapin { transform-box: fill-box; transform-origin: center; animation: snapin 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-@keyframes scope { to { transform: translateX(-50%); } }
-.scope { animation: scope 3s linear infinite; }
-@keyframes crt { 0% { opacity: 0.12; } 50% { opacity: 0.2; } 100% { opacity: 0.12; } }
-.crt { animation: crt 4s ease-in-out infinite; }
-
-@media (prefers-reduced-motion: reduce) {
-  .blink, .breathe, .rise, .flood, .shake, .snapin, .scope, .crt { animation: none; }
-}
+@media (prefers-reduced-motion: reduce) { .fade, .soft { animation: none; } }
