@@ -1,4 +1,4 @@
-"""A0 routes for policies (R6). Applying a patch needs the approvals inbox (B3), not yet built."""
+"""A0 routes for policies (R6). Applying one goes through the approvals inbox (routes_blue.py)."""
 
 from __future__ import annotations
 

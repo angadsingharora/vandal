@@ -66,7 +66,9 @@ def summary(handle: RunHandle) -> dict[str, Any]:
 
 
 def _create(request: Request, body: NewRun) -> dict[str, Any]:
-    handle = deps.registry(request).create_run(body.profile, body.seed, deps.policy(body.policy))
+    handle = deps.registry(request).create_run(
+        body.profile, body.seed, deps.policy(body.policy, request)
+    )
     return summary(handle)
 
 

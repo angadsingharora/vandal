@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from vandal.contracts.events import Event
 from vandal.contracts.interfaces import FinanceOperator
+from vandal.guard.chain import RuntimeMonitor
 from vandal.guard.gate import Gate
 from vandal.operator.reference import ReferenceOperator, SimulatedApprover
 from vandal.synth.templates import V0, Policy
@@ -18,6 +19,7 @@ from vandal.twin.flows import GatedTools
 from vandal.twin.profile import Profile, load_profile
 from vandal.twin.seed import DEFAULT_SEED, seed_state
 from vandal.twin.world import Run, run_world
+from vandal.verify.invariants import Limits, check
 from vandal.verify.replay import RunResult, Trace, replay_trace
 
 
@@ -42,10 +44,17 @@ def new_sandbox(
     *,
     policy: Policy | None = None,
     sink: Callable[[Event], None] | None = None,
+    monitor: bool = False,
 ) -> Sandbox:
-    """A fresh company under `policy` (v0 when omitted). `sink` sees every event."""
+    """A fresh company under `policy` (v0 when omitted). `sink` sees every event. `monitor`
+    turns on Blue's runtime invariant monitor (B2); search leaves it off for speed, since it
+    checks the invariants at the end of every run anyway."""
     profile = load_profile(profile) if isinstance(profile, str) else profile
-    run = Run(seed_state(profile, seed=seed), sink=sink)
+    watcher = None
+    if monitor:
+        limits = Limits.from_profile(profile)
+        watcher = RuntimeMonitor(lambda state: check(state, None, limits))
+    run = Run(seed_state(profile, seed=seed), sink=sink, monitor=watcher)
     policy = policy or V0
     gate = Gate(policy.checks(profile))
     return Sandbox(

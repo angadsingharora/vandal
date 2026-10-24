@@ -28,8 +28,11 @@ def get_job(request: Request, job_id: str) -> Job:
         raise HTTPException(404, f"no job {job_id}") from None
 
 
-def policy(name: str | None) -> Policy:
-    """A policy by name only; the API never loads an arbitrary path."""
+def policy(name: str | None, request: Request | None = None) -> Policy:
+    """A policy by name: one applied through the inbox first, then the built-ins. The API never
+    loads an arbitrary path."""
+    if request is not None and name in registry(request).applied:
+        return registry(request).applied[name]
     if name and name not in available_policies():
         raise HTTPException(400, f"unknown policy {name!r}")
     try:

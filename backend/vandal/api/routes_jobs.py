@@ -219,7 +219,9 @@ def start_verify(request: Request, body: VerifyRequest) -> dict[str, Any]:
             reg.store.save_evidence_pack(pack, synthesis=body.synthesis_id)
         return pack.model_dump(mode="json")
 
-    return reg.submit("verify", work, **body.model_dump()).summary()
+    return reg.submit(
+        "verify", work, **body.model_dump(), policy_json=policy.model_dump(mode="json")
+    ).summary()
 
 
 @router.get("/metrics")
