@@ -13,8 +13,9 @@ answer:
            callback number)
   sender   every sender the attacker profile allows: they differ in facts the gate can see
            (a lookalike domain vs the vendor's real one)
-  channel  one representative change-request channel: email and agent messages are equally
-           unauthenticated, and no fact or template tells them apart
+  channel  one representative unauthenticated channel (no fact or template tells email and
+           agent messages apart), plus the portal if the attacker can take it over: a portal
+           submission is authenticated evidence on its own
   confirm  inbound confirmations on every channel the attacker can fake (phone_in with caller-ID
            spoofing, video with voice cloning)
 
@@ -81,25 +82,29 @@ def confirmation_channels(profile: Profile) -> list[str]:
 def build_alphabet(scenario: Scenario, state: State, profile: Profile) -> list[Move]:
     caps = profile.attacker_capabilities
     vendors = vendor_classes(state, profile)
-    channel = caps.change_request_channels[0]
+    unauthenticated = [c for c in caps.change_request_channels if c != "portal"]
+    channels = unauthenticated[:1] + (
+        ["portal"] if "portal" in caps.change_request_channels else []
+    )
     moves: list[Move] = []
     for at in scenario.window:
         if "change_request" in scenario.kinds:
             for vendor in vendors:
                 for fields in ("bank", "contact"):
-                    for sender in caps.senders:
-                        moves.append(
-                            Move(
-                                kind="change_request",
-                                at=at,
-                                params={
-                                    "vendor": vendor,
-                                    "fields": fields,
-                                    "channel": channel,
-                                    "sender": sender,
-                                },
+                    for channel in channels:
+                        for sender in caps.senders:
+                            moves.append(
+                                Move(
+                                    kind="change_request",
+                                    at=at,
+                                    params={
+                                        "vendor": vendor,
+                                        "fields": fields,
+                                        "channel": channel,
+                                        "sender": sender,
+                                    },
+                                )
                             )
-                        )
         if "inbound_confirmation" in scenario.kinds:
             for vendor in vendors:
                 for ch in confirmation_channels(profile):
