@@ -4,7 +4,7 @@ _Written by the overnight session while the owner slept. Updated after every ite
 
 ## Summary (five lines)
 
-1. **PRs in merge order:** [#25](https://github.com/angadsingharora/vandal/pull/25) `slice/L0-fixes` → [#26](https://github.com/angadsingharora/vandal/pull/26) `slice/L0-recordings` → [#27](https://github.com/angadsingharora/vandal/pull/27) `slice/demo-e2e` → (next slices listed as they open)
+1. **PRs in merge order:** [#25](https://github.com/angadsingharora/vandal/pull/25) `slice/L0-fixes` → [#26](https://github.com/angadsingharora/vandal/pull/26) `slice/L0-recordings` → [#27](https://github.com/angadsingharora/vandal/pull/27) `slice/demo-e2e` → [#28](https://github.com/angadsingharora/vandal/pull/28) `slice/ui-polish` → (next slices listed as they open)
 2. **Tests before:** fast suite 1 failure (`test_api_war_room.py`, stale since O2). **After:** see each slice below.
 3. **Look at this first:** the stacked PR list below, then `docs/screenshots/` once slice 3 lands.
 4. **Broken:** nothing known yet.
