@@ -245,9 +245,10 @@ def test_v1_costs_nothing_on_legitimate_operations() -> None:
 # --- done when ------------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_v1_search_finds_no_violations() -> None:
-    """Depth 2 here keeps the suite fast; set VANDAL_SLOW=1 for the full depth-4 check."""
-    depth = 4 if os.environ.get("VANDAL_SLOW") else 2
+    """Depth 2 by default; VANDAL_DEPTH4=1 runs the full depth-4 check (~3.5 min)."""
+    depth = 4 if os.environ.get("VANDAL_DEPTH4") else 2
     result = search(
         partial(new_sandbox, "bayline", policy=V1), A, depth=depth, workers=8 if depth == 4 else 1
     )
@@ -261,6 +262,7 @@ def test_phone_in_t1_is_rejected_by_the_spoofable_lint(capsys) -> None:
     assert "lint spoofable" in out and "rejected by lint" in out
 
 
+@pytest.mark.slow
 def test_without_the_lint_search_beats_it_with_inbound_confirmation() -> None:
     result = search(partial(new_sandbox, "bayline", policy=PHONE_IN), A, depth=4)
     best = result.best

@@ -38,6 +38,7 @@ def repaired():
     )
 
 
+@pytest.mark.slow
 def test_cegis_repairs_scenario_a(repaired) -> None:
     assert repaired.status == "repaired"
     templates = [c.template for c in repaired.policy.controls]
@@ -49,6 +50,7 @@ def test_cegis_repairs_scenario_a(repaired) -> None:
     assert survivor.measurement.legit_blocked == 0 and survivor.measurement.legit_failed == 0
 
 
+@pytest.mark.slow
 def test_the_log_shows_refuted_candidates(repaired) -> None:
     outcomes = [e.outcome for e in repaired.log]
     assert outcomes.count("counterexample") >= 2 and "false_positive" in outcomes
@@ -64,6 +66,7 @@ def test_the_log_shows_refuted_candidates(repaired) -> None:
     assert all(e.base for e in repaired.log if e.iteration == 2)  # T2 kept as the base
 
 
+@pytest.mark.slow
 def test_exhausted_iterations_say_cannot_auto_repair() -> None:
     r = cegis(
         V0, factory_for, profile=PROFILE, proposer=SweepProposer(PROFILE), depth=2, max_iterations=1
@@ -78,6 +81,7 @@ def test_nothing_to_repair_when_search_finds_nothing() -> None:
     assert r.status == "nothing_to_repair"
 
 
+@pytest.mark.slow
 def test_llm_candidates_are_validated_linted_and_searched(monkeypatch) -> None:
     """With a model answering, its candidates go through the same checks: an invalid one is
     dropped, a spoofable one is refuted by lint, and only search decides the rest."""
@@ -193,6 +197,7 @@ def test_coverage_sees_a_callback_to_a_swapped_contact() -> None:
     assert d.gap == "verification_channel" and "contact changed on day 0" in d.reason
 
 
+@pytest.mark.slow
 def test_vandal_synth_cli(tmp_path, capsys) -> None:
     args = [
         "synth",
