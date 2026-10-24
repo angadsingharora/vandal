@@ -7,10 +7,16 @@ dependencies = [
     "fastapi>=0.115",
     "pydantic>=2.9",
     "pyyaml>=6.0.3",
+    "sqlalchemy>=2.0",
 ]
 
 [project.scripts]
 vandal = "vandal.cli:main"
+
+[project.optional-dependencies]
+postgres = [
+    "psycopg[binary]>=3.2",
+]
 
 [dependency-groups]
 dev = [
