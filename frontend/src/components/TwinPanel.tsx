@@ -34,7 +34,7 @@ function Status({ value }: { value: string }) {
   return <Badge tone={STATUS_TONE[value] ?? "dim"}>{value}</Badge>;
 }
 
-export function TwinPanel() {
+export function TwinPanel({ title }: { title: string }) {
   const s = useWarRoom();
   const [tab, setTab] = useState<Tab>("payments");
   const e = s.entities;
@@ -57,7 +57,7 @@ export function TwinPanel() {
     <Panel
       title={
         <>
-          Financial twin <span className="normal-case tracking-normal text-faint">· {summary?.company ?? "…"}</span>
+          {title} <span className="normal-case tracking-normal text-faint">· {summary?.company ?? "…"}</span>
         </>
       }
       actions={

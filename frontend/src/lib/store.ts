@@ -47,6 +47,9 @@ const FEED_CAP = 400;
 
 export type Phase = "idle" | "running" | "done" | "failed";
 
+/** The two sides of the war room: Red attacks a clone in the sandbox, Blue guards the live path. */
+export type View = "red" | "blue";
+
 export interface RunTab {
   id: string;
   label: string;
@@ -69,6 +72,7 @@ interface State {
   error: string | null;
   settings: Settings | null;
   judge: boolean;
+  view: View;
   policies: PolicyInfo[];
 
   tabs: RunTab[];
@@ -121,6 +125,7 @@ interface Actions {
   init(): Promise<void>;
   clearError(): void;
   toggleJudge(): void;
+  setView(view: View): Promise<void>;
   setPlayback(on: boolean): Promise<void>;
   reset(policy: string, operator?: OperatorKind): Promise<void>;
   setOperator(operator: OperatorKind): void;
@@ -234,6 +239,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     error: null,
     settings: null,
     judge: false,
+    view: "blue",
     policies: [],
     tabs: [],
     liveRunId: null,
@@ -282,6 +288,14 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
 
     clearError: () => set({ error: null }),
     toggleJudge: () => set((s) => ({ judge: !s.judge })),
+
+    // Blue watches the live run; Red looks at its latest sandbox replay, or the live run it clones.
+    setView: guard(async (view: View) => {
+      set({ view });
+      const { tabs, liveRunId, focusRunId } = get();
+      const target = view === "blue" ? liveRunId : (tabs.filter((t) => t.kind === "replay").at(-1)?.id ?? liveRunId);
+      if (target && target !== focusRunId) await get().focus(target);
+    }),
 
     setPlayback: guard(async (on: boolean) => {
       set({ settings: await api().setSettings({ playback: on }) });

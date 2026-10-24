@@ -37,7 +37,7 @@ export function SideTag({ side }: { side: "red" | "blue" | "op" }) {
     blue: "bg-blue/15 text-blue",
     op: "bg-ink/10 text-ink",
   }[side];
-  const label = { red: "RED", blue: "BLUE", op: "OPERATOR" }[side];
+  const label = { red: "RED", blue: "BLUE", op: "AGENT" }[side];
   return <span className={cx("rounded-sm px-1.5 py-0.5 text-[10px] font-bold tracking-wider", style)}>{label}</span>;
 }
 

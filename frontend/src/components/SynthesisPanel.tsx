@@ -2,7 +2,7 @@
 
 import { cx, moveLine, pct, usd } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
-import type { LogEntry, ReplayOut, Scorecard } from "@/lib/types";
+import type { LogEntry, Scorecard } from "@/lib/types";
 import { Badge, Button, Empty, LiveDot, Panel, SideTag, Table, td } from "./ui";
 
 /** What each verification check proves (DESIGN 10), for the tooltip on its name. */
@@ -64,34 +64,6 @@ function LogItem({ e }: { e: LogEntry }) {
   );
 }
 
-function Side({ title, out, policy }: { title: string; out: ReplayOut | null; policy?: string }) {
-  if (!out) {
-    return (
-      <div className="flex-1 rounded border border-dashed border-line p-2 text-[11px] text-faint">
-        {title}: not replayed yet{policy ? ` (${policy})` : ""}
-      </div>
-    );
-  }
-  const held = out.result.violations.length === 0;
-  return (
-    <div className={cx("flex-1 rounded border p-2", held ? "border-ok/40 bg-ok/5" : "border-bad/40 bg-bad/5")}>
-      <div className="flex items-baseline justify-between">
-        <span className="text-[10px] uppercase tracking-wider text-dim">
-          {title} · {out.run.policy}
-        </span>
-        <span className={cx("text-xs font-bold", held ? "text-ok" : "text-bad")}>{held ? "HELD" : "BROKEN"}</span>
-      </div>
-      <div className={cx("num text-lg font-semibold", held ? "text-ok" : "text-bad")}>{usd(out.result.exposure)}</div>
-      <div className="text-[11px] text-dim">
-        {held ? "no invariant broke" : out.result.violated.join(", ")} · payments{" "}
-        {Object.entries(out.run.payments)
-          .map(([k, v]) => `${v} ${k}`)
-          .join(", ")}
-      </div>
-    </div>
-  );
-}
-
 function ScoreRow({ label, before, after, fmt, better }: { label: string; before?: number; after?: number; fmt: (n: number) => string; better: "lower" | "higher" }) {
   const improved = before != null && after != null && (better === "lower" ? after < before : after > before);
   return (
@@ -119,18 +91,21 @@ export function ScoreCompare({ before, after }: { before?: Scorecard; after?: Sc
 export function SynthesisPanel() {
   const s = useWarRoom();
   const { synth, verify, patch, attack } = s;
+  const sendToBlue = async () => {
+    await s.submitPatch();
+    if (useWarRoom.getState().patch) await s.setView("blue");
+  };
   const running = synth.phase === "running";
   const result = synth.result;
   const scored = [...synth.log].filter((e) => e.score != null).sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
   const best = result?.chosen.length ? result.log.find((e) => e.outcome === "survived") : undefined;
   const pack = verify.pack;
-  const applied = s.appliedPolicy;
 
   return (
     <Panel
       title={
         <span title="Counterexample-guided inductive synthesis: propose a control from the template library, let search attack it, learn from what beat it, repeat">
-          Synthesis · CEGIS
+          Fix &amp; prove · CEGIS
         </span>
       }
       tag={<SideTag side="red" />}
@@ -222,16 +197,23 @@ export function SynthesisPanel() {
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-              <Button tone="blue" onClick={s.verifyChoice} busy={verify.phase === "running"} disabled={!synth.jobId}>
+              <Button tone="red" onClick={s.verifyChoice} busy={verify.phase === "running"} disabled={!synth.jobId}>
                 Verify
               </Button>
-              <Button onClick={s.submitPatch} disabled={verify.phase !== "done" || !!patch} title="Put the verified policy and its evidence pack in the approvals inbox">
-                Submit for approval
+              <Button tone="blue" onClick={sendToBlue} disabled={verify.phase !== "done" || !!patch} title="Put the verified policy and its evidence pack in Blue's approvals inbox">
+                Send to Blue for approval →
               </Button>
               {patch && (
                 <span className="text-[11px] text-dim">
                   {patch.id}: <span className="text-ink">{patch.status}</span>
-                  {patch.status === "pending" && " · approve it in the inbox"}
+                  {patch.status === "pending" && (
+                    <>
+                      {" · "}
+                      <button onClick={() => void s.setView("blue")} className="text-blue hover:underline">
+                        approve it in Blue
+                      </button>
+                    </>
+                  )}
                 </span>
               )}
             </div>
@@ -258,19 +240,6 @@ export function SynthesisPanel() {
 
             {pack && pack.metrics.before && <ScoreCompare before={pack.metrics.before} after={pack.metrics.after} />}
 
-            <div>
-              <div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-wider text-faint">Before / after · same counterexample</div>
-              <div className="flex gap-2">
-                <Side title="Before" out={s.replays.before} policy={attack?.policy} />
-                <Side title="After" out={s.replays.after} policy={applied ?? undefined} />
-              </div>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {!s.replays.before && attack && <Button onClick={() => s.replayAttack(attack.policy)}>Replay before</Button>}
-                <Button tone="blue" disabled={!applied || !attack} onClick={() => applied && s.replayAttack(applied)} title={!applied ? "Approve and apply the patch first" : ""}>
-                  Replay under {applied ?? result.policy.version}
-                </Button>
-              </div>
-            </div>
           </>
         )}
       </div>

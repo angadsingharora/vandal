@@ -3,7 +3,7 @@
 import { cx, INVARIANTS, usd } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
 import type { Link } from "@/lib/types";
-import { Badge, Empty, Panel, SideTag, Spinner } from "./ui";
+import { Badge, Panel, SideTag, Spinner } from "./ui";
 
 const MARK: Record<Link["status"], { icon: string; style: string; label: string }> = {
   covered: { icon: "✓", style: "border-ok/40 text-ok", label: "covered" },
@@ -28,17 +28,19 @@ export function ChainView() {
     <Panel
       title={
         <>
-          Authorization chain{" "}
+          Diagnose · authorization chain{" "}
           {chain.payment && <span className="num normal-case tracking-normal text-ink">· {chain.payment}</span>}
           {chain.data?.invoice && <span className="num normal-case tracking-normal text-faint"> for {chain.data.invoice}</span>}
         </>
       }
-      tag={<SideTag side="blue" />}
+      tag={<SideTag side="red" />}
       actions={showingDiagnosis && <Badge tone="bad">diagnosis</Badge>}
-      className="min-h-[220px] lg:max-h-[46vh]"
+      className={chain.payment ? "min-h-[220px] lg:max-h-[46vh]" : ""}
     >
       {!chain.payment && (
-        <Empty>Pick a payment, or diagnose a counterexample, to walk obligation → approval → execution → settlement → books.</Empty>
+        <p className="px-3 py-2 text-[11px] text-faint">
+          Diagnose a counterexample, or click a payment, to walk obligation → approval → execution → settlement → books.
+        </p>
       )}
       {chain.payment && !chain.data && (
         <div className="flex items-center gap-2 p-3 text-xs text-dim">
@@ -83,7 +85,7 @@ export function ChainView() {
 
           {firstBroken && Object.keys(firstBroken.facts).length > 0 && (
             <details className="text-[11px]">
-              <summary className="cursor-pointer text-dim">Facts Blue evaluated at {firstBroken.name}</summary>
+              <summary className="cursor-pointer text-dim">Facts Guard evaluated at {firstBroken.name}</summary>
               <dl className="num mt-1 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5">
                 {Object.entries(firstBroken.facts).map(([k, v]) => (
                   <div key={k} className="contents">
