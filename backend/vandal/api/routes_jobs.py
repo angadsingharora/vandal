@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from vandal.api import deps
+from vandal.contracts.entities import OracleLabel
 from vandal.contracts.moves import Move
 from vandal.sandbox import intake_extractor, new_sandbox
 from vandal.search.alphabet import SCENARIOS
@@ -38,11 +39,11 @@ class SearchRequest(BaseModel):
 
 
 class DiagnoseRequest(BaseModel):
-    search_id: str
+    search_id: str  # a search job, or an inject job (R9)
 
 
 class SynthesizeRequest(BaseModel):
-    search_id: str | None = None  # repair this search's counterexample
+    search_id: str | None = None  # repair this search's (or inject's) counterexample
     policy: str = "v0"  # otherwise, repair what search finds under this policy
     depth: int = Field(default=3, ge=1, le=6)
     workers: int = Field(default=1, ge=1, le=32)
@@ -67,10 +68,10 @@ def _factory_for(profile: str):
     return lambda p: partial(new_sandbox, profile, policy=p)
 
 
-def _done(request: Request, job_id: str, kind: str):
+def _done(request: Request, job_id: str, *kinds: str):
     job = deps.get_job(request, job_id)
-    if job.kind != kind:
-        raise HTTPException(400, f"{job_id} is a {job.kind} job, not {kind}")
+    if job.kind not in kinds:
+        raise HTTPException(400, f"{job_id} is a {job.kind} job, not {' or '.join(kinds)}")
     if job.status != "done":
         raise HTTPException(409, f"{job_id} is {job.status}")
     return job
@@ -92,7 +93,7 @@ def job_events(request: Request, job_id: str, start: int | None = None, follow: 
 def start_search(request: Request, body: SearchRequest) -> dict[str, Any]:
     if body.scenario not in SCENARIOS:
         raise HTTPException(400, f"unknown scenario {body.scenario!r}")
-    policy = deps.policy(body.policy)
+    policy = deps.policy(body.policy, request)
     reg = deps.registry(request)
 
     def work(job) -> dict[str, Any]:
@@ -120,7 +121,7 @@ def start_search(request: Request, body: SearchRequest) -> dict[str, Any]:
 @router.post("/diagnose")
 def start_diagnose(request: Request, body: DiagnoseRequest) -> dict[str, Any]:
     """Root cause of a finished search's best counterexample (R5)."""
-    job = _done(request, body.search_id, "search")
+    job = _done(request, body.search_id, "search", "inject")
     best = job.result.get("best")
     if best is None:
         return {
@@ -129,9 +130,10 @@ def start_diagnose(request: Request, body: DiagnoseRequest) -> dict[str, Any]:
             "reason": "the search found no violation",
         }
     meta = job.meta
-    factory = partial(new_sandbox, meta["profile"], policy=deps.policy(meta["policy"]))
+    factory = partial(new_sandbox, meta["profile"], policy=deps.policy(meta["policy"], request))
     moves = [Move.model_validate(m) for m in best["moves"]]
-    result, sb, _ = replay_detailed(meta["seed"], moves, sandbox=factory)
+    labels = [OracleLabel.model_validate(lb) for lb in job.result.get("labels", [])]
+    result, sb, _ = replay_detailed(meta["seed"], moves, sandbox=factory, labels=labels)
     d = diagnose(sb.run.state, result.violations, Limits.from_profile(sb.profile))
     return {"search_id": body.search_id, "diagnosis": d.model_dump(mode="json") if d else None}
 
@@ -140,15 +142,17 @@ def start_diagnose(request: Request, body: DiagnoseRequest) -> dict[str, Any]:
 def start_synthesize(request: Request, body: SynthesizeRequest) -> dict[str, Any]:
     """CEGIS (R8). Every candidate streams as a `log` message on /jobs/{id}/events."""
     reg = deps.registry(request)
-    parent = deps.policy(body.policy)
-    start = None
+    parent = deps.policy(body.policy, request)
+    start, labels, scenario = None, [], "a"
     if body.search_id:
-        found = _done(request, body.search_id, "search")
-        parent = deps.policy(found.meta["policy"])
+        found = _done(request, body.search_id, "search", "inject")
+        parent = deps.policy(found.meta["policy"], request)
         best = found.result.get("best")
         if best is None:
             raise HTTPException(400, f"{body.search_id} found no violation to repair")
         start = [Move.model_validate(m) for m in best["moves"]]
+        labels = [OracleLabel.model_validate(lb) for lb in found.result.get("labels", [])]
+        scenario = found.result.get("scenario") or found.meta.get("scenario") or "a"
     profile = load_profile(body.profile)
 
     def work(job) -> dict[str, Any]:
@@ -164,6 +168,8 @@ def start_synthesize(request: Request, body: SynthesizeRequest) -> dict[str, Any
             max_iterations=body.max_iterations,
             version=body.version,
             start=start,
+            start_labels=labels,
+            scenario=scenario,
             on_entry=lambda e: job.channel.publish("log", e.model_dump(mode="json")),
         )
         out = result.model_dump(mode="json")
@@ -196,10 +202,10 @@ def start_verify(request: Request, body: VerifyRequest) -> dict[str, Any]:
             for e in synth.result["log"]
         ]
     elif body.policy:
-        policy = deps.policy(body.policy)
+        policy = deps.policy(body.policy, request)
     else:
         raise HTTPException(400, "give a policy or a synthesis_id")
-    parent = deps.policy(body.parent or policy.parent or "v0")
+    parent = deps.policy(body.parent or policy.parent or "v0", request)
 
     def work(job) -> dict[str, Any]:
         job.channel.publish("progress", {"step": "verifying", "policy": policy.version})
@@ -227,13 +233,17 @@ def start_verify(request: Request, body: VerifyRequest) -> dict[str, Any]:
 
 @router.get("/metrics")
 def metrics(
-    policies: str = "v0,v1", depth: int = 1, profile: str = "bayline", seed: int = 7
+    request: Request,
+    policies: str = "v0,v1",
+    depth: int = 1,
+    profile: str = "bayline",
+    seed: int = 7,
 ) -> dict[str, Any]:
     """Scorecards side by side (R7). Depth 1 by default so the call stays interactive; the
     evidence pack from /verify has the full-depth numbers."""
     out = {}
     for name in [p.strip() for p in policies.split(",") if p.strip()]:
-        policy = deps.policy(name)
+        policy = deps.policy(name, request)
         runs = collect(
             policy,
             partial(new_sandbox, profile, policy=policy),

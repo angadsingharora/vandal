@@ -1,0 +1,93 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { cx, pct, usd } from "@/lib/format";
+import { useWarRoom } from "@/lib/store";
+import type { Scorecard } from "@/lib/types";
+import { Button, Modal, Spinner, Table, td } from "./ui";
+
+const ROWS: { label: string; get: (s: Scorecard) => string }[] = [
+  { label: "Sequences explored", get: (s) => s.sequences_explored.toLocaleString() },
+  { label: "Violations found", get: (s) => String(s.violations_found) },
+  { label: "Attack success rate", get: (s) => pct(s.attack_success_rate) },
+  { label: "Exposure", get: (s) => usd(s.exposure, { cents: false }) },
+  { label: "Legit operations", get: (s) => String(s.legit_operations) },
+  { label: "Legit failed", get: (s) => String(s.legit_failed) },
+  { label: "Legit blocked", get: (s) => String(s.legit_blocked) },
+  { label: "Holds (friction)", get: (s) => String(s.holds) },
+  { label: "False-positive rate", get: (s) => pct(s.false_positive_rate, 1) },
+  { label: "Broken invariants", get: (s) => s.broken_invariants.join(", ") || "none" },
+  { label: "Extraction accuracy", get: (s) => pct(s.extraction_accuracy) },
+  { label: "GL coding accuracy", get: (s) => pct(s.gl_coding_accuracy) },
+];
+
+export function ScorecardDialog({ onClose }: { onClose: () => void }) {
+  const s = useWarRoom();
+  const names = s.policies.map((p) => p.name);
+  const [picked, setPicked] = useState<string[]>(() => ["v0", s.appliedPolicy ?? "v1"].filter((p) => names.includes(p)));
+  const data = s.metrics.data;
+  const cards = data ? picked.filter((p) => data.scorecards[p]).map((p) => data.scorecards[p]) : [];
+  const classes = [...new Set(cards.flatMap((c) => Object.keys(c.attack_success)))].sort();
+
+  useEffect(() => {
+    if (!data && picked.length) void s.loadMetrics(picked);
+  }, []); // once, when the dialog opens
+
+  const toggle = (p: string) => setPicked((xs) => (xs.includes(p) ? xs.filter((x) => x !== p) : [...xs, p]));
+
+  return (
+    <Modal title="Scorecard" onClose={onClose} wide>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {names.map((p) => (
+          <label key={p} className="flex items-center gap-1 text-xs">
+            <input type="checkbox" checked={picked.includes(p)} onChange={() => toggle(p)} className="accent-blue" />
+            <span className="num">{p}</span>
+          </label>
+        ))}
+        <Button tone="blue" onClick={() => s.loadMetrics(picked)} busy={s.metrics.phase === "running"} disabled={!picked.length}>
+          Score
+        </Button>
+        <span className="text-[11px] text-faint">
+          Real runs at search depth {data?.depth ?? 1} so this stays interactive; the evidence pack has full-depth numbers.
+        </span>
+      </div>
+      {s.metrics.phase === "running" && !data && (
+        <div className="flex items-center gap-2 text-xs text-dim">
+          <Spinner /> running held-out variants and regression…
+        </div>
+      )}
+      {cards.length > 0 && (
+        <Table head={["", ...cards.map((c) => c.policy)]}>
+          {ROWS.map((row) => (
+            <tr key={row.label}>
+              <td className={cx(td, "text-dim")}>{row.label}</td>
+              {cards.map((c) => (
+                <td key={c.policy} className={cx(td, "num")}>
+                  {row.get(c)}
+                </td>
+              ))}
+            </tr>
+          ))}
+          {classes.map((k) => (
+            <tr key={k}>
+              <td className={cx(td, "text-dim")}>↳ {k}</td>
+              {cards.map((c) => {
+                const r = c.attack_success[k];
+                return (
+                  <td key={c.policy} className={cx(td, "num", r && r.succeeded > 0 ? "text-bad" : "text-ok")}>
+                    {r ? `${r.succeeded}/${r.attempts}` : "—"}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </Table>
+      )}
+      {cards.some((c) => c.notes.length) && (
+        <ul className="mt-3 space-y-0.5 text-[11px] text-faint">
+          {cards.flatMap((c) => c.notes.map((n, i) => <li key={`${c.policy}-${i}`}>{c.policy}: {n}</li>))}
+        </ul>
+      )}
+    </Modal>
+  );
+}

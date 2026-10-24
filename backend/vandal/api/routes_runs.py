@@ -1,4 +1,5 @@
-"""A0 routes for runs: create, operate, read state, stream events, replay (R1, R2, R3, R5)."""
+"""A0 routes for runs: create, operate, read state and entities, stream events, replay (R1, R2,
+R3, R5)."""
 
 from __future__ import annotations
 
@@ -14,7 +15,8 @@ from vandal.contracts.entities import OracleLabel
 from vandal.contracts.moves import Move
 from vandal.synth.coverage import build_chain
 from vandal.twin.world import run_step, schedule
-from vandal.verify.invariants import Limits, check
+from vandal.verify.invariants import Limits, check, exposure
+from vandal.verify.oracle import Oracle
 from vandal.verify.replay import replay_detailed
 
 router = APIRouter()
@@ -39,10 +41,20 @@ class Replay(BaseModel):
     policy: str = "v0"
 
 
+def _violations(handle: RunHandle):
+    """Invariants on the run's state, with a replayed trace's answer key when it has one (INV-4
+    needs to know which accounts the attacker controls)."""
+    oracle = None
+    if handle.labels:
+        oracle = Oracle()
+        oracle.labels.extend(handle.labels)
+    return check(handle.state, oracle, Limits.from_profile(handle.sandbox.profile))
+
+
 def summary(handle: RunHandle) -> dict[str, Any]:
     with handle.lock:
         state = handle.state
-        violations = check(state, None, Limits.from_profile(handle.sandbox.profile))
+        violations = _violations(handle)
         return {
             "run_id": handle.id,
             "company": state.company,
@@ -109,6 +121,57 @@ def run_ledger(request: Request, run_id: str) -> list[dict[str, Any]]:
         return [je.model_dump(mode="json") for je in handle.state.journal]
 
 
+@router.get("/runs/{run_id}/entities")
+def run_entities(request: Request, run_id: str) -> dict[str, Any]:
+    """The twin's tables for the war room (F1): invoices, payments with their instructions,
+    vendors and their bank accounts, the bank feed, change requests, cases, and approvals.
+    `labels` is the oracle's answer key for a replayed trace; only the Judge view shows it."""
+    handle = deps.get_run(request, run_id)
+    with handle.lock:
+        state = handle.state
+
+        def rows(table: dict) -> list[dict[str, Any]]:
+            return [e.model_dump(mode="json") for e in table.values()]
+
+        payments = []
+        for p in state.payments.values():
+            pi = state.payment_instructions.get(p.instruction)
+            payments.append(
+                p.model_dump(mode="json")
+                | (
+                    {"invoice": pi.invoice, "amount": pi.amount, "payee_account": pi.payee_account}
+                    if pi
+                    else {}
+                )
+            )
+        violations = _violations(handle)
+        open_ap = sum(
+            i.amount
+            for i in state.invoices.values()
+            if i.kind == "invoice"
+            and i.status in ("received", "validated", "approved", "scheduled", "held")
+        )
+        return {
+            "run_id": handle.id,
+            "day": state.day,
+            "totals": {
+                "cash": sum(b.balance for b in state.bank_accounts.values()),
+                "open_ap": open_ap,
+                "exposure": exposure(violations),
+            },
+            "vendors": rows(state.vendors),
+            "vendor_bank_accounts": rows(state.vendor_bank_accounts),
+            "invoices": rows(state.invoices),
+            "payments": payments,
+            "bank_accounts": rows(state.bank_accounts),
+            "bank_transactions": rows(state.bank_transactions),
+            "change_requests": rows(state.change_requests),
+            "approval_requests": rows(state.approval_requests),
+            "cases": rows(state.cases),
+            "labels": [lb.model_dump(mode="json") for lb in handle.labels],
+        }
+
+
 @router.get("/runs/{run_id}/events")
 def run_events(request: Request, run_id: str, start: int | None = None, follow: bool = True):
     """SSE: every event of the run from `start`, then live (`event: event` messages)."""
@@ -155,18 +218,21 @@ def chain(request: Request, run_id: str, payment: str) -> dict[str, Any]:
 def replay(request: Request, body: Replay) -> dict[str, Any]:
     """Replay a trace on a fresh company as a new run; its events stream like any run's."""
     reg = deps.registry(request)
-    handle = reg.create_run(body.profile, body.seed, deps.policy(body.policy), kind="replay")
+    policy = deps.policy(body.policy, request)
+    handle = reg.create_run(body.profile, body.seed, policy, kind="replay")
     with handle.lock:
-        result, _, _ = replay_detailed(
+        result, _, oracle = replay_detailed(
             body.seed,
             body.moves,
             sandbox=lambda _seed: handle.sandbox,
             days=body.days,
             labels=body.labels,
         )
+        handle.labels = list(oracle.labels)
         if handle.writer is not None:
             handle.writer.flush()
     return {
         "run": summary(handle),
         "result": {**result.model_dump(mode="json"), "violated": result.violated},
+        "labels": [lb.model_dump(mode="json") for lb in handle.labels],
     }
