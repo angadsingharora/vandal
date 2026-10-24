@@ -4,7 +4,7 @@ _Written by the overnight session while the owner slept. Updated after every ite
 
 ## Summary (five lines)
 
-1. **PRs in merge order (top to bottom, each stacked on the one before):** [#25](https://github.com/angadsingharora/vandal/pull/25) `slice/L0-fixes` → [#26](https://github.com/angadsingharora/vandal/pull/26) `slice/L0-recordings` → [#27](https://github.com/angadsingharora/vandal/pull/27) `slice/demo-e2e` → [#28](https://github.com/angadsingharora/vandal/pull/28) `slice/ui-polish` → `slice/R-scenario-c` → `slice/partial-handoffs` → `slice/submission` → `slice/ci` (PR numbers for the last four are in the "Stack" table at the end). Nothing was merged by this session.
+1. **PRs in merge order (top to bottom, each stacked on the one before):** [#25](https://github.com/angadsingharora/vandal/pull/25) `slice/L0-fixes` → [#26](https://github.com/angadsingharora/vandal/pull/26) `slice/L0-recordings` → [#27](https://github.com/angadsingharora/vandal/pull/27) `slice/demo-e2e` → [#28](https://github.com/angadsingharora/vandal/pull/28) `slice/ui-polish` → [#29](https://github.com/angadsingharora/vandal/pull/29) `slice/R-scenario-c` → [#30](https://github.com/angadsingharora/vandal/pull/30) `slice/partial-handoffs` → [#31](https://github.com/angadsingharora/vandal/pull/31) `slice/submission` → [#32](https://github.com/angadsingharora/vandal/pull/32) `slice/ci`. Nothing was merged by this session.
 2. **Tests before:** fast suite 1 failure on `main` (the stale war-room test). **After, on the top of the stack:** fast suite green, `--slow` green including the new end-to-end smoke test, ruff clean, `npm run typecheck` / `npm test` / `npm run build` green. Playback proof: the whole CLI loop with no key and `DEMO_PLAYBACK=true`, **0 cache misses**.
 3. **Look at this first:** `python scripts/demo.py --playback` and click the loop (README, "Run the whole demo with one command"); then section 2's finding (structured output can't fill a free-form dict, so every LLM inject and every LLM-proposed control was silently empty before PR 26) and section 3's two demo-killers (inject ran on the wrong run; a second loop in one server crashed Verify).
 4. **Broken / open:** `vandal synth --scenario f` cannot auto-repair at depth 3 (passes at depth 2; not in the demo script); Scenario D and "sources that disagree" are not built (over the two-hour line, written up in section 4); a held invoice is not re-validated when its receipt arrives later.
@@ -138,9 +138,9 @@ Done smallest first, as the brief says. Two items landed; two were judged over t
 | 2 | `slice/L0-recordings` | `slice/L0-fixes` | #26 |
 | 3 | `slice/demo-e2e` | `slice/L0-recordings` | #27 |
 | 4 | `slice/ui-polish` | `slice/demo-e2e` | #28 |
-| 5 | `slice/R-scenario-c` | `slice/ui-polish` | opened after the final slow run |
-| 6 | `slice/partial-handoffs` | `slice/R-scenario-c` | opened after the final slow run |
-| 7 | `slice/submission` | `slice/partial-handoffs` | opened after the final slow run |
-| 8 | `slice/ci` | `slice/submission` | opened after the final slow run |
+| 5 | `slice/R-scenario-c` | `slice/ui-polish` | #29 |
+| 6 | `slice/partial-handoffs` | `slice/R-scenario-c` | #30 |
+| 7 | `slice/submission` | `slice/partial-handoffs` | #31 |
+| 8 | `slice/ci` | `slice/submission` | #32 |
 
 Merge top to bottom; after each merge GitHub retargets the next PR to `main`. The worktree at `C:/Users/Angad/vandal-nap` can be removed once the stack is merged (`git worktree remove C:/Users/Angad/vandal-nap`); its only untracked files are a copy of `NAP_PROMPT.md` and `.claude/launch.json`. One more Blue explanation recorded by the smoke runs is committed with this slice.
