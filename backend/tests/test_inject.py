@@ -168,3 +168,128 @@ def test_candidates_must_hold_against_the_given_counterexample() -> None:
     assert r.status == "cannot_auto_repair"
     (entry,) = r.log
     assert entry.outcome == "counterexample" and entry.counterexample == [change(2)]
+
+
+# --- R9: Red, plain-language inject, `vandal inject` ------------------------------------------
+
+from vandal import llm  # noqa: E402
+from vandal.cli import main  # noqa: E402
+from vandal.search import red  # noqa: E402
+
+CFO = "the CFO calls from an airport asking for an urgent wire to a new supplier"
+
+
+@pytest.mark.parametrize(
+    "description,scenario,kinds",
+    [
+        (CFO, "a", ["message"]),
+        (
+            "a vendor emails new bank details after approval, then calls to confirm",
+            "a",
+            ["change_request", "inbound_confirmation"],
+        ),
+        (
+            "a tenant overpays and asks for a refund to a new account",
+            "f",
+            ["deposit", "refund_request"],
+        ),
+        ("the bank loses the ack during the payment run", "b", ["fault"]),
+    ],
+)
+def test_keyword_reader_maps_the_modeled_threats(description, scenario, kinds) -> None:
+    p = red.plan(description, factory_for(None), use_llm=False)
+    assert p.scenario == scenario and [m.kind for m in p.moves] == kinds
+    assert all("text" in m.params for m in p.moves if red.template_for(m))
+
+
+def test_the_cfo_call_says_what_isnt_modeled() -> None:
+    p = red.plan(CFO, factory_for(None), use_llm=False)
+    (move,) = p.moves
+    assert move.params["poses_as"] == "CFO" and move.params["channel"] == "phone_in"
+    assert "It's the CFO" in move.params["text"]
+    assert any("not modeled" in n for n in p.notes)
+
+
+def test_moves_outside_the_attacker_capabilities_are_dropped() -> None:
+    profile = load_profile()
+    honest = profile.model_copy(
+        update={
+            "attacker_capabilities": profile.attacker_capabilities.model_copy(
+                update={"spoof_caller_id": False, "clone_voice": False}
+            )
+        }
+    )
+    with pytest.raises(ValueError, match="capabilities"):
+        red.plan(CFO, partial(new_sandbox, honest), use_llm=False)
+
+
+def test_red_content_fills_in_what_only_the_replay_knows() -> None:
+    move = Move(
+        kind="change_request",
+        at=2,
+        params={
+            "vendor": "V-007",
+            "fields": "bank",
+            "channel": "email",
+            "sender": "lookalike",
+            "text": red.TEMPLATES["change_request/bank"],
+        },
+    )
+    _, sb, _ = replay_detailed(7, [move], sandbox=factory_for(None))
+    (msg,) = [e.payload["message"] for e in sb.run.state.events if e.kind == "channel.received"]
+    assert "{" not in msg["body"] and msg["meta"]["account"] in msg["body"]
+
+
+def test_claude_reads_and_writes_when_l0_answers(monkeypatch) -> None:
+    def fake(*, schema, step, **_):
+        if step == "plan":
+            return schema(
+                moves=[
+                    {
+                        "kind": "change_request",
+                        "at": 2,
+                        "params": {
+                            "vendor": "V-007",
+                            "fields": "bank",
+                            "channel": "email",
+                            "sender": "lookalike",
+                        },
+                    },
+                    {
+                        "kind": "change_request",
+                        "at": 2,
+                        "params": {"vendor": "V-999", "fields": "bank"},
+                    },
+                ],
+                scenario="a",
+            )
+        return schema(texts=["Please use {account} from now on. {signer}"])
+
+    monkeypatch.setattr(llm, "structured", fake)
+    p = red.plan("anything", factory_for(None))
+    assert p.source == "llm" and len(p.moves) == 1  # the unknown vendor was dropped
+    assert any("V-999" in n or "unknown vendor" in n for n in p.notes)
+    assert p.moves[0].params["text"].startswith("Please use {account}")
+
+
+def test_vandal_inject_reports_controls_held_under_v3(capsys) -> None:
+    assert main(["inject", CFO, "--no-llm", "--policy", "v3"]) == 0
+    out = capsys.readouterr().out
+    assert "It's the CFO" in out and "controls held" in out
+
+
+def test_vandal_inject_composes_a_trace(capsys, tmp_path) -> None:
+    trace = Trace(name="composed", moves=[change(2)])
+    path = tmp_path / "t.json"
+    path.write_text(trace.model_dump_json())
+    assert main(["inject", "--trace", str(path), "--no-repair"]) == 1
+    out = capsys.readouterr().out
+    assert "threat (trace)" in out and "diagnosis: approval_binding" in out
+
+
+@pytest.mark.slow
+def test_vandal_inject_sends_the_violation_into_cegis(capsys) -> None:
+    assert main(["inject", CFO, "--no-llm"]) == 1
+    out = capsys.readouterr().out
+    assert "the injected moves weren't needed" in out
+    assert "repaired:" in out and "T1 VerifiedAccountChange" in out

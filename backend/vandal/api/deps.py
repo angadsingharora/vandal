@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from vandal.api.registry import Job, Registry, RunHandle
 from vandal.api.sse import Channel, stream
-from vandal.synth.templates import Policy, load_policy
+from vandal.synth.templates import Policy, available_policies, load_policy
 
 
 def registry(request: Request) -> Registry:
@@ -29,9 +29,12 @@ def get_job(request: Request, job_id: str) -> Job:
 
 
 def policy(name: str | None, request: Request | None = None) -> Policy:
-    """A policy by name: one applied through the inbox first, then the built-in and files."""
+    """A policy by name: one applied through the inbox first, then the built-ins. The API never
+    loads an arbitrary path."""
     if request is not None and name in registry(request).applied:
         return registry(request).applied[name]
+    if name and name not in available_policies():
+        raise HTTPException(400, f"unknown policy {name!r}")
     try:
         return load_policy(name)
     except (FileNotFoundError, ValueError) as err:

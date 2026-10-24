@@ -118,6 +118,7 @@ def test_policies(client) -> None:
 def test_errors(client) -> None:
     assert client.get("/runs/run-nope/state").status_code == 404
     assert client.post("/runs", json={"policy": "v99"}).status_code == 400
+    assert client.post("/runs", json={"policy": "policies/v1.json"}).status_code == 400
     assert client.post("/diagnose", json={"search_id": "search-nope"}).status_code == 404
 
 

@@ -48,6 +48,8 @@ async def stream(channel: Channel, start: int = 0, follow: bool = True) -> Async
     cursor = start
     idle = 0.0
     while True:
+        # Read `closed` before draining, so a message published just before close isn't missed.
+        closed = channel.closed
         batch = channel.since(cursor)
         for i, kind, data in batch:
             yield format_sse(i, kind, data)
@@ -55,7 +57,7 @@ async def stream(channel: Channel, start: int = 0, follow: bool = True) -> Async
         if batch:
             idle = 0.0
             continue
-        if channel.closed or not follow:
+        if closed or not follow:
             return
         await asyncio.sleep(POLL_SECONDS)
         idle += POLL_SECONDS

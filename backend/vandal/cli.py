@@ -422,10 +422,140 @@ def cmd_synth(args: argparse.Namespace) -> int:
     return 0 if pack.approvable else 1
 
 
+def _short(move) -> str:
+    params = " ".join(f"{k}={v}" for k, v in move.params.items() if k != "text")
+    return f"@{move.at:<3} {move.kind} {params}"
+
+
+def cmd_inject(args: argparse.Namespace) -> int:
+    """Preview a user-authored threat, run it on a fresh clone, search k moves around it, and
+    send any violation into diagnose -> CEGIS."""
+    from functools import partial
+
+    from vandal.sandbox import new_sandbox
+    from vandal.search import red
+    from vandal.search.alphabet import SCENARIOS
+    from vandal.search.bfs import search
+    from vandal.search.minimize import minimize_trace
+    from vandal.synth.cegis import cegis
+    from vandal.synth.coverage import diagnose
+    from vandal.synth.propose import LLMProposer, SweepProposer
+    from vandal.twin.profile import load_profile
+    from vandal.verify.invariants import Limits
+    from vandal.verify.replay import Trace, replay, replay_detailed
+
+    policy = _policy(args)
+    profile = load_profile(args.profile)
+
+    def factory_for(p):
+        return partial(new_sandbox, args.profile, policy=p)
+
+    factory = factory_for(policy)
+    if args.trace:  # compose inject: raw moves plus labels
+        trace = Trace.load(args.trace)
+        plan = red.ThreatPlan(
+            description=args.description or trace.name,
+            moves=trace.moves,
+            labels=trace.labels,
+            scenario=args.scenario or "a",
+            source="trace",
+        )
+    else:
+        if not args.description:
+            print("vandal inject: give a description or --trace", file=sys.stderr)
+            return 2
+        try:
+            plan = red.plan(args.description, factory, args.seed, use_llm=not args.no_llm)
+        except ValueError as err:
+            print(f"vandal inject: {err}", file=sys.stderr)
+            return 2
+        if args.scenario:
+            plan.scenario = args.scenario
+    _print_policy(policy)
+    print(f"threat ({plan.source}): {plan.description}")
+    for move in plan.moves:
+        print(f"  {_short(move)}")
+        if text := move.params.get("text"):
+            print(f'        "{str(text).splitlines()[0][:90]}"')
+    for note in plan.notes:
+        print(f"  note: {note}")
+    if args.dry_run:
+        return 0
+
+    def violated(moves) -> set[str]:
+        return set(replay(args.seed, moves, sandbox=factory, labels=plan.labels).violated)
+
+    result = replay(args.seed, plan.moves, sandbox=factory, labels=plan.labels)
+    if result.violations:
+        print(
+            f"on a fresh clone: VIOLATED {', '.join(result.violated)}  "
+            f"exposure ${result.exposure / 100:,.2f}"
+        )
+        moves = minimize_trace(plan.moves, violated)
+    else:
+        print("on a fresh clone: no violation")
+        found = search(
+            factory,
+            SCENARIOS[plan.scenario],
+            seed=args.seed,
+            depth=args.depth,
+            workers=args.workers,
+            around=plan.moves,
+            labels=plan.labels,
+        )
+        print(
+            f"  searched {found.explored} sequences with up to {args.depth} moves around it "
+            f"(scenario {plan.scenario})"
+        )
+        if found.best is None:
+            print("controls held")
+            return 0
+        moves = minimize_trace(found.best.moves, violated)
+        needed = [m for m in plan.moves if m in moves]
+        print(
+            f"  search found a violation in {len(found.best.moves)} moves"
+            + ("" if needed else "; the injected moves weren't needed for it")
+        )
+    final, sb, _ = replay_detailed(args.seed, moves, sandbox=factory, labels=plan.labels)
+    print(f"minimal counterexample ({len(moves)} moves):")
+    for move in moves:
+        print(f"  {_short(move)}")
+    print(f"VIOLATED {', '.join(final.violated)}  exposure ${final.exposure / 100:,.2f}")
+    d = diagnose(sb.run.state, final.violations, Limits.from_profile(sb.profile))
+    if d is None:
+        print("diagnosis: every chain is covered; nothing to attach a control to")
+        return 1
+    print(f"diagnosis: {d.gap} at the {d.link} link of {d.payment}")
+    print(f"  {d.reason}")
+    if args.no_repair:
+        return 1
+    proposer = SweepProposer(profile) if args.no_llm else LLMProposer(profile)
+    print(f"repairing (CEGIS from {policy.version}, depth {args.synth_depth}):")
+    r = cegis(
+        policy,
+        factory_for,
+        profile=profile,
+        proposer=proposer,
+        seed=args.seed,
+        depth=args.synth_depth,
+        workers=args.workers,
+        version=f"{policy.version}-inject",
+        on_entry=lambda e: print(f"  it{e.iteration} {e.outcome:<14} {e.candidate}"),
+        start=moves,
+        start_labels=plan.labels,
+        scenario=plan.scenario,
+    )
+    print(f"{r.status}: {r.reason}")
+    for line in r.chosen:
+        print(f"  + {line}")
+    return 1
+
+
 IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {
     "rebuild": cmd_rebuild,
     "synth": cmd_synth,
     "verify": cmd_verify,
+    "inject": cmd_inject,
     "search": cmd_search,
     "seed": cmd_seed,
     "run": cmd_run,
@@ -440,10 +570,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="command", required=True)
     for name, (help_text, _slice) in COMMANDS.items():
         cmd = sub.add_parser(name, help=help_text)
-        if name in ("seed", "run", "attack", "search", "verify", "synth"):
+        if name in ("seed", "run", "attack", "search", "verify", "synth", "inject"):
             cmd.add_argument("--profile", default="bayline", help="profile name or YAML path")
             cmd.add_argument("--seed", type=int, default=DEFAULT_SEED)
-        if name in ("run", "attack", "search", "verify", "synth"):
+        if name in ("run", "attack", "search", "verify", "synth", "inject"):
             cmd.add_argument("--policy", help="v0, a name under policies/, or a JSON path")
         if name == "synth":
             cmd.add_argument("--no-llm", action="store_true", help="enumerative sweep only")
@@ -493,6 +623,18 @@ def build_parser() -> argparse.ArgumentParser:
             )
         if name == "attack":
             cmd.add_argument("--trace", required=True, help="path to a trace JSON file")
+        if name == "inject":
+            cmd.add_argument("description", nargs="?", help="the threat, in plain language")
+            cmd.add_argument("--trace", help="compose inject: a trace JSON (moves + labels)")
+            cmd.add_argument("--scenario", help="search window around it (default: inferred)")
+            cmd.add_argument("--depth", type=int, default=1, help="moves searched around it")
+            cmd.add_argument("--synth-depth", type=int, default=2, help="CEGIS search depth")
+            cmd.add_argument(
+                "--workers", type=int, default=int(os.environ.get("SEARCH_WORKERS", 1))
+            )
+            cmd.add_argument("--no-llm", action="store_true", help="keywords and templates")
+            cmd.add_argument("--no-repair", action="store_true", help="diagnose, don't repair")
+            cmd.add_argument("--dry-run", action="store_true", help="preview the moves only")
     return parser
 
 
