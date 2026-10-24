@@ -69,6 +69,12 @@ def _invoice_facts(state: State, inv: Invoice) -> dict[str, Any]:
         "vendor.status": vendor.status,
         "vendor.po_required": vendor.po_required,
         "vendor.prior_payments": prior_settled_payments(state, vendor.id),
+        "invoice.misdirected_payments": sum(
+            1
+            for p in state.payments.values()
+            if p.status == "misdirected"
+            and state.payment_instructions[p.instruction].invoice == inv.id
+        ),
         **match_facts(state, inv),
         **_duplicate_and_window_facts(inv, others),
     }
@@ -229,6 +235,7 @@ def facts(state: State, action: Action) -> tuple[dict[str, Any], list[str]]:
             f |= {
                 "approval.id": approval.id,
                 "approval.via": approval.via,
+                "approval.kind": approval.kind,
                 "approved.amount": ai.amount,
                 "approved.payee_account": ai.payee_account,
             }

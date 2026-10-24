@@ -114,6 +114,41 @@ class RefundArgs(_Args):
     message: str | None = None  # the request it answers
 
 
+class CaseOpen(_Args):
+    subject: str
+    kind: Literal["exception", "recovery", "escalation"] = "recovery"
+    reason: str
+
+
+class CaseClose(_Args):
+    case: str
+    outcome: str
+
+
+class RecoveryRef(_Args):
+    payment: str
+    case: str
+
+
+class AccountRef(_Args):
+    account: str
+    case: str
+
+
+class RepaymentArgs(_Args):
+    invoice: str
+    case: str
+
+
+class RequestRef(_Args):
+    request: str
+
+
+class Reassign(_Args):
+    request: str
+    to: str
+
+
 class ChangeRef(_Args):
     change: str  # CR-…
 
@@ -189,9 +224,11 @@ def _grant(
     via: str,
     instr: ApprovedInstruction,
     request: str | None = None,
+    kind: str = "payment",
 ) -> list[EventSpec]:
     inv = state.invoices[iid]
     approval = {
+        "kind": kind,
         "id": f"APR-{len(state.approvals) + 1:04d}",
         "subject": iid,
         "requested_by": requested_by,
@@ -207,10 +244,10 @@ def _grant(
         state.vendors[inv.vendor].gl_account,
         inv.amount,
     )
-    return [
-        ("approval.granted", {"approval": approval, "request": request}),
-        ("journal.posted", {"entry": je.model_dump()}),
-    ]
+    granted = ("approval.granted", {"approval": approval, "request": request})
+    if kind == "repayment":
+        return [granted]  # the liability was reinstated when the payment was marked misdirected
+    return [granted, ("journal.posted", {"entry": je.model_dump()})]
 
 
 def _request_approval(ctx: Ctx, args: InvoiceRef) -> list[EventSpec]:
@@ -234,6 +271,7 @@ def _escalate_approval(ctx: Ctx, args: InvoiceRef) -> list[EventSpec]:
         "subject": args.invoice,
         "requested_by": ctx.actor.id,
         "instruction": instr.model_dump(),
+        "requested_on": ctx.state.day,
     }
     return [("approval.requested", {"request": request})]
 
@@ -247,7 +285,10 @@ def _decide(ctx: Ctx, args: DecideArgs) -> list[EventSpec]:
         raise ToolError(f"{args.request} is not pending")
     if req.requested_by == ctx.actor.id:
         raise ToolError(f"{ctx.actor.id} requested {req.id} and cannot approve it")
-    _invoice(ctx.state, req.subject, "validated")
+    if req.kind == "repayment":
+        _invoice(ctx.state, req.subject, "approved", "scheduled")
+    else:
+        _invoice(ctx.state, req.subject, "validated")
     if not args.approve:
         return [("approval.denied", {"request": req.id, "by": ctx.actor.id, "reason": args.reason})]
     return _grant(
@@ -258,6 +299,7 @@ def _decide(ctx: Ctx, args: DecideArgs) -> list[EventSpec]:
         "approvals_inbox",
         req.instruction,
         request=req.id,
+        kind=req.kind,
     )
 
 
@@ -274,7 +316,7 @@ def _execute(ctx: Ctx, args: InvoiceRef) -> list[EventSpec]:
         p
         for p in state.payments.values()
         if state.payment_instructions[p.instruction].invoice == inv.id
-        and p.status not in ("failed", "recalled")
+        and p.status not in ("failed", "recalled", "misdirected")
     ]
     if live:
         raise ToolError(f"{inv.id} already has payment {live[0].id}")
@@ -619,6 +661,159 @@ def _refund(status: str) -> Effect:
     return effect
 
 
+# --- recovery (O2) and chasing approvals (O3) -----------------------------------------------
+
+
+def _case(state: State, case: str):
+    c = state.cases.get(case)
+    if c is None or c.status != "open":
+        raise ToolError(f"{case} is not an open case")
+    return c
+
+
+def _open_case(ctx: Ctx, args: CaseOpen) -> list[EventSpec]:
+    state = ctx.state
+    if any(c.subject == args.subject and c.status == "open" for c in state.cases.values()):
+        raise ToolError(f"{args.subject} already has an open case")
+    case = {
+        "id": f"CASE-{len(state.cases) + 1:04d}",
+        "kind": args.kind,
+        "subject": args.subject,
+        "reason": args.reason,
+        "opened_on": state.day,
+    }
+    return [("case.opened", {"case": case})]
+
+
+def _resolve_case(ctx: Ctx, args: CaseClose) -> list[EventSpec]:
+    _case(ctx.state, args.case)
+    return [("case.resolved", {"case": args.case, "outcome": args.outcome})]
+
+
+def _mark_misdirected(ctx: Ctx, args: RecoveryRef) -> list[EventSpec]:
+    """The payment went somewhere it shouldn't: the company is owed it back, and still owes the
+    vendor. Dr Misdirected Payment Receivable / Cr AP; the invoice goes back to approved."""
+    state = ctx.state
+    _case(state, args.case)
+    pay = state.payments.get(args.payment)
+    if pay is None or pay.status not in ("submitted", "acknowledged", "settled"):
+        raise ToolError(f"{args.payment} isn't an executed payment")
+    instr = state.payment_instructions[pay.instruction]
+    je = ledger.misdirected(ledger.next_entry_id(state), state.day, pay.id, instr.amount)
+    return [
+        ("payment.misdirected", {"payment": pay.id, "case": args.case}),
+        ("journal.posted", {"entry": je.model_dump()}),
+        ("case.action", {"case": args.case, "action": f"marked {pay.id} misdirected"}),
+    ]
+
+
+def _recall(ctx: Ctx, args: RecoveryRef) -> list[EventSpec]:
+    state = ctx.state
+    _case(state, args.case)
+    pay = state.payments.get(args.payment)
+    if pay is None or pay.status != "misdirected" or pay.recall != "none":
+        raise ToolError(f"{args.payment} isn't a misdirected payment waiting for a recall")
+    return [
+        ("payment.recall_requested", {"payment": pay.id}),
+        ("case.action", {"case": args.case, "action": f"asked the bank to recall {pay.id}"}),
+    ]
+
+
+def _book_recall(ctx: Ctx, args: RecoveryRef) -> list[EventSpec]:
+    """The recall succeeded: the cash is back. Dr Cash / Cr Misdirected Payment Receivable."""
+    state = ctx.state
+    _case(state, args.case)
+    pay = state.payments.get(args.payment)
+    if pay is None or pay.recall != "succeeded":
+        raise ToolError(f"{args.payment} wasn't recalled")
+    if any(je.memo == f"Recalled {pay.id}" for je in state.journal):
+        raise ToolError(f"{pay.id}'s recall is already booked")
+    instr = state.payment_instructions[pay.instruction]
+    cash = state.bank_accounts[bank.OPERATING].gl_account
+    je = ledger.recalled(ledger.next_entry_id(state), state.day, pay.id, cash, instr.amount)
+    return [
+        ("journal.posted", {"entry": je.model_dump()}),
+        ("case.action", {"case": args.case, "action": f"booked the recall of {pay.id}"}),
+    ]
+
+
+def _reject_account(ctx: Ctx, args: AccountRef) -> list[EventSpec]:
+    """Take an account out of the vendor master, and put back the vendor's last account that
+    was verified through an authenticated channel."""
+    state = ctx.state
+    _case(state, args.case)
+    acct = state.vendor_bank_accounts.get(args.account)
+    if acct is None or acct.status == "rejected":
+        raise ToolError(f"{args.account} is unknown or already rejected")
+    earlier = [
+        a
+        for a in state.vendor_bank_accounts.values()
+        if a.vendor == acct.vendor
+        and a.id != acct.id
+        and a.status == "superseded"
+        and a.verified_on is not None
+        and a.verified_by in ("phone_outbound", "portal")
+    ]
+    restored = earlier[-1].id if earlier else None
+    return [
+        ("vendor.account_rejected", {"account": acct.id, "restored": restored}),
+        (
+            "case.action",
+            {
+                "case": args.case,
+                "action": f"rejected {acct.id}" + (f", restored {restored}" if restored else ""),
+            },
+        ),
+    ]
+
+
+def _request_repayment(ctx: Ctx, args: RepaymentArgs) -> list[EventSpec]:
+    """Re-pay the vendor after a misdirected payment. Blue escalates this at any amount: it
+    always waits in the approvals inbox for a human."""
+    state = ctx.state
+    _case(state, args.case)
+    inv = _invoice(state, args.invoice, "approved", "scheduled")
+    misdirected = [
+        p
+        for p in state.payments.values()
+        if p.status == "misdirected" and state.payment_instructions[p.instruction].invoice == inv.id
+    ]
+    if not misdirected:
+        raise ToolError(f"{inv.id} has no misdirected payment to re-pay")
+    if any(r.subject == inv.id and r.status == "pending" for r in state.approval_requests.values()):
+        raise ToolError(f"{inv.id} already has a pending approval request")
+    instr = _approved_instruction(state, inv.id)
+    request = {
+        "id": f"AQ-{len(state.approval_requests) + 1:04d}",
+        "subject": inv.id,
+        "requested_by": ctx.actor.id,
+        "instruction": instr.model_dump(),
+        "kind": "repayment",
+        "requested_on": state.day,
+    }
+    return [
+        ("approval.requested", {"request": request}),
+        ("case.action", {"case": args.case, "action": f"asked to re-pay {inv.id}"}),
+    ]
+
+
+def _pending(state: State, request: str):
+    req = state.approval_requests.get(request)
+    if req is None or req.status != "pending":
+        raise ToolError(f"{request} is not pending")
+    return req
+
+
+def _remind(ctx: Ctx, args: RequestRef) -> list[EventSpec]:
+    _pending(ctx.state, args.request)
+    return [("approval.reminded", {"request": args.request})]
+
+
+def _reassign(ctx: Ctx, args: Reassign) -> list[EventSpec]:
+    _pending(ctx.state, args.request)
+    return [("approval.reassigned", {"request": args.request, "to": args.to})]
+
+
 @dataclass(frozen=True)
 class ToolSpec:
     stage: Stage
@@ -675,6 +870,17 @@ TOOLS: dict[str, ToolSpec] = {
         "verification", CallbackArgs, {"allow": _request_callback}
     ),
     "invoices.receive": ToolSpec("intake", InvoiceArgs, {"allow": _receive_invoice}),
+    "cases.open": ToolSpec("recovery", CaseOpen, {"allow": _open_case}),
+    "cases.resolve": ToolSpec("recovery", CaseClose, {"allow": _resolve_case}),
+    "payments.mark_misdirected": ToolSpec("recovery", RecoveryRef, {"allow": _mark_misdirected}),
+    "payments.recall": ToolSpec("recovery", RecoveryRef, {"allow": _recall}),
+    "payments.book_recall": ToolSpec("recovery", RecoveryRef, {"allow": _book_recall}),
+    "vendors.reject_account": ToolSpec("recovery", AccountRef, {"allow": _reject_account}),
+    "approvals.request_repayment": ToolSpec(
+        "pre_approve", RepaymentArgs, {"escalate": _request_repayment}
+    ),
+    "approvals.remind": ToolSpec("pre_approve", RequestRef, {"allow": _remind}),
+    "approvals.reassign": ToolSpec("pre_approve", Reassign, {"allow": _reassign}),
     "evidence.record_portal": ToolSpec("verification", ChangeRef, {"allow": _record_portal}),
     "evidence.record_inbound": ToolSpec(
         "verification", InboundEvidenceArgs, {"allow": _record_inbound}

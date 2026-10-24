@@ -17,6 +17,7 @@ from vandal.contracts.entities import (
     BankFault,
     BankSubmission,
     BankTransaction,
+    Case,
     Evidence,
     IncomingPayment,
     Invoice,
@@ -116,7 +117,9 @@ def _approval_requested(state: State, event: Event) -> None:
 def _approval_granted(state: State, event: Event) -> None:
     approval = Approval.model_validate(event.payload["approval"])
     state.put("approvals", approval)
-    state.update("invoices", approval.subject, status="approved")
+    inv = state.invoices[approval.subject]
+    if inv.status != "scheduled":  # a repayment approval leaves a scheduled invoice scheduled
+        state.update("invoices", approval.subject, status="approved")
     if request := event.payload.get("request"):
         state.update("approval_requests", request, status="approved", decided_by=approval.approver)
 
@@ -130,6 +133,8 @@ def _approval_denied(state: State, event: Event) -> None:
         decided_by=event.payload["by"],
         reason=event.payload.get("reason", ""),
     )
+    if req.kind == "repayment":
+        return  # the liability stands and the case stays open; the invoice isn't held
     state.update("invoices", req.subject, status="held")
 
 
@@ -200,7 +205,10 @@ def _bank_settled(state: State, event: Event) -> None:
     account = state.bank_accounts[txn.bank_account]
     state.update("bank_accounts", account.id, balance=account.balance + txn.amount)
     if txn.payment:
-        state.update("payments", txn.payment, status="settled", settled_on=state.day)
+        pay = state.payments[txn.payment]
+        # A misdirected payment still settles (the money is moving); it stays misdirected.
+        status = "misdirected" if pay.status == "misdirected" else "settled"
+        state.update("payments", txn.payment, status=status, settled_on=state.day)
     if txn.submission:
         state.update("bank_submissions", txn.submission, status="settled")
 
@@ -341,3 +349,65 @@ def _refund_stopped(state: State, event: Event) -> None:
 @handles("guard.alert")
 def _guard_alert(state: State, event: Event) -> None:
     """Blue's runtime monitor saw an invariant break (B2). Logged; it changes nothing."""
+
+
+@handles("approval.reminded")
+def _approval_reminded(state: State, event: Event) -> None:
+    req = state.approval_requests[event.payload["request"]]
+    state.update("approval_requests", req.id, reminders=req.reminders + 1)
+
+
+@handles("approval.reassigned")
+def _approval_reassigned(state: State, event: Event) -> None:
+    state.update("approval_requests", event.payload["request"], assigned_to=event.payload["to"])
+
+
+@handles("case.opened")
+def _case_opened(state: State, event: Event) -> None:
+    state.put("cases", Case.model_validate(event.payload["case"]))
+
+
+@handles("case.action")
+def _case_action(state: State, event: Event) -> None:
+    case = state.cases[event.payload["case"]]
+    state.update("cases", case.id, actions=[*case.actions, event.payload["action"]])
+
+
+@handles("case.resolved")
+def _case_resolved(state: State, event: Event) -> None:
+    state.update(
+        "cases", event.payload["case"], status="resolved", outcome=event.payload.get("outcome", "")
+    )
+
+
+@handles("payment.misdirected")
+def _payment_misdirected(state: State, event: Event) -> None:
+    pay = state.payments[event.payload["payment"]]
+    state.update("payments", pay.id, status="misdirected")
+    invoice = state.payment_instructions[pay.instruction].invoice
+    state.update("invoices", invoice, status="approved")  # the obligation is reinstated
+
+
+@handles("payment.recall_requested")
+def _recall_requested(state: State, event: Event) -> None:
+    state.update(
+        "payments", event.payload["payment"], recall="requested", recall_requested_on=state.day
+    )
+
+
+@handles("bank.recall_answered")
+def _recall_answered(state: State, event: Event) -> None:
+    pay = state.payments[event.payload["payment"]]
+    if event.payload["outcome"] == "succeeded":
+        for sub in event.payload["cancelled"]:
+            state.update("bank_submissions", sub, status="recalled")
+        state.update("payments", pay.id, recall="succeeded", status="recalled")
+    else:
+        state.update("payments", pay.id, recall="failed")
+
+
+@handles("vendor.account_rejected")
+def _vendor_account_rejected(state: State, event: Event) -> None:
+    state.update("vendor_bank_accounts", event.payload["account"], status="rejected")
+    if restored := event.payload.get("restored"):
+        state.update("vendor_bank_accounts", restored, status="verified")

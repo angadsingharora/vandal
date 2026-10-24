@@ -87,6 +87,18 @@ def schedule(days: int, start_day: int = 0) -> list[Step]:
     return steps
 
 
+def _alert_notice(step: Step, alert: dict[str, Any]) -> ChannelEvent:
+    """What the Operator hears when Blue's runtime monitor raises an alert."""
+    return ChannelEvent(
+        id=f"ALERT-{step.index:05d}-{alert['invariant']}-{alert['subject']}",
+        day=step.day,
+        channel="system",
+        sender="blue",
+        subject="guard_alert",
+        meta={"intent": "guard_alert", **alert},
+    )
+
+
 def _signal(step: Step, channel: str, subject: str) -> ChannelEvent:
     return ChannelEvent(
         id=f"CH-{step.index:05d}",
@@ -122,10 +134,16 @@ def run_step(
     approver: FinanceOperator,
     env: Environment | None = None,
 ) -> None:
+    if step.kind == "ops":
+        # Open cases come up first thing each business day (O2).
+        for case in [c for c in run.state.cases.values() if c.status == "open"]:
+            operator.on_case(case, tools)
     _run_step(run, tools, step, operator, approver)
     settle(run, tools, operator, env)
     if run.monitor is not None:
-        run.monitor(run, step)
+        for alert in run.monitor(run, step) or []:
+            operator.on_event(_alert_notice(step, alert), tools)
+        settle(run, tools, operator, env)
 
 
 def _run_step(
@@ -140,6 +158,8 @@ def _run_step(
             operator.on_event(_signal(step, "system", "payment_batch"), tools)
         case "bank":
             for kind, payload in bank.settle_due(run.state):
+                run.emit(kind, payload, actor="bank")
+            for kind, payload in bank.answer_recalls(run.state):
                 run.emit(kind, payload, actor="bank")
             operator.on_event(_signal(step, "bank_feed", "bank_feed"), tools)
         case "tick":

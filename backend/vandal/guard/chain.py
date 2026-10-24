@@ -58,24 +58,24 @@ class RuntimeMonitor:
         self.checker = checker
         self.seen: set[tuple[str, str]] = set()
 
-    def __call__(self, run, step) -> None:
+    def __call__(self, run, step) -> list[dict[str, Any]]:
+        """Raise a guard.alert for each new violation; return them so the World can tell the
+        Operator (who opens a case, O2)."""
+        alerts = []
         for v in self.checker(run.state):
             key = (v.invariant, v.subject)
             if key in self.seen:
                 continue
             self.seen.add(key)
-            executed = v.subject in run.state.payments and run.state.payments[
-                v.subject
-            ].status not in ("scheduled",)
-            run.emit(
-                "guard.alert",
-                {
-                    "invariant": v.invariant,
-                    "subject": v.subject,
-                    "message": v.message,
-                    "cites": list(v.cites),
-                    "step": {"index": step.index, "day": step.day, "kind": step.kind},
-                    "after_execution": executed,
-                },
-                actor="blue",
-            )
+            pay = run.state.payments.get(v.subject)
+            payload = {
+                "invariant": v.invariant,
+                "subject": v.subject,
+                "message": v.message,
+                "cites": list(v.cites),
+                "step": {"index": step.index, "day": step.day, "kind": step.kind},
+                "after_execution": pay is not None and pay.status != "scheduled",
+            }
+            run.emit("guard.alert", payload, actor="blue")
+            alerts.append(payload)
+        return alerts

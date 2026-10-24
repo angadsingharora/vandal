@@ -46,6 +46,7 @@ class ApproverSpec(_Spec):
     id: str
     name: str
     max_amount: Cents | None
+    response_days: int = 0  # how long the simulated approver takes to answer (O3)
 
 
 class ApprovalMatrix(_Spec):
