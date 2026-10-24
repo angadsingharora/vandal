@@ -183,3 +183,60 @@ def test_o3_refunds_and_cash_application_go_through_the_gate() -> None:
         e.caused_by and state.events[int(e.caused_by[0].split("-")[1])].kind == "gate.verdict"
         for e in money_events
     )
+
+
+def test_o2_a_recall_that_succeeds_brings_the_cash_back() -> None:
+    """Settlement delayed past the recall window: the bank cancels the submission, the Operator
+    books Dr Cash / Cr receivable the same bank step, and the books stay tied out throughout."""
+    delay = Move(kind="fault", at=2, params={"kind": "delay", "days": 4})
+    sb = new_sandbox(monitor=True)
+
+    def tied_out(step, state):
+        broken = [v.invariant for v in check(state) if v.invariant in ("INV-1", "INV-7")]
+        assert broken == [], (step, broken)
+
+    state = run(sb, [delay, *Trace.load(TRACE).moves], days=5, each_step=tied_out)
+    pay = state.payments["PAY-0057"]
+    assert pay.recall == "succeeded" and pay.status == "recalled" and pay.settled_on is None
+    assert ledger.balance(state, ledger.MISDIRECTED_RECEIVABLE) == 0
+    (case,) = state.cases.values()
+    assert "booked the recall of PAY-0057" in case.actions
+    assert case.status == "resolved" and case.outcome == "recalled; vendor re-paid"
+    assert state.invoices["INV-1042"].status == "paid"
+
+
+def test_o2_a_denied_repayment_is_asked_once() -> None:
+    """Deny every repayment: the Operator records it, leaves the case open, and never asks again
+    with the same instruction."""
+    from vandal.contracts.entities import Actor as _Actor
+    from vandal.twin.flows import DecideArgs
+
+    class Denier:
+        """Approves payments as usual, denies every repayment."""
+
+        def __init__(self, usual):
+            self.usual = usual
+
+        def on_event(self, ev, tools):
+            if ev.subject != "approvals_inbox":
+                return
+            for req in list(tools.view.approval_requests.values()):
+                if req.status == "pending" and req.kind == "repayment":
+                    tools.call(
+                        _Actor(id="U-CTRL", role="approver"),
+                        "approvals.decide",
+                        DecideArgs(request=req.id, approve=False, reason="not now"),
+                    )
+            self.usual.on_event(ev, tools)
+
+        def on_case(self, case, tools):
+            pass
+
+    sb = new_sandbox(monitor=True)
+    sb.approver = Denier(sb.approver)
+    state = run(sb, Trace.load(TRACE).moves, days=4)
+    repayments = [r for r in state.approval_requests.values() if r.kind == "repayment"]
+    assert len(repayments) == 1 and repayments[0].status == "denied"
+    (case,) = state.cases.values()
+    assert case.status == "open"
+    assert state.invoices["INV-1042"].status in ("approved", "scheduled")  # liability stands

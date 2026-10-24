@@ -237,6 +237,9 @@ def _grant(
         "approved_instruction": instr.model_dump(),
         "instruction_hash": instruction_hash(instr),
     }
+    granted = ("approval.granted", {"approval": approval, "request": request})
+    if kind == "repayment":
+        return [granted]  # the liability was reinstated when the payment was marked misdirected
     je = ledger.invoice_approved(
         ledger.next_entry_id(state),
         state.day,
@@ -244,9 +247,6 @@ def _grant(
         state.vendors[inv.vendor].gl_account,
         inv.amount,
     )
-    granted = ("approval.granted", {"approval": approval, "request": request})
-    if kind == "repayment":
-        return [granted]  # the liability was reinstated when the payment was marked misdirected
     return [granted, ("journal.posted", {"entry": je.model_dump()})]
 
 

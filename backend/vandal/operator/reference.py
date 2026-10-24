@@ -66,6 +66,7 @@ class ReferenceOperator:
                 self._reconcile(tools)
                 self._apply_cash(tools)
                 self._retry_timeouts(tools)
+                self._work_cases(tools)  # the bank may have answered a recall today
             case "retry_timer":
                 self._retry_timeouts(tools)
             case _ if ev.meta.get("intent") in ("vendor_bank_change", "vendor_contact_change"):
@@ -132,6 +133,10 @@ class ReferenceOperator:
         case = next(c for c in tools.view.cases.values() if c.subject == payment)
         self.on_case(case, tools)
 
+    def _work_cases(self, tools: Tools) -> None:
+        for case in [c for c in tools.view.cases.values() if c.status == "open"]:
+            self.on_case(case, tools)
+
     def on_case(self, case: Case, tools: Tools) -> None:
         """Work a recovery case one step further each time it comes up. Every step is a tool
         call through Blue; re-paying the vendor waits for a human in the approvals inbox."""
@@ -172,9 +177,10 @@ class ReferenceOperator:
             and p.status in ("submitted", "acknowledged", "settled")
             and state.payment_instructions[p.instruction].invoice == invoice
         ]
+        # One request per case: a denied repayment is never resubmitted unchanged (DESIGN 6);
+        # the case stays open for a person to decide what happens next.
         asked = any(
-            r.subject == invoice and r.kind == "repayment" and r.status in ("pending", "approved")
-            for r in state.approval_requests.values()
+            r.subject == invoice and r.kind == "repayment" for r in state.approval_requests.values()
         )
         if not repaid and not asked and state.invoices[invoice].status in ("approved", "scheduled"):
             tools.call(
@@ -463,6 +469,10 @@ class SimulatedApprover:
                 "approvals.decide",
                 DecideArgs(request=req.id, approve=approve, reason=reason),
             )
+
+    def _work_cases(self, tools: Tools) -> None:
+        for case in [c for c in tools.view.cases.values() if c.status == "open"]:
+            self.on_case(case, tools)
 
     def on_case(self, case: Case, tools: Tools) -> None:
         """The approver has no cases."""

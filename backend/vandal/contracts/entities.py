@@ -170,8 +170,8 @@ class Approval(Entity):  # APR-…
     subject: str
     requested_by: str
     approver: str
-    via: Literal["approvals_inbox", "policy"] = "approvals_inbox"
-    kind: Literal["payment", "repayment"] = "payment"  # policy = gate, under threshold
+    via: Literal["approvals_inbox", "policy"] = "approvals_inbox"  # policy = gate, under threshold
+    kind: Literal["payment", "repayment"] = "payment"  # repayment: after a misdirected payment
     approved_instruction: ApprovedInstruction
     instruction_hash: str
 
