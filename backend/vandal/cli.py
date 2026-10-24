@@ -164,7 +164,8 @@ def cmd_search(args: argparse.Namespace) -> int:
     if result.best is None:
         print(f"no violations within depth {result.depth}")
         return 0
-    print(f"  violating         {len(result.findings)} sequences at depth {len(result.best.moves)}")
+    n, shortest = len(result.findings), len(result.best.moves)
+    print(f"  violating         {n} sequences (shortest: {shortest} moves)")
 
     def violated(moves):
         return set(replay(args.seed, moves, sandbox=factory, days=scenario.days).violated)

@@ -58,7 +58,7 @@ class SearchResult(BaseModel):
     deduped: int  # runs whose state was already seen
     pruned: int  # canonical-order skips (partial-order reduction)
     levels: list[int]  # sequences run per depth
-    findings: list[Finding]  # every violating sequence at the depth where violations appeared
+    findings: list[Finding]  # first violating depth only, or every depth if exhaustive
     best: Finding | None
     seconds: float
     workers: int
