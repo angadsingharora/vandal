@@ -288,6 +288,18 @@ def _execution(state: State, index: EventIndex, inv, pay, instr, approval) -> Li
                 provenance["entities"],
             )
         )
+    elif fresh := _fresh_callback_contacts(state, instr.payee_account):
+        # Verified by an outbound call, but to a contact that was itself changed shortly before
+        # the request: the callback proved only that whoever controls that number said yes.
+        gaps.append(
+            (
+                "verification_channel",
+                f"{instr.payee_account} was verified by calling "
+                f"{', '.join(c for c, _ in fresh)}, a contact changed on day "
+                f"{fresh[0][1]}, inside the request's window",
+                provenance["entities"] + [c for c, _ in fresh],
+            )
+        )
 
     siblings = _paid_invoices(state).get(inv.id, [])
     if len(siblings) > 1:
@@ -324,6 +336,26 @@ def _execution(state: State, index: EventIndex, inv, pay, instr, approval) -> Li
         events=events,
         facts=facts,
     )
+
+
+def _fresh_callback_contacts(state: State, account: str, window: int = 30) -> list[tuple[str, int]]:
+    """Contacts dialed in the callbacks that verified `account`, if they were added within
+    `window` days before the change request: (contact, valid_from)."""
+    acct = state.vendor_bank_accounts.get(account)
+    if acct is None or not acct.source.startswith("change_request:"):
+        return []
+    cr = state.change_requests.get(acct.source.split(":", 1)[1])
+    if cr is None:
+        return []
+    out = []
+    for ev_id in cr.evidence:
+        ev = state.evidence[ev_id]
+        if ev.channel != "phone_outbound" or not ev.confirms or ev.contact is None:
+            continue
+        contact = state.vendor_contacts.get(ev.contact)
+        if contact and contact.valid_from > cr.received_on - window:
+            out.append((contact.id, contact.valid_from))
+    return out
 
 
 def _account_provenance(state: State, index: EventIndex, account: str) -> dict[str, list[str]]:

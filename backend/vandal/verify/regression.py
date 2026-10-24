@@ -477,7 +477,7 @@ def run_case(case: Case, factory: SandboxFactory, seed: int = 7) -> CaseResult:
         status="failed" if problems else "passed",
         problems=problems,
         violations=violations,
-        holds=verdicts.count("hold"),
+        holds=verdicts.count("hold") + verdicts.count("escalate"),  # both wait on someone
         blocks=verdicts.count("block"),
     )
 

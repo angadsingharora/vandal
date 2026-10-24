@@ -317,7 +317,79 @@ def cmd_verify(args: argparse.Namespace) -> int:
     return 0 if pack.approvable else 1
 
 
+def cmd_synth(args: argparse.Namespace) -> int:
+    from functools import partial
+
+    from vandal.sandbox import new_sandbox
+    from vandal.synth.cegis import cegis
+    from vandal.synth.propose import LLMProposer, SweepProposer
+    from vandal.twin.profile import load_profile
+    from vandal.verify.evidence_pack import Candidate
+    from vandal.verify.suite import verify
+
+    profile = load_profile(args.profile)
+    parent = load_policy(args.policy)
+    proposer = SweepProposer(profile) if args.no_llm else LLMProposer(profile)
+    print(
+        f"synthesizing from {parent.version} ({'sweep' if args.no_llm else 'LLM, sweep fallback'}, "
+        f"depth {args.depth}, up to {args.max_iterations} iterations)"
+    )
+
+    def show(e) -> None:
+        print(f"  it{e.iteration} {e.outcome:<14} {e.candidate}")
+        print(f"      {e.detail}" + (f"  [score {e.score:,}]" if e.score is not None else ""))
+
+    def factory_for(p):
+        return partial(new_sandbox, args.profile, policy=p)
+
+    result = cegis(
+        parent,
+        factory_for,
+        profile=profile,
+        proposer=proposer,
+        seed=args.seed,
+        depth=args.depth,
+        workers=args.workers,
+        max_iterations=args.max_iterations,
+        version=args.version,
+        on_entry=show,
+    )
+    for note in result.notes:
+        print(f"  note: {note}")
+    refuted = sum(1 for e in result.log if e.outcome != "survived")
+    print(f"{result.status}: {result.reason} ({len(result.log)} candidates, {refuted} refuted)")
+    if result.status != "repaired" or result.policy is None:
+        return 1
+    for line in result.chosen:
+        print(f"  + {line}")
+    candidates = [
+        Candidate(
+            source=f"cegis it{e.iteration} ({e.source})",
+            controls=[*e.base, e.candidate],
+            lint=e.lint,
+            result=f"{e.outcome}: {e.detail}",
+        )
+        for e in result.log
+    ]
+    pack = verify(
+        result.policy,
+        parent,
+        factory_for,
+        profile=args.profile,
+        seed=args.seed,
+        depth=args.depth,
+        workers=args.workers,
+        candidates=candidates,
+    )
+    for c in pack.checks:
+        print(f"  {'PASS' if c.passed else 'FAIL'}  {c.number} {c.name:<11} {c.detail}")
+    path = pack.write(args.out)
+    print(f"{'approvable' if pack.approvable else 'NOT approvable'}: wrote {path}")
+    return 0 if pack.approvable else 1
+
+
 IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {
+    "synth": cmd_synth,
     "verify": cmd_verify,
     "search": cmd_search,
     "seed": cmd_seed,
@@ -333,13 +405,17 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="command", required=True)
     for name, (help_text, _slice) in COMMANDS.items():
         cmd = sub.add_parser(name, help=help_text)
-        if name in ("seed", "run", "attack", "search", "verify"):
+        if name in ("seed", "run", "attack", "search", "verify", "synth"):
             cmd.add_argument("--profile", default="bayline", help="profile name or YAML path")
             cmd.add_argument("--seed", type=int, default=DEFAULT_SEED)
-        if name in ("run", "attack", "search", "verify"):
+        if name in ("run", "attack", "search", "verify", "synth"):
             cmd.add_argument("--policy", help="v0, a name under policies/, or a JSON path")
-        if name == "verify":
-            cmd.add_argument("--parent", help="policy to compare against (default: its parent)")
+        if name == "synth":
+            cmd.add_argument("--no-llm", action="store_true", help="enumerative sweep only")
+            cmd.add_argument("--max-iterations", type=int, default=4)
+            cmd.add_argument("--version", default="v1-synth", help="name of the new policy")
+        if name in ("verify", "synth"):
+            cmd.add_argument("--out", default="evidence", help="directory for the evidence pack")
             cmd.add_argument(
                 "--depth", type=int, default=int(os.environ.get("SEARCH_DEPTH", DEFAULT_DEPTH))
             )
@@ -348,7 +424,8 @@ def build_parser() -> argparse.ArgumentParser:
                 type=int,
                 default=int(os.environ.get("SEARCH_WORKERS", min(8, os.cpu_count() or 1))),
             )
-            cmd.add_argument("--out", default="evidence", help="directory for the evidence pack")
+        if name == "verify":
+            cmd.add_argument("--parent", help="policy to compare against (default: its parent)")
         if name == "run":
             cmd.add_argument("--days", type=int, default=5)
         if name == "search":
