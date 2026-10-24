@@ -6,7 +6,6 @@ import argparse
 import os
 import sys
 from collections.abc import Callable
-from pathlib import Path
 
 # Exhaustive depth 4 takes ~75s even with partial-order reduction and 8-10 workers, so the
 # default is 3 (IMPLEMENTATION R4, step 5). --depth 4 still works.
@@ -33,19 +32,10 @@ def cmd_seed(args: argparse.Namespace) -> int:
     return 0
 
 
-POLICIES_DIR = Path(__file__).resolve().parents[1] / "policies"
-
-
 def load_policy(name: str | None):
-    """`v0`, a name under policies/ (`v1` -> policies/v1.json), or a path."""
-    from vandal.synth.templates import V0, Policy
+    from vandal.synth.templates import load_policy as load
 
-    if not name or name == "v0":
-        return V0
-    path = Path(name)
-    if not path.suffix:
-        path = POLICIES_DIR / f"{name}.json"
-    return Policy.load(path)
+    return load(name)
 
 
 def _policy(args: argparse.Namespace):

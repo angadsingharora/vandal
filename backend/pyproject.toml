@@ -8,6 +8,7 @@ dependencies = [
     "pydantic>=2.9",
     "pyyaml>=6.0.3",
     "sqlalchemy>=2.0",
+    "uvicorn>=0.30",
 ]
 
 [project.scripts]
@@ -20,6 +21,7 @@ postgres = [
 
 [dependency-groups]
 dev = [
+    "httpx>=0.27",
     "pytest>=8.3",
     "ruff>=0.8",
 ]
@@ -35,6 +37,10 @@ module-root = ""
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+filterwarnings = [
+    # starlette's TestClient nudges toward httpx2; harmless for our tests
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
 
 [tool.ruff]
 line-length = 100
