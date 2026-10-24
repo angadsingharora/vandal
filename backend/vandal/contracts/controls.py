@@ -11,6 +11,7 @@ Stage = Literal[
     "invoice.match",
     "pre_approve",
     "change_request",
+    "verification",
     "schedule",
     "pre_execute",
     "submit",
@@ -71,5 +72,7 @@ class Control(BaseModel):
     params: dict[str, str | int | list[str]]
 
     def compile(self) -> list[Check]:
-        # Per-template compilation lands with synth/templates.py in R6.
-        raise NotImplementedError(f"{self.template}.compile() lands in R6")
+        # The templates live in synth/; imported here lazily so contracts stay a leaf.
+        from vandal.synth.templates import compile_control
+
+        return compile_control(self)

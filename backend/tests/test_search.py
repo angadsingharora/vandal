@@ -30,26 +30,29 @@ def found():
 
 def test_vendor_classes_cover_exposure_not_the_answer() -> None:
     state, profile = seed_state(), load_profile()
-    over, under, none = vendor_classes(state, profile)
+    over, under = vendor_classes(state, profile)
     assert over == "V-007"  # the only vendor with an open invoice over $25k
-    assert state.invoices and under != over
     open_vendors = {i.vendor for i in state.invoices.values() if i.status == "received"}
-    assert under in open_vendors and none not in open_vendors
+    assert under in open_vendors and under != over
+
+
+def _caps(profile, **changes):
+    return profile.model_copy(
+        update={"attacker_capabilities": profile.attacker_capabilities.model_copy(update=changes)}
+    )
 
 
 def test_alphabet_respects_attacker_capabilities() -> None:
     state, profile = seed_state(), load_profile()
     alphabet = build_alphabet(A, state, profile)
-    assert len(alphabet) == 5 * (3 * 2 * 2 + 1)
-    assert {m.params.get("channel") for m in alphabet} == {None, "email", "agent_msg"}
-    narrow = profile.model_copy(
-        update={
-            "attacker_capabilities": profile.attacker_capabilities.model_copy(
-                update={"senders": ["lookalike"]}
-            )
-        }
-    )
-    assert len(build_alphabet(A, state, narrow)) == 5 * (3 * 2 * 1 + 1)
+    # per insertion point: 2 vendors x {bank, contact} x 2 senders, 2 vendors x 2 confirmation
+    # channels, and one batch trigger
+    assert len(alphabet) == 5 * (2 * 2 * 2 + 2 * 2 + 1)
+    assert {m.kind for m in alphabet} == {"change_request", "inbound_confirmation", "trigger_batch"}
+    assert {m.params.get("channel") for m in alphabet} == {None, "email", "phone_in", "video"}
+    assert len(build_alphabet(A, state, _caps(profile, senders=["lookalike"]))) == 5 * (4 + 4 + 1)
+    no_fakes = _caps(profile, spoof_caller_id=False, clone_voice=False)
+    assert not [m for m in build_alphabet(A, state, no_fakes) if m.kind == "inbound_confirmation"]
 
 
 def test_search_finds_scenario_a_unaided(found) -> None:

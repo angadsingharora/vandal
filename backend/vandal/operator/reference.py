@@ -11,8 +11,11 @@ from vandal.contracts.events import ChannelEvent
 from vandal.contracts.interfaces import Tools
 from vandal.twin.facts import match_facts, prior_settled_payments
 from vandal.twin.flows import (
+    CallbackArgs,
+    ChangeRef,
     ChangeRequestArgs,
     DecideArgs,
+    InboundEvidenceArgs,
     InvoiceRef,
     PaymentRef,
     ScheduleArgs,
@@ -36,8 +39,12 @@ class ReferenceOperator:
                 self._pay(tools)
             case "bank_feed":
                 self._reconcile(tools)
-            case _ if ev.meta.get("intent") == "vendor_bank_change":
+            case _ if ev.meta.get("intent") in ("vendor_bank_change", "vendor_contact_change"):
                 self._change_request(ev, tools)
+            case _ if ev.meta.get("intent") == "change_confirmation":
+                self._inbound_confirmation(ev, tools)
+            case _ if ev.meta.get("intent") == "callback_answered":
+                self._apply(str(ev.meta["request"]), tools)
 
     def on_case(self, case: Case, tools: Tools) -> None:
         """Exceptions and recovery land in O2."""
@@ -68,21 +75,76 @@ class ReferenceOperator:
                 tools.call(self.actor, "payments.submit", PaymentRef(payment=pay.id))
 
     def _change_request(self, ev: ChannelEvent, tools: Tools) -> None:
-        """Intake of a bank-detail change. The reference Operator reads the structured fields
+        """Intake of a vendor-master change. The reference Operator reads the structured fields
         the message carries; the LLM Operator (O1) extracts them from the body instead."""
         m = ev.meta
-        tools.call(
+        bank = m["intent"] == "vendor_bank_change"
+        result = tools.call(
             self.actor,
             "vendors.change_request",
             ChangeRequestArgs(
                 vendor=str(m["vendor"]),
+                fields="bank" if bank else "contact",
                 channel=ev.channel,
                 sender=ev.sender,
                 message=ev.id,
-                routing=str(m["routing"]),
-                account=str(m["account"]),
+                routing=str(m["routing"]) if bank else None,
+                account=str(m["account"]) if bank else None,
+                contact_name=None if bank else str(m.get("contact_name", "")),
+                contact_email=None if bank else str(m.get("contact_email", "")),
+                contact_phone=None if bank else str(m.get("contact_phone", "")),
             ),
         )
+        held = [
+            c
+            for c in tools.view.change_requests.values()
+            if c.message == ev.id and c.status == "held"
+        ]
+        if held:
+            self._verify(held[-1].id, result.verdict.facts.get("gate.requires", []), tools)
+
+    def _verify(self, change: str, requires: list[dict], tools: Tools) -> None:
+        """Answer an evidence-gated hold the way the control asks: an outbound callback to the
+        contact on file as of `contact_as_of`. Inbound calls are never solicited."""
+        for req in requires:
+            if "phone_outbound" in req.get("accepted_channels", []):
+                tools.call(
+                    self.actor,
+                    "evidence.request_callback",
+                    CallbackArgs(
+                        change=change,
+                        contact_as_of=req.get("contact_as_of") or "before_request",
+                        window_days=req.get("window_days"),
+                    ),
+                )
+                return
+
+    def _inbound_confirmation(self, ev: ChannelEvent, tools: Tools) -> None:
+        """Someone calls in to confirm a pending change: record it as evidence, then let the
+        gate decide whether that evidence is enough."""
+        vendor = str(ev.meta["vendor"])
+        result = tools.call(
+            self.actor,
+            "evidence.record_inbound",
+            InboundEvidenceArgs(
+                vendor=vendor,
+                channel=ev.channel,
+                message=ev.id,
+                voice_match=ev.meta.get("voice_match"),
+            ),
+        )
+        if result.ok:
+            held = [
+                c
+                for c in tools.view.change_requests.values()
+                if c.vendor == vendor and c.status == "held"
+            ]
+            self._apply(held[-1].id, tools)
+
+    def _apply(self, change: str, tools: Tools) -> None:
+        cr = tools.view.change_requests.get(change)
+        if cr is not None and cr.status == "held":
+            tools.call(self.actor, "vendors.apply_change", ChangeRef(change=change))
 
     def _reconcile(self, tools: Tools) -> None:
         for txn in list(tools.view.bank_transactions.values()):

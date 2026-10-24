@@ -9,7 +9,8 @@ Each business day runs the same steps in order:
   tick       the clock advances one business day
 
 Search (R4) inserts adversary moves between these steps; a move's `at` is a step index.
-Operators are passed in, never imported, so the twin stays independent of any one agent.
+Operators are passed in, never imported, so the twin stays independent of any one agent. So is
+the Environment (twin/evidence.py), which answers callbacks; Tools never see it.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from typing import Any, Literal
 from vandal.contracts.events import ChannelEvent, Event
 from vandal.contracts.interfaces import FinanceOperator, Tools
 from vandal.twin import bank
+from vandal.twin.evidence import Environment, LegitEnvironment, answer_callbacks, answered_notice
 from vandal.twin.reducer import apply_in_place
 from vandal.twin.state import State
 
@@ -80,7 +82,36 @@ def _signal(step: Step, channel: str, subject: str) -> ChannelEvent:
     )
 
 
+def settle(
+    run: Run, tools: Tools, operator: FinanceOperator, env: Environment | None, rounds: int = 8
+) -> None:
+    """Let the environment answer what the Operator just set in motion (outbound callbacks),
+    and tell the Operator, until nothing is pending. Synchronous, like a phone call."""
+    env = env or LegitEnvironment()
+    for _ in range(rounds):
+        answers = answer_callbacks(run.state, env)
+        if not answers:
+            return
+        for kind, payload in answers:
+            run.emit(kind, payload, actor="phone")
+        for _kind, payload in answers:
+            evidence = run.state.evidence[payload["evidence"]]
+            operator.on_event(answered_notice(evidence, run.state.day), tools)
+
+
 def run_step(
+    run: Run,
+    tools: Tools,
+    step: Step,
+    operator: FinanceOperator,
+    approver: FinanceOperator,
+    env: Environment | None = None,
+) -> None:
+    _run_step(run, tools, step, operator, approver)
+    settle(run, tools, operator, env)
+
+
+def _run_step(
     run: Run, tools: Tools, step: Step, operator: FinanceOperator, approver: FinanceOperator
 ) -> None:
     match step.kind:

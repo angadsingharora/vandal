@@ -70,16 +70,27 @@ class VendorBankAccount(Entity):  # BA-…
     verified_on: SimDay | None = None
 
 
-class Evidence(Entity):
+EvidenceChannel = Literal["email", "portal", "agent_msg", "phone_in", "phone_outbound", "video"]
+
+
+class Evidence(Entity):  # EVD-…: verification of a change request (R6)
     change_request: str
-    channel: Literal["email", "portal", "agent_msg", "phone_in", "phone_outbound", "video"]
+    channel: EvidenceChannel
     direction: Literal["inbound", "outbound"]
-    contact_as_of: SimDay | None = None
-    authenticated: bool = False
+    received_on: SimDay
+    status: Literal["pending", "answered"] = "answered"  # an outbound callback starts pending
+    confirms: bool | None = None  # did the other party confirm the change?
+    contact: str | None = None  # the contact dialed (outbound) or claimed (inbound)
+    phone: str | None = None
+    contact_as_of: SimDay | None = None  # the day whose contact record was used
+    authenticated: bool = False  # outbound to a number on file, or an authenticated portal
+    voice_match: int | None = None  # percent, for inbound calls and video
+    message: str | None = None
 
 
 class VendorChangeRequest(Entity):  # CR-…
     vendor: str
+    fields: Literal["bank", "contact"] = "bank"
     proposed: dict[str, str]
     channel: Literal["email", "portal", "agent_msg"]
     sender: str

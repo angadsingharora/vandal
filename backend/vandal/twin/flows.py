@@ -17,7 +17,7 @@ import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -71,11 +71,32 @@ class ChangeRequestArgs(_Args):
     """A vendor-master change as the Operator extracted it from an inbound message."""
 
     vendor: str
+    fields: Literal["bank", "contact"] = "bank"
     channel: str
     sender: str
     message: str | None = None
-    routing: str
-    account: str
+    routing: str | None = None
+    account: str | None = None
+    contact_name: str | None = None
+    contact_email: str | None = None
+    contact_phone: str | None = None
+
+
+class ChangeRef(_Args):
+    change: str  # CR-…
+
+
+class CallbackArgs(_Args):
+    change: str
+    contact_as_of: Literal["current", "before_request"]
+    window_days: int | None = None
+
+
+class InboundEvidenceArgs(_Args):
+    vendor: str
+    channel: Literal["phone_in", "video"]
+    message: str | None = None
+    voice_match: int | None = None
 
 
 # --- Tool effects ---------------------------------------------------------------------------
@@ -271,10 +292,23 @@ def _reconcile(ctx: Ctx, args: TransactionRef) -> list[EventSpec]:
 def _change_request(state: State, args: ChangeRequestArgs, status: str) -> dict[str, Any]:
     if args.vendor not in state.vendors:
         raise ToolError(f"unknown vendor {args.vendor}")
+    if args.fields == "bank":
+        if not (args.routing and args.account):
+            raise ToolError("a bank change needs routing and account")
+        proposed = {"routing": args.routing, "account": args.account}
+    else:
+        if not args.contact_phone:
+            raise ToolError("a contact change needs at least a phone number")
+        proposed = {
+            "name": args.contact_name or "",
+            "email": args.contact_email or "",
+            "phone": args.contact_phone,
+        }
     return {
         "id": f"CR-{len(state.change_requests) + 1:04d}",
         "vendor": args.vendor,
-        "proposed": {"routing": args.routing, "account": args.account},
+        "fields": args.fields,
+        "proposed": proposed,
         "channel": args.channel,
         "sender": args.sender,
         "message": args.message,
@@ -283,30 +317,60 @@ def _change_request(state: State, args: ChangeRequestArgs, status: str) -> dict[
     }
 
 
-def _apply_change(ctx: Ctx, args: ChangeRequestArgs) -> list[EventSpec]:
-    """v0: the vendor master is updated as requested, with no verification."""
-    state = ctx.state
-    request = _change_request(state, args, "open")
+def _change_events(
+    state: State, request: dict[str, Any], verified_by: str | None = None
+) -> list[EventSpec]:
+    """Apply a change request to the vendor master. A bank account changed without evidence is
+    unverified; with evidence that cleared T1 it's verified by that evidence's channel."""
+    vendor = request["vendor"]
+    if request["fields"] == "contact":
+        ended = [
+            c.id
+            for c in state.vendor_contacts.values()
+            if c.vendor == vendor and c.valid_to is None
+        ]
+        p = request["proposed"]
+        contact = {
+            "id": f"VC-{len(state.vendor_contacts) + 1:04d}",
+            "vendor": vendor,
+            "name": p["name"],
+            "email": p["email"],
+            "phone": p["phone"],
+            "valid_from": state.day,
+        }
+        return [
+            (
+                "vendor.contact_changed",
+                {"request": request["id"], "contact": contact, "ended": ended},
+            )
+        ]
     superseded = [
         a.id
         for a in state.vendor_bank_accounts.values()
-        if a.vendor == args.vendor and a.status in ("verified", "unverified")
+        if a.vendor == vendor and a.status in ("verified", "unverified")
     ]
     account = {
         "id": f"BA-{len(state.vendor_bank_accounts) + 1:04d}",
-        "vendor": args.vendor,
-        "routing": args.routing,
-        "account": args.account,
-        "status": "unverified",
+        "vendor": vendor,
+        "routing": request["proposed"]["routing"],
+        "account": request["proposed"]["account"],
+        "status": "verified" if verified_by else "unverified",
         "source": f"change_request:{request['id']}",
+        "verified_by": verified_by,
+        "verified_on": state.day if verified_by else None,
     }
     return [
-        ("change_request.created", {"request": request}),
         (
             "vendor.bank_changed",
             {"request": request["id"], "account": account, "superseded": superseded},
-        ),
+        )
     ]
+
+
+def _new_change(ctx: Ctx, args: ChangeRequestArgs) -> list[EventSpec]:
+    """No control stopped it: v0 updates the vendor master as asked, with no verification."""
+    request = _change_request(ctx.state, args, "open")
+    return [("change_request.created", {"request": request})] + _change_events(ctx.state, request)
 
 
 def _stop_change(status: str) -> Effect:
@@ -319,6 +383,81 @@ def _stop_change(status: str) -> Effect:
         ]
 
     return effect
+
+
+def _held_change(state: State, change: str):
+    cr = state.change_requests.get(change)
+    if cr is None or cr.status != "held":
+        raise ToolError(f"{change} is not held")
+    return cr
+
+
+def _apply_held(ctx: Ctx, args: ChangeRef) -> list[EventSpec]:
+    """Apply a held change once the gate allows it. The evidence that cleared the hold, if any,
+    is what the new account is verified by."""
+    cr = _held_change(ctx.state, args.change)
+    cleared = ctx.verdict.facts.get("gate.cleared_evidence", [])
+    verified_by = ctx.state.evidence[cleared[0]].channel if cleared else None
+    return _change_events(ctx.state, cr.model_dump(mode="json"), verified_by)
+
+
+def _reject_held(ctx: Ctx, args: ChangeRef) -> list[EventSpec]:
+    _held_change(ctx.state, args.change)
+    return [("change_request.rejected", {"request": args.change, "checks": ctx.verdict.fired})]
+
+
+def _request_callback(ctx: Ctx, args: CallbackArgs) -> list[EventSpec]:
+    """Place an outbound call to the vendor contact on file as of the day the control names."""
+    from vandal.twin.evidence import contact_as_of_day, contact_on
+
+    state = ctx.state
+    cr = _held_change(state, args.change)
+    as_of = contact_as_of_day(cr, args.contact_as_of, args.window_days, state.day)
+    if any(
+        e.change_request == cr.id and e.channel == "phone_outbound" and e.contact_as_of == as_of
+        for e in state.evidence.values()
+    ):
+        raise ToolError(f"already called back on {cr.id} as of day {as_of}")
+    contact = contact_on(state, cr.vendor, as_of)
+    if contact is None:
+        raise ToolError(f"{cr.vendor} had no contact on file on day {as_of}")
+    evidence = {
+        "id": f"EVD-{len(state.evidence) + 1:04d}",
+        "change_request": cr.id,
+        "channel": "phone_outbound",
+        "direction": "outbound",
+        "received_on": state.day,
+        "status": "pending",
+        "contact": contact.id,
+        "phone": contact.phone,
+        "contact_as_of": as_of,
+        "authenticated": True,
+    }
+    return [("evidence.created", {"evidence": evidence})]
+
+
+def _record_inbound(ctx: Ctx, args: InboundEvidenceArgs) -> list[EventSpec]:
+    """Someone called in (or joined a video call) to confirm a pending change. Inbound evidence
+    is never authenticated: caller ID and voice can both be faked."""
+    state = ctx.state
+    held = [
+        c for c in state.change_requests.values() if c.vendor == args.vendor and c.status == "held"
+    ]
+    if not held:
+        raise ToolError(f"no held change request for {args.vendor}")
+    evidence = {
+        "id": f"EVD-{len(state.evidence) + 1:04d}",
+        "change_request": held[-1].id,
+        "channel": args.channel,
+        "direction": "inbound",
+        "received_on": state.day,
+        "status": "answered",
+        "confirms": True,
+        "authenticated": False,
+        "voice_match": args.voice_match,
+        "message": args.message,
+    }
+    return [("evidence.created", {"evidence": evidence})]
 
 
 @dataclass(frozen=True)
@@ -350,11 +489,20 @@ TOOLS: dict[str, ToolSpec] = {
         "change_request",
         ChangeRequestArgs,
         {
-            "allow": _apply_change,
+            "allow": _new_change,
             "hold": _stop_change("held"),
             "escalate": _stop_change("held"),
             "block": _stop_change("rejected"),
         },
+    ),
+    "vendors.apply_change": ToolSpec(
+        "change_request", ChangeRef, {"allow": _apply_held, "block": _reject_held}
+    ),
+    "evidence.request_callback": ToolSpec(
+        "verification", CallbackArgs, {"allow": _request_callback}
+    ),
+    "evidence.record_inbound": ToolSpec(
+        "verification", InboundEvidenceArgs, {"allow": _record_inbound}
     ),
 }
 

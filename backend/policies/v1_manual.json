@@ -1,0 +1,8 @@
+{
+  "version": "v1-manual",
+  "parent": "v0",
+  "controls": [
+    {"template": "T1", "params": {"accepted_channels": ["phone_outbound", "portal"], "contact_as_of": "before_request"}},
+    {"template": "T2", "params": {"bound_fields": ["amount", "payee_account"]}}
+  ]
+}

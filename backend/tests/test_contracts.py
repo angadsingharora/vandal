@@ -51,6 +51,8 @@ def test_hold_outranks_escalate() -> None:
     assert max(["escalate", "hold"], key=DECISION_ORDER.__getitem__) == "hold"
 
 
-def test_control_compile_is_not_yet_implemented() -> None:
-    with pytest.raises(NotImplementedError):
-        Control(template="T1", params={}).compile()
+def test_control_compile_validates_its_template_params() -> None:
+    with pytest.raises(ValidationError):
+        Control(template="T1", params={}).compile()  # T1 needs accepted_channels
+    checks = Control(template="T1", params={"accepted_channels": ["phone_outbound"]}).compile()
+    assert {c.stage for c in checks} == {"change_request", "pre_execute"}

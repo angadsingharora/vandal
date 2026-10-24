@@ -9,9 +9,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from vandal.contracts.interfaces import FinanceOperator
-from vandal.guard.checks import v0_checks
 from vandal.guard.gate import Gate
 from vandal.operator.reference import ReferenceOperator, SimulatedApprover
+from vandal.synth.templates import V0, Policy
 from vandal.twin.flows import GatedTools
 from vandal.twin.profile import Profile, load_profile
 from vandal.twin.seed import DEFAULT_SEED, seed_state
@@ -22,6 +22,7 @@ from vandal.verify.replay import RunResult, Trace, replay_trace
 @dataclass
 class Sandbox:
     profile: Profile
+    policy: Policy
     run: Run
     gate: Gate
     tools: GatedTools
@@ -33,12 +34,17 @@ class Sandbox:
         return self
 
 
-def new_sandbox(profile: Profile | str = "bayline", seed: int = DEFAULT_SEED) -> Sandbox:
+def new_sandbox(
+    profile: Profile | str = "bayline", seed: int = DEFAULT_SEED, *, policy: Policy | None = None
+) -> Sandbox:
+    """A fresh company under `policy` (v0 when omitted)."""
     profile = load_profile(profile) if isinstance(profile, str) else profile
     run = Run(seed_state(profile, seed=seed))
-    gate = Gate(v0_checks(profile.approval_matrix))
+    policy = policy or V0
+    gate = Gate(policy.checks(profile))
     return Sandbox(
         profile=profile,
+        policy=policy,
         run=run,
         gate=gate,
         tools=GatedTools(run, gate),

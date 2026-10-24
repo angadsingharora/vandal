@@ -1,6 +1,8 @@
 """R2: the gate (Blue core). Runs compiled Checks at each stage; the most restrictive match wins.
 
-The gate only sees deterministic facts. Evidence-gated holds (`Check.require`) land in R6.
+The gate only sees deterministic facts. A hold whose Check has a `require` clause clears only
+when the required evidence is on record (twin/evidence.satisfying); the verdict then names the
+evidence in `gate.cleared_evidence`, or says what it would take in `gate.requires`.
 
 Fail closed: if a check needs a fact the gate can't compute, the check fires anyway, at least as
 a hold, so a gap in facts.py can never let an action through. The verdict names the missing facts.
@@ -13,6 +15,7 @@ from typing import Any
 from vandal.contracts.controls import DECISION_ORDER, Check, Condition, Stage
 from vandal.contracts.interfaces import Action
 from vandal.contracts.verdicts import Verdict
+from vandal.twin.evidence import satisfying
 from vandal.twin.facts import facts
 from vandal.twin.state import State
 
@@ -46,6 +49,15 @@ def holds(cond: Condition, f: dict[str, Any]) -> bool:
     raise ValueError(f"unknown op {cond.op!r}")
 
 
+def _cleared_by(state: State, f: dict[str, Any], check: Check) -> list[str]:
+    """Evidence that clears an evidence-gated hold. Only recorded evidence counts: what anyone
+    says in a conversation never does."""
+    subject = f.get("change.id")
+    if not subject or check.require is None:
+        return []
+    return satisfying(state, subject, check.require)
+
+
 class Gate:
     def __init__(self, checks: list[Check]) -> None:
         self.checks = list(checks)
@@ -55,6 +67,9 @@ class Gate:
         fired: list[str] = []
         decisions: list[str] = []
         missing: set[str] = set()
+        requires: list[dict] = []  # holds that evidence could clear: what it would take
+        cleared: list[str] = []
+        cleared_evidence: set[str] = set()
         for c in self.checks:
             if c.stage != stage:
                 continue
@@ -64,9 +79,21 @@ class Gate:
                 fired.append(c.id)
                 decisions.append(max(c.action, "hold", key=DECISION_ORDER.__getitem__))
             elif all(holds(cond, f) for cond in c.when.all):
+                if c.action == "hold" and c.require is not None:
+                    evidence = _cleared_by(state, f, c)
+                    if evidence:
+                        cleared.append(c.id)
+                        cleared_evidence |= set(evidence)
+                        continue
+                    requires.append({"check": c.id, **c.require.model_dump()})
                 fired.append(c.id)
                 decisions.append(c.action)
         if missing:
             f = {**f, "gate.missing_facts": sorted(missing)}
+        if requires:
+            f = {**f, "gate.requires": requires}
+        if cleared:
+            f = {**f, "gate.cleared": cleared, "gate.cleared_evidence": sorted(cleared_evidence)}
+            cites = cites + sorted(cleared_evidence)
         decision = max(decisions, key=DECISION_ORDER.__getitem__, default="allow")
         return Verdict(decision=decision, fired=fired, facts=f, cites=cites)
