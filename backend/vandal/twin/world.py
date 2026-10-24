@@ -15,7 +15,7 @@ the Environment (twin/evidence.py), which answers callbacks; Tools never see it.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -33,8 +33,10 @@ DAY_STEPS: tuple[StepKind, ...] = ("ops", "approvals", "batch", "bank", "tick")
 class Run:
     """Owns one run's state and its append-only event log."""
 
-    def __init__(self, state: State) -> None:
+    def __init__(self, state: State, sink: Callable[[Event], None] | None = None) -> None:
+        """`sink` sees every event after it's applied (persistence, R12; live streams, A0)."""
         self.state = state.clone()
+        self.sink = sink
 
     def emit(
         self,
@@ -58,6 +60,8 @@ class Run:
             },
         )
         apply_in_place(self.state, event)
+        if self.sink is not None:
+            self.sink(event)
         return event
 
 

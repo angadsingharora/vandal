@@ -11,7 +11,16 @@ def test_help_lists_every_command(capsys) -> None:
     out = capsys.readouterr().out
     for name in ("seed", "run", "attack", "search", "synth", "verify", "inject"):
         assert name in out
-    assert set(COMMANDS) == {"seed", "run", "attack", "search", "synth", "verify", "inject"}
+    assert set(COMMANDS) == {
+        "seed",
+        "run",
+        "attack",
+        "search",
+        "synth",
+        "verify",
+        "inject",
+        "rebuild",
+    }
 
 
 def test_stub_commands_exit_nonzero() -> None:

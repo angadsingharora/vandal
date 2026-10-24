@@ -20,6 +20,7 @@ COMMANDS: dict[str, tuple[str, str]] = {
     "synth": ("Diagnose and synthesize a control (CEGIS)", "R8"),
     "verify": ("Run the verification suite against a policy", "R7"),
     "inject": ("Run a user-authored threat in plain language", "R9"),
+    "rebuild": ("Rebuild a persisted run from its events and check its hash", "R12"),
 }
 
 
@@ -73,8 +74,26 @@ def cmd_run(args: argparse.Namespace) -> int:
     from vandal.sandbox import new_sandbox
     from vandal.verify.invariants import check
 
-    sb = new_sandbox(args.profile, seed=args.seed, policy=_policy(args)).operate(args.days)
+    policy = _policy(args)
+    store = writer = run_id = None
+    if args.persist:
+        from vandal.api.db import Store
+
+        store = Store(args.db)
+        store.migrate()
+        run_id = store.create_run(
+            kind="operate", profile=args.profile, policy=policy.version, seed=args.seed
+        )
+        writer = store.writer(run_id)
+    sb = new_sandbox(args.profile, seed=args.seed, policy=policy, sink=writer)
+    sb.operate(args.days)
     state = sb.run.state
+    if store is not None and writer is not None and run_id is not None:
+        writer.flush()
+        store.finish_run(
+            run_id,
+            {"days": args.days, "events": len(state.events), "state_hash": state.state_hash()},
+        )
     verdicts = Counter(
         e.payload["verdict"]["decision"] for e in state.events if e.kind == "gate.verdict"
     )
@@ -92,7 +111,28 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(f"    {v.invariant}: {v.message}")
     print(f"  events           {len(state.events)}")
     print(f"  state_hash       {state.state_hash()}")
+    if run_id is not None:
+        print(f"  persisted        {run_id} ({writer.written} events) in {store.dialect}")
     return 1 if violations else 0
+
+
+def cmd_rebuild(args: argparse.Namespace) -> int:
+    from vandal.api.db import Store
+
+    store = Store(args.db)
+    row = store.run_row(args.run_id)
+    state = store.rebuild(args.run_id)
+    recorded = (row["summary"] or {}).get("state_hash")
+    rebuilt = state.state_hash()
+    print(
+        f"run {args.run_id}: {row['kind']} on {row['profile']} (seed {row['seed']}, "
+        f"policy {row['policy']}), {len(state.events)} events"
+    )
+    print(f"  recorded   {recorded}")
+    print(f"  rebuilt    {rebuilt}")
+    same = recorded == rebuilt
+    print("  identical" if same else "  MISMATCH")
+    return 0 if same else 1
 
 
 def cmd_attack(args: argparse.Namespace) -> int:
@@ -393,6 +433,7 @@ def cmd_synth(args: argparse.Namespace) -> int:
 
 
 IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {
+    "rebuild": cmd_rebuild,
     "synth": cmd_synth,
     "verify": cmd_verify,
     "search": cmd_search,
@@ -435,6 +476,15 @@ def build_parser() -> argparse.ArgumentParser:
             cmd.add_argument("--scenario", default="a", help="threat family to repair")
         if name == "run":
             cmd.add_argument("--days", type=int, default=5)
+            cmd.add_argument(
+                "--persist",
+                action="store_true",
+                help="write the run and its events to the database",
+            )
+        if name in ("run", "rebuild"):
+            cmd.add_argument("--db", help="database URL (default: DATABASE_URL, else SQLite)")
+        if name == "rebuild":
+            cmd.add_argument("run_id")
         if name == "search":
             cmd.add_argument("--scenario", default="a", help="scenario name (search/alphabet.py)")
             cmd.add_argument(

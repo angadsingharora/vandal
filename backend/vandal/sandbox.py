@@ -6,8 +6,10 @@ receive the Operator from here and never import it themselves.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
+from vandal.contracts.events import Event
 from vandal.contracts.interfaces import FinanceOperator
 from vandal.guard.gate import Gate
 from vandal.operator.reference import ReferenceOperator, SimulatedApprover
@@ -35,11 +37,15 @@ class Sandbox:
 
 
 def new_sandbox(
-    profile: Profile | str = "bayline", seed: int = DEFAULT_SEED, *, policy: Policy | None = None
+    profile: Profile | str = "bayline",
+    seed: int = DEFAULT_SEED,
+    *,
+    policy: Policy | None = None,
+    sink: Callable[[Event], None] | None = None,
 ) -> Sandbox:
-    """A fresh company under `policy` (v0 when omitted)."""
+    """A fresh company under `policy` (v0 when omitted). `sink` sees every event."""
     profile = load_profile(profile) if isinstance(profile, str) else profile
-    run = Run(seed_state(profile, seed=seed))
+    run = Run(seed_state(profile, seed=seed), sink=sink)
     policy = policy or V0
     gate = Gate(policy.checks(profile))
     return Sandbox(
