@@ -4,8 +4,10 @@ version = "0.1.0"
 description = "Red, Blue, and the Operator: adversarial testing and runtime guarding for autonomous finance."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "anthropic>=2.3.0",
     "fastapi>=0.115",
     "pydantic>=2.9",
+    "python-dotenv>=1.2.4",
     "pyyaml>=6.0.3",
     "sqlalchemy>=2.0",
     "uvicorn>=0.30",

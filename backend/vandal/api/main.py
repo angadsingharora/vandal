@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from vandal.api import routes_blue, routes_inject, routes_jobs, routes_policies, routes_runs
 from vandal.api.db import Store
 from vandal.api.registry import Registry
+from vandal.llm import load_env
 
 
 class Settings(BaseModel):
@@ -31,6 +32,7 @@ class Settings(BaseModel):
 
 def create_app(store: Store | None = None, persist: bool | None = None) -> FastAPI:
     """`store` wins; otherwise persist when DATABASE_URL is set (or `persist` says so)."""
+    load_env()
     if store is None and (persist if persist is not None else bool(os.environ.get("DATABASE_URL"))):
         store = Store()
         store.migrate()
