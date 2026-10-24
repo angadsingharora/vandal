@@ -57,6 +57,7 @@ class ApprovalMatrix(_Spec):
 
 class OperatorSpec(_Spec):
     id: str
+    payment_horizon_days: int = 10  # the batch pays approved invoices due within this window
 
 
 class AttackerCapabilities(_Spec):

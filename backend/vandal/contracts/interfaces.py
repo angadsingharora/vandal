@@ -37,6 +37,11 @@ class ToolResult(BaseModel):
 class Tools(Protocol):
     """The only way to change state; always runs Blue's gate."""
 
+    @property
+    def view(self) -> State:
+        """Read-only view of the current state. Mutating it is a bug; use call()."""
+        ...
+
     def call(self, actor: Actor, name: str, args: BaseModel) -> ToolResult: ...
 
 

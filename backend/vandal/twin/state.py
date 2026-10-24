@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict
 
 from vandal.contracts.entities import (
     Approval,
+    ApprovalRequest,
     BankAccount,
     BankTransaction,
     Case,
@@ -60,6 +61,7 @@ class State(BaseModel):
     purchase_orders: dict[str, PurchaseOrder] = {}
     receipts: dict[str, Receipt] = {}
     invoices: dict[str, Invoice] = {}
+    approval_requests: dict[str, ApprovalRequest] = {}
     approvals: dict[str, Approval] = {}
 
     payment_instructions: dict[str, PaymentInstruction] = {}
@@ -126,8 +128,9 @@ class State(BaseModel):
 
 _SCALARS = ("company", "seed", "day")
 _COLLECTIONS = tuple(
-    name for name, field in State.model_fields.items() if field.annotation is not None
-    and getattr(field.annotation, "__origin__", None) is dict
+    name
+    for name, field in State.model_fields.items()
+    if field.annotation is not None and getattr(field.annotation, "__origin__", None) is dict
 )
 
 

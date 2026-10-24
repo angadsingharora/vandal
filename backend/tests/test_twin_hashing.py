@@ -44,10 +44,24 @@ def test_entity_hash_ignores_the_event_log(seed) -> None:
 
 
 def test_entity_hash_ignores_insertion_order(seed) -> None:
-    a = Invoice(id="INV-X1", vendor="V-001", number="X1", amount=100, dimension="P-01",
-                received_on=0, due_date=10)
-    b = Invoice(id="INV-X2", vendor="V-001", number="X2", amount=200, dimension="P-01",
-                received_on=0, due_date=10)
+    a = Invoice(
+        id="INV-X1",
+        vendor="V-001",
+        number="X1",
+        amount=100,
+        dimension="P-01",
+        received_on=0,
+        due_date=10,
+    )
+    b = Invoice(
+        id="INV-X2",
+        vendor="V-001",
+        number="X2",
+        amount=200,
+        dimension="P-01",
+        received_on=0,
+        due_date=10,
+    )
     s1, s2 = seed.clone(), seed.clone()
     s1.put("invoices", a)
     s1.put("invoices", b)

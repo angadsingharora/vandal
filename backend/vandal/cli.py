@@ -26,7 +26,35 @@ def cmd_seed(args: argparse.Namespace) -> int:
     return 0
 
 
-IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {"seed": cmd_seed}
+def cmd_run(args: argparse.Namespace) -> int:
+    from collections import Counter
+
+    from vandal.sandbox import new_sandbox
+    from vandal.verify.invariants import check
+
+    sb = new_sandbox(args.profile, seed=args.seed).operate(args.days)
+    state = sb.run.state
+    verdicts = Counter(
+        e.payload["verdict"]["decision"] for e in state.events if e.kind == "gate.verdict"
+    )
+    statuses = Counter(i.status for i in state.invoices.values())
+    pays = Counter(p.status for p in state.payments.values())
+    violations = check(state)
+    print(f"{state.company}: ran {args.days} business days (now day {state.day})")
+    print(f"  tool calls       {sb.tools.calls}  verdicts {dict(sorted(verdicts.items()))}")
+    print(f"  invoices         {dict(sorted(statuses.items()))}")
+    print(f"  payments         {dict(sorted(pays.items()))}")
+    for ba in state.bank_accounts.values():
+        print(f"  bank {ba.name:<11} ${ba.balance / 100:,.2f}")
+    print(f"  invariants       {'all hold' if not violations else ''}")
+    for v in violations:
+        print(f"    {v.invariant}: {v.message}")
+    print(f"  events           {len(state.events)}")
+    print(f"  state_hash       {state.state_hash()}")
+    return 1 if violations else 0
+
+
+IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {"seed": cmd_seed, "run": cmd_run}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,9 +64,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="command", required=True)
     for name, (help_text, _slice) in COMMANDS.items():
         cmd = sub.add_parser(name, help=help_text)
-        if name == "seed":
+        if name in ("seed", "run"):
             cmd.add_argument("--profile", default="bayline", help="profile name or YAML path")
             cmd.add_argument("--seed", type=int, default=DEFAULT_SEED)
+        if name == "run":
+            cmd.add_argument("--days", type=int, default=5)
     return parser
 
 

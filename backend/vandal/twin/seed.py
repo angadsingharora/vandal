@@ -89,7 +89,9 @@ def seed_state(profile: Profile | None = None, seed: int = DEFAULT_SEED) -> Stat
 def _seed_vendors(state: State, profile: Profile, rng: random.Random, ids: _Ids) -> None:
     history = -profile.generation.history_days
     for spec in profile.vendors:
-        state.vendors[spec.id] = Vendor(id=spec.id, name=spec.name, domain=spec.domain)
+        state.vendors[spec.id] = Vendor(
+            id=spec.id, name=spec.name, domain=spec.domain, gl_account=spec.gl, po_required=spec.po
+        )
 
         contact_from = history * 2
         if rng.random() < profile.generation.prior_contact_rate:
@@ -285,7 +287,12 @@ def _add_invoice(
     )
     pay_id = ids.next("PAY")
     state.payments[pay_id] = Payment(
-        id=pay_id, instruction=pi_id, status="settled", attempts=1, settled_on=due_date
+        id=pay_id,
+        instruction=pi_id,
+        status="settled",
+        attempts=1,
+        submitted_on=due_date - 1,
+        settled_on=due_date,
     )
 
 

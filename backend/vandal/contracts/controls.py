@@ -11,6 +11,7 @@ Stage = Literal[
     "invoice.match",
     "pre_approve",
     "change_request",
+    "schedule",
     "pre_execute",
     "submit",
     "retry",
