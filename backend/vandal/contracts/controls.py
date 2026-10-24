@@ -18,6 +18,7 @@ Stage = Literal[
     "retry",
     "refund",
     "journal",
+    "recovery",
     "message.outbound",
 ]
 

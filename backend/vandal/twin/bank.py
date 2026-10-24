@@ -24,6 +24,7 @@ from vandal.twin.state import State
 OPERATING = "CB-OPER"
 SETTLEMENT_LAG = 1  # business days
 CLEARING_DAYS = 2  # a provisional deposit clears, or comes back, this many days later
+RECALL_DAYS = 2  # the beneficiary's bank answers a recall this many days later
 FAULT_KINDS = ("timeout", "drop_ack", "duplicate_ack", "delay", "feed_delay")
 
 EventSpec = tuple[str, dict[str, Any]]
@@ -158,6 +159,34 @@ def settle_due(state: State) -> list[EventSpec]:
                         "submission": sub.id,
                         "counterparty_account": sub.payee_account,
                     }
+                },
+            )
+        )
+    return specs
+
+
+def answer_recalls(state: State) -> list[EventSpec]:
+    """Recalls the beneficiary's bank answers today. A recall succeeds only if the money hasn't
+    settled yet: the submission is cancelled and never settles. Settlement is T+1 and a recall
+    takes RECALL_DAYS, so most recalls fail unless settlement was delayed."""
+    specs: list[EventSpec] = []
+    for pay in state.payments.values():
+        if pay.recall != "requested" or pay.recall_requested_on is None:
+            continue
+        if state.day - pay.recall_requested_on < RECALL_DAYS:
+            continue
+        open_subs = [
+            s.id
+            for s in state.bank_submissions.values()
+            if s.payment == pay.id and s.status == "processed"
+        ]
+        specs.append(
+            (
+                "bank.recall_answered",
+                {
+                    "payment": pay.id,
+                    "outcome": "succeeded" if open_subs else "failed",
+                    "cancelled": open_subs,
                 },
             )
         )

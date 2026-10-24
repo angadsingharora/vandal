@@ -308,6 +308,8 @@ def _message(sb: SandboxLike, move: Move, index: int, oracle: Oracle) -> None:
         sender = f"agent@{lookalike(vendor.domain) if attacker else vendor.domain}"
         subject = f"Re: {vendor.name} remittance"
         meta = {"intent": "conversation", "vendor": vendor_id}
+        if p.get("asks") == "payment_status":  # "we haven't been paid"
+            meta = {"intent": "payment_inquiry", "vendor": vendor_id}
     else:  # an executive or an approver, by title: "CFO", "Controller"
         approver = next(
             (a for a in sb.profile.approval_matrix.approvers if a.name.lower() == poses_as.lower()),
