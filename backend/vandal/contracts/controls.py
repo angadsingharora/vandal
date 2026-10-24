@@ -16,12 +16,15 @@ Stage = Literal[
     "retry",
     "refund",
     "journal",
+    "message.outbound",
 ]
 
 Decision = Literal["allow", "hold", "escalate", "block"]
 
-# Most restrictive wins when several checks match.
-DECISION_ORDER: dict[str, int] = {"allow": 0, "hold": 1, "escalate": 2, "block": 3}
+# Most restrictive wins when several checks match (DESIGN 7: block > hold > escalate > allow).
+# A hold outranks an escalation: a human approval must never clear a hold that needs evidence,
+# e.g. a $40k payment to an unverified account that trips both T1 and the approval threshold.
+DECISION_ORDER: dict[str, int] = {"allow": 0, "escalate": 1, "hold": 2, "block": 3}
 
 
 class Condition(BaseModel):

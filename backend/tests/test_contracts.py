@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from vandal.contracts.controls import Check, Control, Predicate
+from vandal.contracts.controls import DECISION_ORDER, Check, Control, Predicate
 from vandal.contracts.entities import Actor, Invoice
 from vandal.contracts.moves import Move
 from vandal.contracts.verdicts import Verdict
@@ -33,6 +33,13 @@ def test_money_is_integer_cents() -> None:
 def test_contracts_reject_unknown_fields() -> None:
     with pytest.raises(ValidationError):
         Move(kind="tick", params={}, at=0, extra=1)
+
+
+def test_hold_outranks_escalate() -> None:
+    # An approval (escalate) must never override a hold that needs evidence.
+    assert DECISION_ORDER["block"] > DECISION_ORDER["hold"] > DECISION_ORDER["escalate"]
+    assert DECISION_ORDER["escalate"] > DECISION_ORDER["allow"]
+    assert max(["escalate", "hold"], key=DECISION_ORDER.__getitem__) == "hold"
 
 
 def test_control_compile_is_not_yet_implemented() -> None:
