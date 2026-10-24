@@ -1,4 +1,4 @@
-# Vandal — Design Doc (v0.5)
+# Vandal — Design Doc (v0.6)
 
 **Break it. Fix it. Prove it.**
 Status: final direction for the hackathon build · Target: Cal Hacks 13.0, Hyphenate track · Submission deadline: Sun 2026-10-25 9:00 AM PT
