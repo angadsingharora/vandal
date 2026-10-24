@@ -151,19 +151,27 @@ class SweepProposer:
 
 # --- Claude ---------------------------------------------------------------------------------
 
-PROMPT_VERSION = "synth-v1"
+PROMPT_VERSION = "synth-v2"  # v2: params as key/value pairs (a free-form dict comes back empty)
 SYSTEM = (
     "You repair financial controls. You may only propose controls from the template catalog, "
-    "with parameters that fit each template's schema. A candidate is refuted by a "
+    "with parameters that fit each template's schema, given as key/value pairs under "
+    "`params`. A candidate is refuted by a "
     "counterexample (an attack search still finds), a false positive (a legitimate operation "
     "it breaks), or a lint (it is overfit, spoofable, or blocks where a hold works). Learn from "
     "the refutations. Prefer the least restrictive control that closes the gap."
 )
 
 
+class _LLMParam(BaseModel):
+    key: str
+    value: str | int | list[str]
+
+
 class _LLMCandidate(BaseModel):
     template: str
-    params: dict
+    # Structured output can't fill a free-form dict (it comes back as {}), so a template's
+    # parameters travel as key/value pairs and are folded into Control.params here.
+    params: list[_LLMParam] = Field(default_factory=list)
     rationale: str
 
 
@@ -213,13 +221,13 @@ class LLMProposer:
         out = []
         for c in reply.candidates:
             try:
-                control = Control(template=c.template, params=c.params)
+                control = Control(template=c.template, params={p.key: p.value for p in c.params})
                 params_of(control)
             except (ValidationError, KeyError, ValueError) as err:
                 self.notes.append(f"iteration {ctx.iteration}: dropped invalid {c.template}: {err}")
                 continue
             p = Proposal(controls=[control], rationale=c.rationale, source="llm")
-            if p.label not in ctx.tried:
+            if p.label not in ctx.tried and p.label not in {o.label for o in out}:
                 out.append(p)
         if not out:
             self.notes.append(f"iteration {ctx.iteration}: no usable LLM candidates; sweep")

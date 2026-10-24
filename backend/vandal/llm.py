@@ -171,5 +171,9 @@ def structured[T: BaseModel](
         raise LLMUnavailable(f"no structured reply (stop_reason={response.stop_reason})")
 
     reply = response.parsed_output
-    _write_cache(key, {"model": response.model, "system": system, "prompt": prompt}, reply)
+    # `model` is what the key was computed from; `served_by` is the model that answered, which
+    # differs when the server-side fallback took over. Recomputing the key from the request must
+    # give the file name back (tests/test_llm_cache.py).
+    request = {"model": model, "served_by": response.model, "system": system, "prompt": prompt}
+    _write_cache(key, request, reply)
     return reply

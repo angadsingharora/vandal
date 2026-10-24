@@ -1,0 +1,97 @@
+{
+  "cache_key": "explain-v1.blue.explain.9469afb3dcc9e9ac8c5c4f71d2989bb2a15d7fa0d2a0e6e7f52dded6430fbc8d",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "prompt": "{\"subject\": \"PAY-0057\", \"question\": null, \"trace\": [{\"text\": \"Obligation is covered: validated (3-way match) and unique.\", \"cites\": [\"INV-1042\", \"PO-0063\", \"EV-000000\", \"EV-000001\"]}, {\"text\": \"Approval is covered: approved via approvals_inbox by U-CTRL.\", \"cites\": [\"APR-0025\", \"EV-000048\", \"EV-000049\", \"EV-000356\", \"EV-000357\", \"EV-000362\", \"EV-000363\"]}, {\"text\": \"Execution is uncovered: PAY-0057 executed payee_account different from what APR-0025 approved: the approval doesn't bind the instruction. Gap: approval_binding.\", \"cites\": [\"PAY-0057\", \"PI-0057\", \"BA-0032\", \"APR-0025\", \"CR-0001\", \"MSG-0001\", \"EV-000168\", \"EV-000169\", \"EV-000170\", \"EV-000171\", \"EV-000174\", \"EV-000175\", \"EV-000222\", \"EV-000223\", \"EV-000225\", \"EV-000362\", \"EV-000363\"]}, {\"text\": \"Settlement is pending: PAY-0057 is misdirected.\", \"cites\": [\"PAY-0057\", \"EV-000371\"]}, {\"text\": \"Books is pending: bank line not reconciled yet.\", \"cites\": [\"JE-0025\", \"JE-0026\", \"EV-000167\", \"EV-000226\"]}, {\"text\": \"On day 0, approvals.request at pre_approve was escalate, because v0.approval.threshold fired.\", \"cites\": [\"EV-000048\", \"v0.approval.threshold\"]}, {\"text\": \"On day 0, payments.execute at pre_execute was allow.\", \"cites\": [\"EV-000174\"]}, {\"text\": \"On day 0, approvals.request_repayment at pre_approve was escalate, because blue.repayment_inbox fired.\", \"cites\": [\"EV-000356\", \"blue.repayment_inbox\"]}, {\"text\": \"On day 1, payments.execute at pre_execute was allow.\", \"cites\": [\"EV-000364\"]}], \"allowed_ids\": [\"APR-0025\", \"BA-0032\", \"CR-0001\", \"EV-000000\", \"EV-000001\", \"EV-000048\", \"EV-000049\", \"EV-000167\", \"EV-000168\", \"EV-000169\", \"EV-000170\", \"EV-000171\", \"EV-000174\", \"EV-000175\", \"EV-000222\", \"EV-000223\", \"EV-000225\", \"EV-000226\", \"EV-000356\", \"EV-000357\", \"EV-000362\", \"EV-000363\", \"EV-000364\", \"EV-000371\", \"INV-1042\", \"JE-0025\", \"JE-0026\", \"MSG-0001\", \"PAY-0057\", \"PI-0057\", \"PO-0063\", \"blue.repayment_inbox\", \"v0.approval.threshold\"], \"feedback\": \"\"}",
+    "system": "You explain a finance control system's decisions. Answer only from the trace you are given. Every claim must cite ids from the trace, and nothing else. Never suggest a way around a hold; a conversation never clears one. Point to the approvals inbox for decisions."
+  },
+  "response": {
+    "claims": [
+      {
+        "cites": [
+          "INV-1042",
+          "PO-0063",
+          "EV-000000",
+          "EV-000001"
+        ],
+        "text": "The obligation is covered: the invoice was validated through a 3-way match and is unique."
+      },
+      {
+        "cites": [
+          "APR-0025",
+          "EV-000048",
+          "EV-000049",
+          "EV-000356",
+          "EV-000357",
+          "EV-000362",
+          "EV-000363"
+        ],
+        "text": "Approval is covered: it was approved via the approvals inbox by U-CTRL."
+      },
+      {
+        "cites": [
+          "PAY-0057",
+          "PI-0057",
+          "BA-0032",
+          "APR-0025",
+          "CR-0001",
+          "MSG-0001",
+          "EV-000168",
+          "EV-000169",
+          "EV-000170",
+          "EV-000171",
+          "EV-000174",
+          "EV-000175",
+          "EV-000222",
+          "EV-000223",
+          "EV-000225",
+          "EV-000362",
+          "EV-000363"
+        ],
+        "text": "Execution is uncovered because PAY-0057 was executed to a payee account different from the one APR-0025 approved, so the approval does not bind the instruction. The gap is approval_binding."
+      },
+      {
+        "cites": [
+          "PAY-0057",
+          "EV-000371"
+        ],
+        "text": "Settlement is pending because PAY-0057 is misdirected."
+      },
+      {
+        "cites": [
+          "JE-0025",
+          "JE-0026",
+          "EV-000167",
+          "EV-000226"
+        ],
+        "text": "Books are pending because the bank line has not been reconciled yet."
+      },
+      {
+        "cites": [
+          "EV-000048",
+          "v0.approval.threshold"
+        ],
+        "text": "On day 0, the approval request at pre_approve was escalated because the v0.approval.threshold rule fired."
+      },
+      {
+        "cites": [
+          "EV-000174"
+        ],
+        "text": "On day 0, payment execution at pre_execute was allowed."
+      },
+      {
+        "cites": [
+          "EV-000356",
+          "blue.repayment_inbox"
+        ],
+        "text": "On day 0, the repayment approval request at pre_approve was escalated because the blue.repayment_inbox rule fired."
+      },
+      {
+        "cites": [
+          "EV-000364"
+        ],
+        "text": "On day 1, payment execution at pre_execute was allowed."
+      }
+    ]
+  }
+}

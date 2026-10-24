@@ -93,20 +93,22 @@ def test_llm_candidates_are_validated_linted_and_searched(monkeypatch) -> None:
                 "candidates": [
                     {
                         "template": "T1",
-                        "params": {"accepted_channels": ["carrier_pigeon"]},
+                        "params": [{"key": "accepted_channels", "value": ["carrier_pigeon"]}],
                         "rationale": "invalid",
                     },
                     {
                         "template": "T1",
-                        "params": {"accepted_channels": ["phone_outbound", "phone_in"]},
+                        "params": [
+                            {"key": "accepted_channels", "value": ["phone_outbound", "phone_in"]}
+                        ],
                         "rationale": "accept the vendor calling in too",
                     },
                     {
                         "template": "T1",
-                        "params": {
-                            "accepted_channels": ["phone_outbound"],
-                            "contact_as_of": "before_request",
-                        },
+                        "params": [
+                            {"key": "accepted_channels", "value": ["phone_outbound"]},
+                            {"key": "contact_as_of", "value": "before_request"},
+                        ],
                         "rationale": "call back the number on file before the request",
                     },
                 ]

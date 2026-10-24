@@ -1,0 +1,53 @@
+{
+  "cache_key": "synth-v2.synth.propose-1.e690967b9479279cac013fc118bfbdc21a4f9625277d522cb4efc895fa3e0aa7",
+  "request": {
+    "model": "claude-opus-5-5",
+    "prompt": "{\"catalog\": {\"T1\": {\"name\": \"VerifiedAccountChange\", \"params\": {\"additionalProperties\": false, \"properties\": {\"accepted_channels\": {\"items\": {\"enum\": [\"email\", \"portal\", \"agent_msg\", \"phone_in\", \"phone_outbound\", \"video\"], \"type\": \"string\"}, \"minItems\": 1, \"title\": \"Accepted Channels\", \"type\": \"array\"}, \"contact_as_of\": {\"default\": \"before_request\", \"enum\": [\"current\", \"before_request\"], \"title\": \"Contact As Of\", \"type\": \"string\"}, \"window_days\": {\"default\": 30, \"minimum\": 1, \"title\": \"Window Days\", \"type\": \"integer\"}}, \"required\": [\"accepted_channels\"], \"title\": \"T1Params\", \"type\": \"object\"}}, \"T2\": {\"name\": \"ApprovalBinding\", \"params\": {\"additionalProperties\": false, \"properties\": {\"bound_fields\": {\"items\": {\"enum\": [\"amount\", \"payee_account\", \"due_date\"], \"type\": \"string\"}, \"minItems\": 1, \"title\": \"Bound Fields\", \"type\": \"array\"}, \"on_mismatch\": {\"default\": \"hold\", \"enum\": [\"hold\", \"reapprove\", \"block\"], \"title\": \"On Mismatch\", \"type\": \"string\"}}, \"required\": [\"bound_fields\"], \"title\": \"T2Params\", \"type\": \"object\"}}, \"T3\": {\"name\": \"IdempotentExecution\", \"params\": {\"additionalProperties\": false, \"properties\": {\"key_fields\": {\"default\": [\"invoice\"], \"items\": {\"enum\": [\"invoice\", \"approval\", \"instruction_hash\"], \"type\": \"string\"}, \"title\": \"Key Fields\", \"type\": \"array\"}, \"on_timeout\": {\"default\": \"query_status_then_retry\", \"enum\": [\"query_status_then_retry\", \"retry_with_key\"], \"title\": \"On Timeout\", \"type\": \"string\"}}, \"title\": \"T3Params\", \"type\": \"object\"}}, \"T4\": {\"name\": \"DuplicateObligationGuard\", \"params\": {\"additionalProperties\": false, \"properties\": {\"action\": {\"default\": \"hold\", \"enum\": [\"hold\", \"block\"], \"title\": \"Action\", \"type\": \"string\"}, \"amount_tol_pct\": {\"default\": 0, \"maximum\": 100, \"minimum\": 0, \"title\": \"Amount Tol Pct\", \"type\": \"integer\"}, \"normalize_number\": {\"default\": true, \"title\": \"Normalize Number\", \"type\": \"boolean\"}, \"window_days\": {\"default\": 30, \"title\": \"Window Days\", \"type\": \"integer\"}}, \"title\": \"T4Params\", \"type\": \"object\"}}, \"T5\": {\"name\": \"AggregateApprovalThreshold\", \"params\": {\"additionalProperties\": false, \"properties\": {\"group_by\": {\"const\": \"vendor\", \"default\": \"vendor\", \"title\": \"Group By\", \"type\": \"string\"}, \"threshold\": {\"exclusiveMinimum\": 0, \"title\": \"Threshold\", \"type\": \"integer\"}, \"window_days\": {\"default\": 5, \"title\": \"Window Days\", \"type\": \"integer\"}}, \"required\": [\"threshold\"], \"title\": \"T5Params\", \"type\": \"object\"}}, \"T6\": {\"name\": \"RefundToSource\", \"params\": {\"additionalProperties\": false, \"properties\": {\"allowed\": {\"default\": \"source_only\", \"enum\": [\"source_only\", \"source_or_verified\"], \"title\": \"Allowed\", \"type\": \"string\"}, \"cooling_days\": {\"default\": 0, \"minimum\": 0, \"title\": \"Cooling Days\", \"type\": \"integer\"}, \"require_cleared_funds\": {\"default\": true, \"title\": \"Require Cleared Funds\", \"type\": \"boolean\"}}, \"title\": \"T6Params\", \"type\": \"object\"}}}, \"current_controls\": [], \"diagnosis\": {\"gap\": \"verification_channel\", \"link\": \"execution\", \"reason\": \"BA-0032 was never verified through an authenticated channel before PAY-0062 executed\", \"violated\": [\"INV-4\", \"INV-5\"]}, \"gap\": \"verification_channel\", \"refuted\": [], \"templates_for_gap\": [\"T1\"]}",
+    "system": "You repair financial controls. You may only propose controls from the template catalog, with parameters that fit each template's schema, given as key/value pairs under `params`. A candidate is refuted by a counterexample (an attack search still finds), a false positive (a legitimate operation it breaks), or a lint (it is overfit, spoofable, or blocks where a hold works). Learn from the refutations. Prefer the least restrictive control that closes the gap."
+  },
+  "response": {
+    "candidates": [
+      {
+        "params": [
+          {
+            "key": "accepted_channels",
+            "value": [
+              "phone_outbound"
+            ]
+          },
+          {
+            "key": "contact_as_of",
+            "value": "before_request"
+          },
+          {
+            "key": "window_days",
+            "value": 30
+          }
+        ],
+        "rationale": "Bank account changes like BA-0032 must be confirmed by an outbound callback before any payment such as PAY-0062 executes. The callback goes to contact details on file before the change request, so an attacker who also changes the contact cannot spoof it. Email, agent messages and inbound calls are excluded because the requester controls them. The default 30-day window avoids needless re-verification.",
+        "template": "T1"
+      },
+      {
+        "params": [
+          {
+            "key": "accepted_channels",
+            "value": [
+              "phone_outbound",
+              "portal"
+            ]
+          },
+          {
+            "key": "contact_as_of",
+            "value": "before_request"
+          },
+          {
+            "key": "window_days",
+            "value": 30
+          }
+        ],
+        "rationale": "This is a less restrictive alternative that also accepts confirmation through the vendor's authenticated portal. The portal is an authenticated channel independent of the change request, which reduces false positives for vendors who self-serve. Contact details are still pinned to before the request.",
+        "template": "T1"
+      }
+    ]
+  }
+}
