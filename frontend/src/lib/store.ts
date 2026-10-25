@@ -25,7 +25,6 @@ import type {
   LogEntry,
   MessyDocument,
   Metrics,
-  OperatorKind,
   OracleLabel,
   PatchRequest,
   PolicyInfo,
@@ -86,8 +85,7 @@ interface State {
   activity: VandalEvent[];
 
   operate: { phase: Phase; day: number | null; events: number | null };
-  /** O1: which Operator a new run gets, the documents it can receive, and what intake read. */
-  operator: OperatorKind;
+  /** O1: the documents the LLM Operator can receive, and what intake read. */
   documents: MessyDocument[];
   intake: IntakeRead[];
   delivering: Phase;
@@ -127,8 +125,7 @@ interface Actions {
   toggleJudge(): void;
   setView(view: View): Promise<void>;
   setPlayback(on: boolean): Promise<void>;
-  reset(policy: string, operator?: OperatorKind): Promise<void>;
-  setOperator(operator: OperatorKind): void;
+  reset(policy: string): Promise<void>;
   loadIntake(): Promise<void>;
   deliverDocument(documentId: string): Promise<void>;
   operateDays(days: number): Promise<void>;
@@ -251,7 +248,6 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     alerts: [],
     activity: [],
     operate: { ...idle, day: null, events: null },
-    operator: "reference",
     documents: [],
     intake: [],
     delivering: "idle",
@@ -301,8 +297,6 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       set({ settings: await api().setSettings({ playback: on }) });
     }),
 
-    setOperator: (operator: OperatorKind) => set({ operator }),
-
     loadIntake: guard(async () => {
       const runId = get().focusRunId;
       if (!runId || get().summary?.operator !== "llm") {
@@ -330,13 +324,14 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       }
     }),
 
-    reset: guard(async (policy: string, operator: OperatorKind = get().operator) => {
+    // The demo has one path: every run gets the LLM Operator, and a reset starts over on Blue at step 1.
+    reset: guard(async (policy: string) => {
       const a = api();
-      const run = await a.reset(policy, operator);
+      const run = await a.reset(policy, "llm");
       set({
+        view: "blue",
         tabs: [{ id: run.run_id, label: "Live", policy: run.policy, kind: "live" }],
         liveRunId: run.run_id,
-        operator,
         documents: [],
         intake: [],
         delivering: "idle",
