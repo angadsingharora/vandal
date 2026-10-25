@@ -421,8 +421,8 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       if (get().focusRunId !== runId) await get().focus(runId);
       set({ operate: { phase: "running", day: null, events: null } });
       const refresh = throttle(() => void get().refresh(), 800);
-      const job = await a.operate(runId, days);
       try {
+        const job = await a.operate(runId, days);
         await finished(a, job.id, {
           progress: (p: { day: number; events: number }) => {
             set({ operate: { phase: "running", day: p.day, events: p.events } });
@@ -449,9 +449,9 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         search: { ...get().search, phase: "running", explored: 0, atDepth: 0, result: null, jobId: null },
         diagnosis: { ...idle, data: null, reason: null },
       });
-      const job = await a.search({ policy, scenario, depth });
-      set((s) => ({ search: { ...s.search, jobId: job.id } }));
       try {
+        const job = await a.search({ policy, scenario, depth });
+        set((s) => ({ search: { ...s.search, jobId: job.id } }));
         const done = await finished<SearchResult>(a, job.id, {
           progress: (p: { depth: number; explored: number }) =>
             set((s) => ({ search: { ...s.search, explored: p.explored, atDepth: p.depth } })),
@@ -527,9 +527,9 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         patch: null,
       }));
       const { noLlm, depth } = get().synth;
-      const job = await a.synthesize({ search_id: attack.jobId, no_llm: noLlm, depth });
-      set((s) => ({ synth: { ...s.synth, jobId: job.id } }));
       try {
+        const job = await a.synthesize({ search_id: attack.jobId, no_llm: noLlm, depth });
+        set((s) => ({ synth: { ...s.synth, jobId: job.id } }));
         const done = await finished<CEGISResult>(a, job.id, {
           log: (e: LogEntry) => set((s) => ({ synth: { ...s.synth, log: [...s.synth.log, e] } })),
         });
@@ -545,9 +545,9 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       const synthId = get().synth.jobId;
       if (!synthId) return;
       set({ verify: { phase: "running", jobId: null, checks: [], pack: null }, patch: null });
-      const job = await a.verify(synthId, get().synth.depth); // prove it at the depth CEGIS used
-      set((s) => ({ verify: { ...s.verify, jobId: job.id } }));
       try {
+        const job = await a.verify(synthId, get().synth.depth); // prove it at the depth CEGIS used
+        set((s) => ({ verify: { ...s.verify, jobId: job.id } }));
         const done = await finished<EvidencePack>(a, job.id, {
           check: (c: CheckResult) => set((s) => ({ verify: { ...s.verify, checks: [...s.verify.checks, c] } })),
         });
@@ -624,9 +624,9 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         hunt: { phase: "running", jobId: null, attempts: [], result: null },
         diagnosis: { ...idle, data: null, reason: null },
       });
-      const job = await a.hunt(runId, { attempts });
-      set((s) => ({ hunt: { ...s.hunt, jobId: job.id } }));
       try {
+        const job = await a.hunt(runId, { attempts });
+        set((s) => ({ hunt: { ...s.hunt, jobId: job.id } }));
         const done = await finished<HuntResult>(a, job.id, {
           log: (t: HuntAttempt) => set((s) => ({ hunt: { ...s.hunt, attempts: [...s.hunt.attempts, t] } })),
         });
@@ -649,9 +649,9 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       const runId = get().focusRunId ?? get().liveRunId;
       if (!runId) return;
       set((s) => ({ inject: { ...s.inject, phase: "running", jobId: null, result: null } }));
-      const job = await a.inject(runId, { ...body, dry_run: false });
-      set((s) => ({ inject: { ...s.inject, jobId: job.id } }));
       try {
+        const job = await a.inject(runId, { ...body, dry_run: false });
+        set((s) => ({ inject: { ...s.inject, jobId: job.id } }));
         const done = await finished<InjectResult>(a, job.id, {});
         const result = done.result!;
         const policy = String(done.meta.policy ?? get().summary?.policy ?? "v0");

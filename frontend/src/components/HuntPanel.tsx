@@ -61,7 +61,7 @@ export function HuntPanel({ quiet }: { quiet?: boolean }) {
         {!hunt.attempts.length && !running && (
           <p className="text-xs leading-snug text-dim">
             {needsKey
-              ? "The hunt needs Claude: set ANTHROPIC_API_KEY on the backend."
+              ? "The hunt didn't start. It needs a backend with the hunt route (main, PR 40 or later) and ANTHROPIC_API_KEY set."
               : "Instead of a preset threat, Claude studies this company's vendors, invoices, credits and controls, then invents attacks the search doesn't try. Each attempt runs on the twin, and what Guard did feeds the next one."}
           </p>
         )}
