@@ -153,9 +153,11 @@ _(22 of 25 tags.)_
 - [Atlassian] Best Agent / Best Security Solution for Agents
 - Cal Hacks Most Technically Complex Hack
 
-**Emails used to apply to Cal Hacks 13.0:** _(fill in for each teammate)_
+**Emails used to apply to Cal Hacks 13.0:** _(not kept in the repo, which will be public; paste them from the team's notes)_
 
-**Universities or schools:** _(fill in)_
+**Universities or schools:**
+- University of California, Berkeley
+- University of Washington, Seattle
 
 **GoDaddy Registry domains:** none
 
