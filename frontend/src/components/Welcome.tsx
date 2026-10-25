@@ -10,10 +10,12 @@ import { Button } from "./ui";
 
 export const WELCOME_KEY = "vandal.welcomed";
 
-/** True on a first visit: the welcome hasn't been dismissed in this browser yet. */
+/** True on a first visit (not dismissed in this browser yet), or when the URL asks for it with `?welcome`. */
 export function wantsWelcome(): boolean {
+  if (typeof window === "undefined") return false;
+  if (new URLSearchParams(window.location.search).has("welcome")) return true;
   try {
-    return typeof window !== "undefined" && !window.localStorage.getItem(WELCOME_KEY);
+    return !window.localStorage.getItem(WELCOME_KEY);
   } catch {
     return false;
   }
