@@ -1,8 +1,10 @@
 "use client";
 
-// R13: Red's threat hunter, the other way to find an attack on the Attack page. Claude reads
-// this company's books and controls, proposes an attack nobody wrote down, the twin runs it,
-// and what Guard did feeds the next attempt.
+// R13: the hunt, the other way to find an attack on the Attack page. It studies
+// this company's books and controls, tries an attack from outside the preset search, the twin
+// runs it, and what Guard did feeds the next attempt.
+
+import { useEffect, useState } from "react";
 
 import { usd } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
@@ -11,6 +13,30 @@ import { MovesTimeline } from "./SearchPanel";
 import { Badge, Block, Button, LiveDot } from "./ui";
 
 const ATTEMPTS = 6;
+
+/** What the hunt is "doing" during the pause before an attempt lands, one line a second. */
+const THINKING = [
+  "Studying the books: open invoices, approvals, accounts on file…",
+  "Reading the active controls for a gap between the check and the money…",
+  "Weighing a hypothesis against what Guard did last time…",
+  "Running it on the twin…",
+];
+
+function Thinking({ attempt }: { attempt: number }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    setI(0);
+    const t = setInterval(() => setI((x) => (x + 1) % THINKING.length), 1000);
+    return () => clearInterval(t);
+  }, [attempt]);
+  return (
+    <p className="flex items-center gap-1.5 text-xs text-dim" aria-live="polite">
+      <LiveDot className="text-red" />
+      <span className="num text-[10px] font-bold text-red">{attempt}</span>
+      <span>{THINKING[i]}</span>
+    </p>
+  );
+}
 
 /** The check that stopped an attempt, from Guard's first hold/escalate/block line. */
 function stoppedBy(a: HuntAttempt): string | null {
@@ -42,7 +68,7 @@ export function HuntPanel({ quiet }: { quiet?: boolean }) {
 
   return (
     <Block
-      label="Or let Claude hunt"
+      label="Or hunt"
       quiet={quiet}
       aside={
         <>
@@ -61,11 +87,10 @@ export function HuntPanel({ quiet }: { quiet?: boolean }) {
         {!hunt.attempts.length && !running && (
           <p className="text-xs leading-snug text-dim">
             {needsKey
-              ? "The hunt didn't start. It needs a backend with the hunt route (main, PR 40 or later) and ANTHROPIC_API_KEY set."
-              : "Instead of a preset threat, Claude studies this company's vendors, invoices, credits and controls, then invents attacks the search doesn't try. Each attempt runs on the twin, and what Guard did feeds the next one."}
+              ? "The hunt didn't start. It needs a backend with the hunt route (main, PR 40 or later)."
+              : "Instead of a preset threat, the hunt studies this company's vendors, invoices, credits and controls, then tries attacks the search doesn't. Each attempt runs on the twin, and what Guard did feeds the next one."}
           </p>
         )}
-        {running && hunt.attempts.length === 0 && <p className="text-xs text-dim">Claude is studying the books…</p>}
         {hunt.attempts.length > 0 && (
           <ol className="space-y-1.5">
             {hunt.attempts.map((a) => (
@@ -92,6 +117,7 @@ export function HuntPanel({ quiet }: { quiet?: boolean }) {
             ))}
           </ol>
         )}
+        {running && <Thinking attempt={hunt.attempts.length + 1} />}
         {hunt.result && (
           <div className="flex flex-wrap items-center gap-1.5 border-t border-line pt-2 text-[11px] text-dim">
             <span>{hunt.result.reason}</span>

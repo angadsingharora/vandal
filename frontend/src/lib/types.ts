@@ -444,7 +444,7 @@ export interface ThreatPlan {
   source: "llm" | "keywords" | "trace";
 }
 
-/** R13: one hypothesis from Red's threat hunter, and what the twin did with it. */
+/** R13: one hypothesis from the hunt, and what the twin did with it. */
 export interface HuntAttempt {
   n: number;
   rationale: string;

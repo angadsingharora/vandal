@@ -88,7 +88,7 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
             </select>
           </label>
           <Button tone="red" onClick={s.runSearch} busy={running} disabled={!s.ready} nudge={!attack} className="h-8 px-4 text-[13px] font-semibold">
-            Release Vandal Strike on {policy}
+            Release Vandal Strike
           </Button>
         </div>
       </Block>
@@ -115,7 +115,7 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
                 </span>
               }
               value={explored.toLocaleString()}
-              sub={hunted ? "Claude's hypotheses, each run on the twin" : running ? `exploring depth ${search.atDepth}…` : r ? `per depth [${r.levels.join(", ")}]` : attack?.source === "inject" ? "around your scenario" : undefined}
+              sub={hunted ? "hunt hypotheses, each run on the twin" : running ? `exploring depth ${search.atDepth}…` : r ? `per depth [${r.levels.join(", ")}]` : attack?.source === "inject" ? "around your scenario" : undefined}
             />
             <Stat label="Safe" value={explored ? `${safe.toLocaleString()} / ${explored.toLocaleString()}` : "—"} tone="ok" sub="Guard held, or nothing broke" />
             <Stat
@@ -138,7 +138,7 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
         <Reveal k={attack.jobId}>
           <Block
             label="3 · The sequence that broke the books"
-            aside={<Badge tone="dim">{attack.source === "inject" ? "from your scenario" : attack.source === "hunt" ? "Claude's hunt" : "shortest one found"}</Badge>}
+            aside={<Badge tone="dim">{attack.source === "inject" ? "from your scenario" : attack.source === "hunt" ? "from the hunt" : "shortest one found"}</Badge>}
           >
             <div className="grid grid-cols-1 gap-px bg-line md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
               <div className="bg-panel p-3">

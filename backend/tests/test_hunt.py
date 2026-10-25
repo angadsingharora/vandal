@@ -1,60 +1,28 @@
-"""R13: Red's threat hunter. Claude studies the company and proposes attacks; the twin runs them,
-and what happened goes back into the next prompt. The suite never calls Claude, so these tests
-script the model's replies."""
+"""R13: the hunt. Attacks come from a written playbook, in its order; the twin runs them, and
+everything about the outcome comes from the simulation. No model is involved."""
 
 from __future__ import annotations
 
 import json
+import random
 import time
 from functools import partial
 
 import pytest
 from fastapi.testclient import TestClient
 
-from vandal import llm
 from vandal.api.main import create_app
 from vandal.contracts.moves import Move
 from vandal.sandbox import new_sandbox
-from vandal.search.hunt import (
-    HuntUnavailable,
-    hunt,
-    run_hypothesis,
-    snapshot,
-    window_for,
-)
+from vandal.search.hunt import PLAYBOOK, hunt, run_hypothesis, snapshot, window_for
+from vandal.synth.templates import load_policy
 
 FACTORY = partial(new_sandbox, "bayline")
-BANK_CHANGE = {
-    "kind": "change_request",
-    "at": 2,
-    "params": [
-        {"key": "vendor", "value": "V-007"},
-        {"key": "fields", "value": "bank"},
-        {"key": "channel", "value": "email"},
-        {"key": "sender", "value": "lookalike"},
-    ],
-}
-
-
-def scripted(monkeypatch, replies: list[dict]) -> list[dict]:
-    """Make structured() return `replies` in order; returns the prompts it was given."""
-    prompts: list[dict] = []
-
-    def fake(*, schema, prompt, **_kw):
-        prompts.append(json.loads(prompt))
-        return schema.model_validate(replies[len(prompts) - 1])
-
-    monkeypatch.setattr(llm, "structured", fake)
-    return prompts
-
-
-def hyp(weak_spot: str, *moves: dict) -> dict:
-    return {
-        "rationale": f"noticed: {weak_spot}",
-        "weak_spot": weak_spot,
-        "target_invariant": "INV-4",
-        "moves": list(moves),
-    }
+BANK_CHANGE = Move(
+    kind="change_request",
+    at=2,
+    params={"vendor": "V-007", "fields": "bank", "channel": "email", "sender": "lookalike"},
+)
 
 
 def test_snapshot_is_the_company_and_never_the_oracle() -> None:
@@ -66,10 +34,7 @@ def test_snapshot_is_the_company_and_never_the_oracle() -> None:
 
 
 def test_run_hypothesis_reports_what_broke_and_what_guard_did() -> None:
-    m = Move.model_validate(
-        {**BANK_CHANGE, "params": {p["key"]: p["value"] for p in BANK_CHANGE["params"]}}
-    )
-    _, out = run_hypothesis([m], 7, FACTORY)
+    _, out = run_hypothesis([BANK_CHANGE], 7, FACTORY)
     assert {"INV-2", "INV-4"} <= set(out.violated) and out.exposure == 4_000_000
     assert any("approval.threshold" in g for g in out.guard)  # Guard escalated the $40k invoice
 
@@ -80,39 +45,59 @@ def test_moves_the_twin_cant_run_are_dropped_with_a_reason() -> None:
     assert ran == [] and out.dropped and "V-999" in out.dropped[0]
 
 
-def test_the_loop_feeds_each_outcome_into_the_next_prompt(monkeypatch) -> None:
-    prompts = scripted(
-        monkeypatch,
-        [
-            hyp(
-                "an unknown vendor",
-                {**BANK_CHANGE, "params": [{"key": "vendor", "value": "V-999"}]},
-            ),
-            hyp("approval reads the current account", BANK_CHANGE),
-        ],
-    )
+@pytest.mark.parametrize("hyp", PLAYBOOK, ids=lambda h: h.target_invariant)
+def test_every_playbook_entry_breaks_v0_in_the_twin(hyp) -> None:
+    """The playbook is canned; whether it works is not. Each entry must still break the
+    invariant it names at the seeded books, or the demo would show a hunt that finds nothing."""
+    ran, out = run_hypothesis(hyp.moves, 7, FACTORY)
+    assert ran and not out.dropped, (hyp.weak_spot, out.dropped)
+    assert hyp.target_invariant in out.violated and out.exposure > 0, (hyp.weak_spot, out)
+
+
+def test_the_hunt_is_deterministic_and_stops_at_the_first_hit() -> None:
+    """The demo lands on the same attack, and so the same fix, every time: attempt 1 is the
+    bank change after approval."""
     seen = []
-    r = hunt(FACTORY, attempts=4, on_attempt=seen.append)
-    assert [a.n for a in seen] == [1, 2] and r.hits == 1
-    assert prompts[0]["earlier_attempts"] == []
-    first = prompts[1]["earlier_attempts"][0]
-    assert first["weak_spot"] == "an unknown vendor" and first["outcome"]["dropped"]
-    assert r.best and set(r.best.violated) >= {"INV-4"} and r.best.attempt == 2
-    assert len(r.best.moves) == 1  # minimized
-    assert r.best.outside_preset_search is False  # this one is in Scenario A's alphabet
+    r = hunt(FACTORY, attempts=4, on_attempt=seen.append, pause=0)
+    assert [a.n for a in seen] == [1] and r.hits == 1
+    assert seen[0].weak_spot == PLAYBOOK[0].weak_spot
+    assert seen[0].moves[0].kind == "change_request"
+    assert r.best and r.best.attempt == 1 and r.best.violated == ["INV-2", "INV-4", "INV-5"]
+    assert r.best.exposure == 4_000_000 and len(r.best.moves) == 1  # minimized
+    assert r.reason == "attempt 1 broke INV-2, INV-4, INV-5"
+    again = hunt(FACTORY, attempts=4, pause=0)
+    assert again.model_dump() == r.model_dump()
 
 
-def test_novelty_is_measured_against_the_preset_alphabets(monkeypatch) -> None:
-    off_grid = {**BANK_CHANGE, "at": 7}  # day 1: outside Scenario A's one-day window
-    scripted(monkeypatch, [hyp("late change", off_grid)])
-    r = hunt(FACTORY, attempts=1)
-    if r.best:  # whether a day-1 change still lands depends on the World; novelty must match
-        assert r.best.outside_preset_search is bool(r.best.novel_moves)
+def test_an_rng_shuffles_the_playbook_and_never_repeats_an_entry() -> None:
+    first = {
+        hunt(FACTORY, attempts=1, pause=0, rng=random.Random(s)).attempts[0].weak_spot
+        for s in range(8)
+    }
+    assert len(first) > 1
+    r = hunt(FACTORY, attempts=12, keep_going=True, pause=0, rng=random.Random(1))
+    spots = [a.weak_spot for a in r.attempts]
+    assert len(spots) == len(PLAYBOOK) == len(set(spots))
+    assert r.hits == len(PLAYBOOK)
+    assert r.reason == f"{r.hits} of {len(PLAYBOOK)} attempts broke an invariant"
+    assert r.best.exposure == 4_000_000  # the costliest hit wins
+    assert r.best.outside_preset_search is False  # bank change or lost ack: both in a family
 
 
-def test_no_claude_no_hunt() -> None:
-    with pytest.raises(HuntUnavailable):
-        hunt(FACTORY, attempts=1)
+def test_the_hunt_pauses_before_each_attempt() -> None:
+    t = time.monotonic()
+    hunt(FACTORY, attempts=1, pause=0.3)
+    assert time.monotonic() - t >= 0.3
+
+
+def test_under_a_stronger_policy_the_twin_decides() -> None:
+    """The same playbook against v3: whether an entry still lands is the twin's call, and the
+    hunt reports a miss as held rather than asserting a hit."""
+    v3 = partial(new_sandbox, "bayline", policy=load_policy("v3"))
+    r = hunt(v3, attempts=12, keep_going=True, pause=0)
+    held = [a for a in r.attempts if not a.outcome.violated]
+    assert held, "v3 should stop at least one playbook entry"
+    assert all(a.outcome.guard for a in held)
 
 
 def test_window_for_picks_the_family() -> None:
@@ -129,7 +114,7 @@ def test_window_for_picks_the_family() -> None:
 
 
 def test_api_hunt_then_diagnose(monkeypatch) -> None:
-    scripted(monkeypatch, [hyp("approval reads the current account", BANK_CHANGE)])
+    monkeypatch.setenv("VANDAL_HUNT_PAUSE", "0")
     with TestClient(create_app(persist=False)) as client:
         run = client.post("/runs", json={"policy": "v0"}).json()
         job = client.post(f"/runs/{run['run_id']}/hunt", json={"attempts": 2}).json()
@@ -140,15 +125,14 @@ def test_api_hunt_then_diagnose(monkeypatch) -> None:
             time.sleep(0.05)
         assert done["status"] == "done", done.get("error")
         assert done["result"]["best"]["exposure"] == 4_000_000
+        assert done["result"]["scenario"] == "a"
         d = client.post("/diagnose", json={"search_id": job["id"]}).json()
         assert d["diagnosis"]["gap"] == "approval_binding"
 
 
 def test_a_bill_red_sends_is_booked_as_a_duplicate_by_the_harness() -> None:
-    """Claude's first live finding: a near-duplicate bill for a vendor with no PO is paid twice,
-    under every policy through v3. The harness, not the model, says the bill isn't owed."""
-    from vandal.synth.templates import load_policy
-
+    """A near-duplicate bill for a vendor with no PO is paid twice, under every policy through
+    v3. The harness, not the hypothesis, says the bill isn't owed."""
     clone = Move(
         kind="submit_invoice",
         at=0,
