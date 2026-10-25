@@ -76,3 +76,10 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .welcome-enter, .welcome-enter > .welcome-card, .welcome-leave, .welcome-leave > .welcome-card { animation-duration: 1ms; }
 }
+
+.welcome-grid {
+  background-image: linear-gradient(var(--color-line) 1px, transparent 1px), linear-gradient(90deg, var(--color-line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  opacity: 0.35;
+}

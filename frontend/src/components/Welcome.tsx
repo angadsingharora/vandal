@@ -102,103 +102,126 @@ export function Welcome({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div
-      className={cx(
-        "fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-bg/95 p-4 pt-[6vh] backdrop-blur-sm",
-        leaving ? "welcome-leave" : "welcome-enter",
-      )}
-    >
-      <div role="dialog" aria-modal aria-labelledby="welcome-title" className="welcome-card w-full max-w-3xl border border-line bg-panel shadow-2xl">
-        <header className="border-b border-line px-6 py-5">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-faint">Welcome to</div>
-          <div className="mt-0.5 flex items-baseline gap-3">
-            <h1 id="welcome-title" className="text-2xl font-black tracking-[0.25em] text-ink">
-              VANDAL
-            </h1>
-            <span className="text-xs text-dim">Break it. Fix it. Prove it.</span>
-          </div>
-          <p className="mt-2 max-w-2xl text-xs leading-relaxed text-dim">
-            A finance agent pays the bills. <span className="text-blue">Guard</span> checks every action it takes against the books.{" "}
-            <span className="text-red">Vandal</span> attacks a clone until the books break, names the broken link, and builds a control
-            that Guard then enforces. Nothing here moves real money.
+    <div className={cx("fixed inset-0 z-50 overflow-auto bg-bg", leaving ? "welcome-leave" : "welcome-enter")}>
+      {/* Backdrop: a faint grid with one glow per side. */}
+      <div aria-hidden className="welcome-grid pointer-events-none absolute inset-0" />
+      <div aria-hidden className="pointer-events-none absolute -left-40 -top-40 size-[34rem] rounded-full bg-blue/15 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-40 -right-40 size-[34rem] rounded-full bg-red/15 blur-3xl" />
+
+      <div
+        role="dialog"
+        aria-modal
+        aria-labelledby="welcome-title"
+        className="welcome-card relative mx-auto grid min-h-full w-full max-w-7xl gap-10 px-6 py-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:items-center lg:px-12"
+      >
+        {/* Left: what this is. */}
+        <section className="flex flex-col justify-center">
+          <div className="text-xs uppercase tracking-[0.3em] text-faint">Welcome to</div>
+          <h1 id="welcome-title" className="mt-2 text-6xl font-black leading-none tracking-[0.2em] text-ink sm:text-7xl lg:text-8xl">
+            VANDAL
+          </h1>
+          <p className="mt-4 text-base font-medium text-dim sm:text-lg">
+            Break it. <span className="text-ink">Fix it.</span> Prove it.
           </p>
-          <ol className="mt-3 flex flex-wrap items-center gap-1" aria-label="The loop">
-            {steps.map((st, i) => {
+          <p className="mt-6 max-w-xl text-sm leading-relaxed text-dim sm:text-[15px]">
+            A finance agent pays the bills. <span className="font-semibold text-blue">Guard</span> checks every action it takes
+            against the books. <span className="font-semibold text-red">Vandal</span> attacks a clone until the books break, names
+            the broken link, and builds a control that Guard then enforces. Nothing here moves real money.
+          </p>
+
+          <div className="mt-8 text-[10px] uppercase tracking-[0.2em] text-faint">The loop</div>
+          <ol className="mt-3 grid gap-2 sm:grid-cols-2" aria-label="The loop">
+            {steps.map((st) => {
               const red = st.side === "red";
               return (
-                <li key={st.n} className="flex items-center gap-1">
-                  {i > 0 && <span aria-hidden className={cx("h-px w-3", steps[i - 1].side !== st.side ? "bg-dim" : "bg-line")} />}
+                <li
+                  key={st.n}
+                  className={cx(
+                    "flex items-start gap-3 rounded border border-l-4 bg-panel/70 px-3 py-2",
+                    red ? "border-line border-l-red" : "border-line border-l-blue",
+                  )}
+                >
                   <span
-                    title={st.next}
-                    className={cx("flex h-6 items-center gap-1.5 rounded-full border px-2 text-[11px]", red ? "border-red/40 text-red" : "border-blue/40 text-blue")}
+                    className={cx(
+                      "num mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-bg",
+                      red ? "bg-red" : "bg-blue",
+                    )}
                   >
-                    <span className={cx("num flex size-4 items-center justify-center rounded-full text-[9px] font-bold text-bg", red ? "bg-red" : "bg-blue")}>
-                      {st.n}
-                    </span>
-                    {st.label}
+                    {st.n}
                   </span>
+                  <div className="min-w-0">
+                    <div className={cx("text-xs font-bold uppercase tracking-wider", red ? "text-red" : "text-blue")}>{st.label}</div>
+                    <div className="text-[11px] leading-snug text-dim">{st.next.split(". ")[0].replace(/\.$/, "")}</div>
+                  </div>
                 </li>
               );
             })}
           </ol>
-        </header>
+        </section>
 
-        <div className="space-y-5 px-6 py-5">
-          <section>
-            <div className="mb-2 text-[10px] uppercase tracking-wider text-faint">Start on</div>
-            <div role="radiogroup" aria-label="Side" className="grid gap-2 sm:grid-cols-2">
+        {/* Right: the three choices and the way in. */}
+        <section className="flex flex-col gap-6 rounded-lg border border-line bg-panel/90 p-6 shadow-2xl backdrop-blur">
+          <div>
+            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-faint">Start on</div>
+            <div role="radiogroup" aria-label="Side" className="grid gap-2">
               {SIDES.map((x) => {
                 const red = x.id === "red";
                 return (
-                  <Choice key={x.id} on={side === x.id} red={red} onClick={() => setSide(x.id)} className={cx("border-l-4 p-3", red ? "border-l-red" : "border-l-blue")}>
+                  <Choice key={x.id} on={side === x.id} red={red} onClick={() => setSide(x.id)} className={cx("border-l-4 p-3.5", red ? "border-l-red" : "border-l-blue")}>
                     <div className="flex items-center gap-2">
-                      <span className={cx("text-[11px] font-bold tracking-wider", red ? "text-red" : "text-blue")}>{x.name}</span>
-                      <span className="font-semibold text-ink">{x.product}</span>
+                      <span className={cx("text-xs font-black tracking-wider", red ? "text-red" : "text-blue")}>{x.name}</span>
+                      <span className="text-sm font-semibold text-ink">{x.product}</span>
+                      <span className="ml-auto text-[10px] text-faint">{x.first}</span>
                     </div>
-                    <p className="mt-1 leading-snug text-dim">{x.blurb}</p>
-                    <p className="mt-1 text-[11px] text-faint">{x.first}</p>
+                    <p className="mt-1 text-xs leading-snug text-dim">{x.blurb}</p>
                   </Choice>
                 );
               })}
             </div>
-          </section>
-
-          <section className="grid gap-4 sm:grid-cols-[1fr_auto]">
-            <div>
-              <div className="mb-2 text-[10px] uppercase tracking-wider text-faint">Threat for Red to search</div>
-              <div role="radiogroup" aria-label="Scenario" className="flex flex-col gap-1">
-                {SCENARIOS.map((x) => (
-                  <Choice key={x.id} on={scenario === x.id} red onClick={() => setScenario(x.id)} title={x.hint} className="flex items-center gap-2 px-2 py-1">
-                    <span className={cx("num text-[10px] font-bold uppercase", scenario === x.id ? "text-red" : "text-faint")}>{x.id}</span>
-                    {x.label}
-                  </Choice>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className="mb-2 text-[10px] uppercase tracking-wider text-faint">Finance agent</div>
-              <div role="radiogroup" aria-label="Operator" className="flex flex-col gap-1">
-                {OPERATORS.map((x) => (
-                  <Choice key={x.id} on={operator === x.id} onClick={() => setOperator(x.id)} title={x.hint} className="px-2 py-1">
-                    {x.label}
-                  </Choice>
-                ))}
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <footer className="flex flex-wrap items-center gap-3 border-t border-line px-6 py-3">
-          <span className="text-[11px] text-faint">All of this can be changed later from the top bar and the panels.</span>
-          <div className="ml-auto flex items-center gap-2">
-            <Button tone="ghost" onClick={dismiss}>
-              Skip
-            </Button>
-            <Button tone={side === "red" ? "red" : "blue"} onClick={enter} busy={entering} disabled={!s.ready}>
-              {s.ready ? "Enter the war room" : "Connecting…"}
-            </Button>
           </div>
-        </footer>
+
+          <div>
+            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-faint">Threat for Red to search</div>
+            <div role="radiogroup" aria-label="Scenario" className="grid gap-1.5">
+              {SCENARIOS.map((x) => (
+                <Choice key={x.id} on={scenario === x.id} red onClick={() => setScenario(x.id)} title={x.hint} className="flex items-center gap-3 px-3 py-2">
+                  <span className={cx("num text-[11px] font-black uppercase", scenario === x.id ? "text-red" : "text-faint")}>{x.id}</span>
+                  <span className="text-ink">{x.label}</span>
+                </Choice>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-faint">Finance agent</div>
+            <div role="radiogroup" aria-label="Operator" className="grid grid-cols-2 gap-1.5">
+              {OPERATORS.map((x) => (
+                <Choice key={x.id} on={operator === x.id} onClick={() => setOperator(x.id)} title={x.hint} className="px-3 py-2">
+                  <div className="text-ink">{x.label}</div>
+                  <div className="mt-0.5 text-[11px] leading-snug text-faint">{x.hint}</div>
+                </Choice>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 border-t border-line pt-4">
+            <span className="text-[11px] text-faint">All of this can be changed later.</span>
+            <div className="ml-auto flex items-center gap-2">
+              <Button tone="ghost" onClick={dismiss}>
+                Skip
+              </Button>
+              <Button
+                tone={side === "red" ? "red" : "blue"}
+                onClick={enter}
+                busy={entering}
+                disabled={!s.ready}
+                className="h-9 px-5 text-sm font-semibold"
+              >
+                {s.ready ? "Enter the war room →" : "Connecting…"}
+              </Button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
