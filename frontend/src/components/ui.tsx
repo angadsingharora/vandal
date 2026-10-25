@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cx, DECISION_STYLE } from "@/lib/format";
 import type { Decision } from "@/lib/types";
 
@@ -52,6 +52,7 @@ export function Button({
   title,
   className,
   type = "button",
+  nudge,
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -61,6 +62,8 @@ export function Button({
   title?: string;
   className?: string;
   type?: "button" | "submit";
+  /** The one thing to click next: a soft ring breathes around it. */
+  nudge?: boolean;
 }) {
   const tones: Record<Tone, string> = {
     default: "border-line bg-raised text-ink hover:border-dim",
@@ -79,6 +82,8 @@ export function Button({
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue",
         "disabled:cursor-not-allowed disabled:opacity-40",
         tones[tone],
+        nudge && !disabled && !busy && "nudge",
+        nudge && tone === "red" && "nudge-red",
         className,
       )}
     >
@@ -121,7 +126,7 @@ export function Badge({ children, tone = "dim" }: { children: ReactNode; tone?: 
   return <span className={cx("inline-block rounded-sm border px-1.5 py-px text-[10px] font-medium", tones[tone])}>{children}</span>;
 }
 
-export function Stat({ label, value, tone, sub }: { label: string; value: ReactNode; tone?: "bad" | "ok"; sub?: ReactNode }) {
+export function Stat({ label, value, tone, sub }: { label: ReactNode; value: ReactNode; tone?: "bad" | "ok"; sub?: ReactNode }) {
   return (
     <div className="min-w-0 border-r border-line px-3 py-2 last:border-r-0">
       <div className="text-[10px] uppercase tracking-wider text-faint">{label}</div>
@@ -220,3 +225,30 @@ export function Table({ head, children }: { head: ReactNode[]; children: ReactNo
 }
 
 export const td = "border-b border-line/50 px-2 py-1 align-top";
+
+/** Plays the reveal animation when it mounts and again whenever `k` changes, so new information
+ * rises in and glows for a moment. */
+export function Reveal({ k, className, children }: { k?: string | number | boolean | null; className?: string; children: ReactNode }) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    setTick((t) => t + 1);
+  }, [k]);
+  return (
+    <div key={tick} className={cx("reveal rounded", className)}>
+      {children}
+    </div>
+  );
+}
+
+/** A labelled block on a stage page: a small caption, then the content. */
+export function Block({ label, aside, children, className, quiet }: { label: ReactNode; aside?: ReactNode; children: ReactNode; className?: string; quiet?: boolean }) {
+  return (
+    <section className={cx("rounded border border-line bg-panel", quiet && "quiet", className)}>
+      <header className="flex min-h-8 items-center gap-2 border-b border-line px-3 py-1">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-dim">{label}</h3>
+        <div className="ml-auto flex items-center gap-2 text-[11px] text-faint">{aside}</div>
+      </header>
+      {children}
+    </section>
+  );
+}

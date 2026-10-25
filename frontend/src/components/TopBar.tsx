@@ -60,38 +60,44 @@ function SideSwitch() {
   );
 }
 
-/** Where the demo is: seven steps, coloured by the side that does them. Click one to go there. */
+/** The stepper: seven steps, coloured by the side that does them. The page being looked at is
+ * outlined; the step to do next breathes until it is. Click any step to open its page. */
 export function LoopStrip() {
   const s = useWarRoom();
-  const steps = loopSteps({
-    operated: s.operate.phase === "done",
-    attacked: !!s.attack,
-    diagnosed: s.diagnosis.phase === "done" && !!s.diagnosis.data,
-    synthesized: !!s.synth.result?.policy,
-    submitted: !!s.patch,
-    applied: !!s.appliedPolicy,
-    enforced: !!s.replays.after,
-  });
+  const steps = loopSteps(s.progress());
   const now = currentStep(steps);
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-line bg-bg px-4 py-1.5">
-      <ol className="flex flex-wrap items-center gap-1" aria-label="Demo loop">
+    <nav aria-label="The loop" className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-line bg-bg px-4 py-1.5">
+      <ol className="flex flex-wrap items-center gap-1">
         {steps.map((st, i) => {
           const red = st.side === "red";
-          const current = now?.n === st.n;
+          const current = now?.id === st.id;
+          const viewing = s.stage === st.id;
           return (
-            <li key={st.n} className="flex items-center gap-1">
+            <li key={st.id} className="flex items-center gap-1">
               {i > 0 && <span aria-hidden className={cx("h-px w-3", steps[i - 1].side !== st.side ? "bg-dim" : "bg-line")} />}
               <button
-                onClick={() => void s.setView(st.side)}
-                aria-current={current ? "step" : undefined}
+                onClick={() => void s.setStage(st.id)}
+                aria-current={viewing ? "page" : undefined}
                 title={`${red ? "Vandal Strike" : "Vandal Guard"}: ${st.next}`}
                 className={cx(
-                  "flex h-6 items-center gap-1.5 rounded-full border px-2 text-[11px] transition-colors",
-                  st.done && (red ? "border-red/40 text-red" : "border-blue/40 text-blue"),
-                  current && (red ? "border-red bg-red/20 text-ink" : "border-blue bg-blue/20 text-ink"),
-                  !st.done && !current && "border-line text-faint hover:text-dim",
+                  "flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] transition-colors",
+                  viewing
+                    ? red
+                      ? "border-red bg-red/15 text-ink"
+                      : "border-blue bg-blue/15 text-ink"
+                    : st.done
+                      ? red
+                        ? "border-red/30 text-red/80 hover:text-red"
+                        : "border-blue/30 text-blue/80 hover:text-blue"
+                      : current
+                        ? red
+                          ? "border-red/60 text-ink"
+                          : "border-blue/60 text-ink"
+                        : "border-line text-faint hover:text-dim",
+                  current && !viewing && "nudge",
+                  current && !viewing && red && "nudge-red",
                 )}
               >
                 <span
@@ -112,7 +118,7 @@ export function LoopStrip() {
         {now ? (
           <>
             <span className={cx("font-semibold", now.side === "red" ? "text-red" : "text-blue")}>
-              Next{s.view !== now.side && ` (${now.side === "red" ? "Strike" : "Guard"})`}:
+              Next{s.stage !== now.id && `, on ${now.label}`}:
             </span>{" "}
             {now.next}
           </>
@@ -120,7 +126,7 @@ export function LoopStrip() {
           <span className="text-ok">Loop closed: Strike found the gap, built and proved a fix, and Guard now holds the attack.</span>
         )}
       </p>
-    </div>
+    </nav>
   );
 }
 

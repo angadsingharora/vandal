@@ -10,6 +10,7 @@ import type {
   Entities,
   EvidencePack,
   Explanation,
+  HuntResult,
   InjectResult,
   Job,
   JournalEntry,
@@ -81,6 +82,8 @@ export interface VandalApi {
   metrics(policies: string[], depth?: number): Promise<Metrics>;
   inject(runId: string, body: InjectBody & { dry_run: true }): Promise<{ plan: ThreatPlan }>;
   inject(runId: string, body: InjectBody): Promise<Job<InjectResult>>;
+  /** R13: Claude studies the run's company and reasons out attacks; each attempt streams as a log. */
+  hunt(runId: string, body: { attempts: number; keep_going?: boolean }): Promise<Job<HuntResult>>;
 
   approvals(): Promise<Approvals>;
   decidePayment(
@@ -179,6 +182,8 @@ export class HttpApi implements VandalApi {
     );
   inject = ((runId: string, body: InjectBody) =>
     this.call("POST", `/runs/${runId}/inject`, body)) as VandalApi["inject"];
+  hunt = (runId: string, body: { attempts: number; keep_going?: boolean }) =>
+    this.call<Job<HuntResult>>("POST", `/runs/${runId}/hunt`, body);
 
   approvals = () => this.call<Approvals>("GET", "/approvals");
   decidePayment = (runId: string, requestId: string, actor: Actor, approve: boolean, reason = "") =>

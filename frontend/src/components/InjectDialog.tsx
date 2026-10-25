@@ -227,10 +227,11 @@ export function InjectDialog({ onClose }: { onClose: () => void }) {
                       tone="red"
                       onClick={() => {
                         onClose();
+                        void s.setStage("diagnose");
                         void s.diagnose();
                       }}
                     >
-                      Send to diagnose → CEGIS
+                      Diagnose it →
                     </Button>
                   </div>
                 </div>

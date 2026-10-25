@@ -1,9 +1,10 @@
 "use client";
 
-import { atLabel, cx, INVARIANTS, moveLine, moveTitle, usd } from "@/lib/format";
-import { useWarRoom } from "@/lib/store";
+// The attack's building blocks, shared by the Attack page, the inject dialog and the welcome
+// screen: the three threats Red knows how to search, and a sequence of moves drawn as a timeline.
+
+import { atLabel, moveLine, moveTitle } from "@/lib/format";
 import type { Move, OracleLabel } from "@/lib/types";
-import { Badge, Button, Empty, LiveDot, Panel, SideTag } from "./ui";
 
 export const SCENARIOS = [
   { id: "a", label: "Bank change after approval", hint: "A vendor's bank details change between approval and the payment run" },
@@ -45,147 +46,5 @@ export function MovesTimeline({ moves, labels, judge }: { moves: Move[]; labels?
         </li>
       )}
     </ol>
-  );
-}
-
-export function SearchPanel() {
-  const s = useWarRoom();
-  const { search, attack } = s;
-  const running = search.phase === "running";
-  const r = search.result;
-  const policy = s.summary?.policy ?? "v0";
-  const replayed = s.replays.before;
-
-  return (
-    <Panel
-      title="Attack · adversarial search"
-      tag={<SideTag side="red" />}
-      className="min-h-[320px]"
-      bodyClass="flex flex-col"
-    >
-      <div className="space-y-2 border-b border-line p-3">
-        <div className="text-[10px] uppercase tracking-wider text-faint">Threat to search</div>
-        <div role="radiogroup" aria-label="Scenario" className="flex flex-col gap-1">
-          {SCENARIOS.map((x) => {
-            const on = search.scenario === x.id;
-            return (
-              <button
-                key={x.id}
-                role="radio"
-                aria-checked={on}
-                onClick={() => s.setSearch({ scenario: x.id })}
-                title={x.hint}
-                className={cx(
-                  "flex items-center gap-2 rounded border px-2 py-1 text-left text-xs transition-colors",
-                  on ? "border-red/70 bg-red/10 text-ink" : "border-line text-dim hover:border-dim hover:text-ink",
-                )}
-              >
-                <span className={cx("num text-[10px] font-bold uppercase", on ? "text-red" : "text-faint")}>{x.id}</span>
-                {x.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-dim" title="How many attacker moves or faults per sequence">Moves per sequence</span>
-          <label className="sr-only" htmlFor="depth">Depth</label>
-          <select
-            id="depth"
-            value={search.depth}
-            onChange={(e) => s.setSearch({ depth: Number(e.target.value) })}
-            className="num h-7 rounded border border-line bg-raised px-1.5 text-xs"
-            title="Moves per sequence"
-          >
-            {[1, 2, 3, 4].map((d) => (
-              <option key={d} value={d}>
-                k={d}
-              </option>
-            ))}
-          </select>
-        </div>
-        <Button tone="red" className="w-full justify-center" onClick={s.runSearch} busy={running} disabled={!s.ready}>
-          Release Vandal Strike on {policy}
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-2 border-b border-line">
-        <div className="border-r border-line px-3 py-2">
-          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-faint">
-            Sequences {running && <LiveDot className="text-red" />}
-          </div>
-          <div className="num text-2xl font-semibold text-ink">{search.explored.toLocaleString()}</div>
-        </div>
-        <div className="px-3 py-2">
-          <div className="text-[10px] uppercase tracking-wider text-faint">Violations</div>
-          <div className={`num text-2xl font-semibold ${r?.findings.length ? "text-bad" : "text-ink"}`}>
-            {r ? r.findings.length : running ? "…" : "—"}
-          </div>
-        </div>
-      </div>
-      {running && <div className="px-3 py-1.5 text-[11px] text-dim">exploring depth {search.atDepth}…</div>}
-      {r && (
-        <div className="num border-b border-line px-3 py-1.5 text-[11px] text-dim">
-          depth {r.depth} · alphabet {r.alphabet} · per depth [{r.levels.join(", ")}] · {r.deduped} deduped ·{" "}
-          {r.pruned} pruned · {Math.round(r.runs_per_second)} runs/s
-        </div>
-      )}
-
-      <div className="flex-1 p-3">
-        {!attack && !running && (
-          <Empty>
-            {r ? `No violation within depth ${r.depth} under ${policy}. Bounded claim: not a proof beyond it.` : "Strike tries every short sequence of attacker moves and bank faults against the twin, looking for one that sends money to the wrong place."}
-          </Empty>
-        )}
-        {attack && (
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Minimal counterexample</span>
-              <Badge tone="dim">{attack.source === "inject" ? "from your scenario" : `under ${attack.policy}`}</Badge>
-            </div>
-            <MovesTimeline moves={attack.finding.moves} labels={attack.labels} judge={s.judge} />
-            <div className="rounded border border-bad/40 bg-bad/10 p-2">
-              <div className="flex items-baseline justify-between">
-                <span className="text-[11px] text-bad">Money misdirected</span>
-                <span className="num text-lg font-bold text-bad">{usd(attack.finding.exposure)}</span>
-              </div>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {attack.finding.violated.map((v) => (
-                  <span key={v} title={INVARIANTS[v]}>
-                    <Badge tone="bad">{v}</Badge>
-                  </span>
-                ))}
-              </div>
-            </div>
-            {r && attack.source === "search" && r.findings.length > 1 && (
-              <details className="text-[11px] text-dim">
-                <summary className="cursor-pointer">{r.findings.length} violating traces at this depth</summary>
-                <ul className="num mt-1 space-y-1">
-                  {r.findings.map((f, i) => (
-                    <li key={i} className="break-all">
-                      {f.moves.map(moveLine).join(" → ")} · {usd(f.exposure, { cents: false })}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-            <div className="flex flex-wrap gap-1.5">
-              <Button onClick={() => s.replayAttack(attack.policy)} title="Run the counterexample on a fresh clone and show its books">
-                Replay on twin
-              </Button>
-              <Button tone="red" onClick={s.diagnose} busy={s.diagnosis.phase === "running"}>
-                Diagnose
-              </Button>
-            </div>
-            {replayed && (
-              <div className="text-[11px] text-dim">
-                Replayed on a fresh clone:{" "}
-                {["INV-1", "INV-7"].some((v) => replayed.result.violated.includes(v)) ? "the books don't tie out" : "the books balance"}
-                , and {replayed.result.violated.length ? `${replayed.result.violated.join(", ")} broke` : "nothing broke"}.
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </Panel>
   );
 }
