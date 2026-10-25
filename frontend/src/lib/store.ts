@@ -6,6 +6,7 @@
 
 import { create } from "zustand";
 import { getApi, type Handlers, type InjectBody, type VandalApi } from "./api";
+import { landingStage, loopSteps, sideOf, type LoopInput, type Stage } from "./loop";
 import type {
   Actor,
   AlertItem,
@@ -73,6 +74,8 @@ interface State {
   settings: Settings | null;
   judge: boolean;
   view: View;
+  /** The page of the loop being looked at. Its side is `view`. */
+  stage: Stage;
   policies: PolicyInfo[];
 
   tabs: RunTab[];
@@ -126,6 +129,9 @@ interface Actions {
   clearError(): void;
   toggleJudge(): void;
   setView(view: View): Promise<void>;
+  setStage(stage: Stage): Promise<void>;
+  /** Which steps of the loop are done, for the stepper and the pages. */
+  progress(): LoopInput;
   setPlayback(on: boolean): Promise<void>;
   reset(policy: string, operator?: OperatorKind): Promise<void>;
   setOperator(operator: OperatorKind): void;
@@ -240,6 +246,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     settings: null,
     judge: false,
     view: "blue",
+    stage: "operate",
     policies: [],
     tabs: [],
     liveRunId: null,
@@ -289,11 +296,37 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     clearError: () => set({ error: null }),
     toggleJudge: () => set((s) => ({ judge: !s.judge })),
 
-    // Blue watches the live run; Red looks at its latest sandbox replay, or the live run it clones.
-    setView: guard(async (view: View) => {
-      set({ view });
-      const { tabs, liveRunId, focusRunId } = get();
-      const target = view === "blue" ? liveRunId : (tabs.filter((t) => t.kind === "replay").at(-1)?.id ?? liveRunId);
+    progress: () => {
+      const s = get();
+      return {
+        operated: s.operate.phase === "done",
+        attacked: !!s.attack,
+        diagnosed: s.diagnosis.phase === "done" && !!s.diagnosis.data,
+        synthesized: !!s.synth.result?.policy,
+        submitted: !!s.patch,
+        applied: !!s.appliedPolicy,
+        enforced: !!s.replays.after,
+      };
+    },
+
+    // Switching sides opens that side's current page.
+    setView: async (view: View) => {
+      await get().setStage(landingStage(loopSteps(get().progress()), view));
+    },
+
+    // Blue's pages watch the live run (Enforce: the replay under the new policy, once there is
+    // one); Red's look at the latest sandbox clone of the attack, or the live run it clones.
+    setStage: guard(async (stage: Stage) => {
+      const view = sideOf(stage);
+      set({ stage, view });
+      const { tabs, liveRunId, focusRunId, replays } = get();
+      const afterId = replays.after?.run.run_id ?? null;
+      const target =
+        stage === "enforce"
+          ? (afterId ?? liveRunId)
+          : view === "blue"
+            ? liveRunId
+            : (tabs.filter((t) => t.kind === "replay" && t.id !== afterId).at(-1)?.id ?? liveRunId);
       if (target && target !== focusRunId) await get().focus(target);
     }),
 
@@ -353,6 +386,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         inject: { ...idle, plan: null, jobId: null, result: null },
         explanation: { ...idle, data: null, subject: null },
         policies: await a.policies(),
+        stage: get().view === "blue" ? "operate" : "attack",
       });
       await get().focus(run.run_id);
       await get().loadApprovals();
@@ -426,6 +460,8 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         set((s) => ({ search: { ...s.search, phase: "failed" } }));
         throw err;
       }
+      // Show the attack on a fresh clone right away: its books, and the message that did it.
+      if (get().search.result?.best) await get().replayAttack(policy);
     }),
 
     replayAttack: guard(async (policy: string) => {
@@ -515,11 +551,13 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       }
     }),
 
+    // The fix crosses to Blue: the war room follows it to the Approve page.
     submitPatch: guard(async () => {
       const jobId = get().verify.jobId;
       if (!jobId) return;
       set({ patch: await api().submitPatch(jobId, SYNTHESIZER) });
       await get().loadApprovals();
+      await get().setStage("approve");
     }),
 
     decidePatch: guard(async (actor: Actor, approve: boolean, reason = "") => {
@@ -536,6 +574,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       await a.applyPolicy(patch.version);
       set({ patch: { ...patch, status: "applied" }, appliedPolicy: patch.version, policies: await a.policies() });
       await get().loadApprovals();
+      await get().setStage("enforce");
     }),
 
     loadApprovals: guard(async () => {
@@ -591,6 +630,8 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         set((s) => ({ inject: { ...s.inject, phase: "failed" } }));
         throw err;
       }
+      const atk = get().attack;
+      if (get().inject.result?.best && atk) await get().replayAttack(atk.policy);
     }),
 
     loadMetrics: guard(async (policies: string[]) => {
