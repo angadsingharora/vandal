@@ -1,22 +1,28 @@
 @import "tailwindcss";
 
-/* War room palette: dark, technical, with one meaning per color. */
+/* Black and white, with two highlights. One near-black surface everywhere; white for words and
+ * figures, grey for labels; red for what Vandal found and what is at risk, blue for what Guard
+ * decided and approved. Amber marks a hold, violet an escalation; nothing else is coloured. */
 @theme {
-  --color-bg: #0a0c10;
-  --color-panel: #10141b;
-  --color-raised: #161b24;
-  --color-line: #232a36;
-  --color-ink: #d7dde8;
-  --color-dim: #8590a3;
-  --color-faint: #566072;
-  --color-red: #ff4d5e;
-  --color-blue: #4da3ff;
-  --color-ok: #3ccf91;
-  --color-warn: #f5b942;
-  --color-esc: #c084fc;
-  --color-bad: #ff4d5e;
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-bg: #0b0b0c;
+  --color-panel: #0b0b0c;
+  --color-raised: #19191b; /* hover, selection */
+  --color-line: #262629; /* hairlines */
+  --color-ink: #f3f3f1;
+  --color-dim: #9a9a98;
+  --color-faint: #5a5a5c;
+  --color-red: #e5484d;
+  --color-blue: #5fd3db;
+  --color-ok: #5fd3db;
+  --color-warn: #e2aa3c;
+  --color-esc: #b89eff;
+  --color-bad: #e5484d;
+  --color-edge: #3a3f47;
+  --color-sheet: #141416;
+}
+@theme inline {
+  --font-sans: var(--font-pmono), "JetBrains Mono", ui-monospace, monospace;
+  --font-mono: var(--font-pmono), "JetBrains Mono", ui-monospace, monospace;
 }
 
 html,
@@ -29,12 +35,23 @@ body {
 body {
   font-family: var(--font-sans);
   font-size: 13px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+}
+
+/* every id, amount and day the backend returns speaks in the machine's voice */
+.num {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.rounded, .rounded-sm, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl {
+  border-radius: 3px;
 }
 
 :focus-visible {
   outline: 2px solid var(--color-blue);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 * {
@@ -42,18 +59,141 @@ body {
   scrollbar-color: var(--color-line) transparent;
 }
 
-.num {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
+select,
+input,
+textarea,
+button {
+  font: inherit;
 }
 
+/* --- motion: one pulse for live work, one fade for a result landing ------------------- */
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.25; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
 }
 .live-dot {
   animation: pulse-dot 1.2s ease-in-out infinite;
 }
+
+@keyframes land {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.land {
+  animation: land 0.3s ease-out both;
+}
+
+@keyframes ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+.ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  animation: ring 1.8s ease-out infinite;
+}
+
+/* --- Evidence scan: the intercepted message ------------------------------------------- */
+.es-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -2px;
+  height: 1px;
+  background: var(--color-red);
+  animation: es-sweep 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  pointer-events: none;
+}
+@keyframes es-sweep {
+  0% {
+    top: -2px;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+.es-mark {
+  background: transparent;
+  color: inherit;
+  transition: color 0.3s, box-shadow 0.3s;
+}
+.es-mark.on {
+  color: var(--color-red);
+  box-shadow: inset 0 -1px 0 var(--color-red);
+}
+.es-forged {
+  font-weight: 600;
+  color: var(--color-red);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.es-finding {
+  transition: opacity 0.35s;
+}
+.es-finding.off {
+  opacity: 0;
+}
+.es-finding.on {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .live-dot { animation: none; }
+  .live-dot,
+  .ring::after,
+  .es-scanline,
+  .land {
+    animation: none;
+  }
+  .es-scanline {
+    display: none;
+  }
+  .es-finding,
+  .es-mark {
+    transition: none;
+  }
+}
+
+/* --- system map pulses (from the console mock) ----------------------------------------- */
+.map-dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes map-fx { 0% { transform: translateX(0); opacity: 0; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { transform: translateX(var(--dx)); opacity: 0; } }
+  @keyframes map-fy { 0% { transform: translateY(0); opacity: 0; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { transform: translateY(var(--dy)); opacity: 0; } }
+  @keyframes map-fxy { 0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: 1; } 48% { transform: translate(var(--dx), 0); } 92% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+  .map-dot.px.live { animation: map-fx var(--t, 1.8s) linear infinite; }
+  .map-dot.py.live { animation: map-fy var(--t, 1.8s) linear infinite; }
+  .map-dot.pxy.live { animation: map-fxy var(--t, 2.2s) linear infinite; }
 }

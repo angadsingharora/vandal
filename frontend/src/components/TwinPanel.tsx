@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { attackerAccounts, cx, INVARIANTS, usd, usdShort } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
-import { Badge, Empty, Panel, Stat, Table, Tabs, td } from "./ui";
+import { Badge, Empty, Figure, Panel, Table, Tabs, td } from "./ui";
 
 type Tab = "invoices" | "payments" | "ledger" | "bank" | "vendors";
 
@@ -34,6 +34,21 @@ function Status({ value }: { value: string }) {
   return <Badge tone={STATUS_TONE[value] ?? "dim"}>{value}</Badge>;
 }
 
+function Why({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={(ev) => {
+        ev.stopPropagation();
+        onClick();
+      }}
+      className="text-[11.5px] text-blue hover:underline"
+    >
+      why?
+    </button>
+  );
+}
+
+/** The books: totals across the top, then the registers. */
 export function TwinPanel({ title }: { title: string }) {
   const s = useWarRoom();
   const [tab, setTab] = useState<Tab>("payments");
@@ -42,10 +57,7 @@ export function TwinPanel({ title }: { title: string }) {
 
   const vendorName = useMemo(() => new Map(e?.vendors.map((v) => [v.id, v.name]) ?? []), [e]);
   const accounts = useMemo(() => new Map(e?.vendor_bank_accounts.map((a) => [a.id, a]) ?? []), [e]);
-  const attacker = useMemo(
-    () => (e && s.judge ? attackerAccounts(e.labels, e.vendor_bank_accounts) : new Set<string>()),
-    [e, s.judge],
-  );
+  const attacker = useMemo(() => (e && s.judge ? attackerAccounts(e.labels, e.vendor_bank_accounts) : new Set<string>()), [e, s.judge]);
   const invoiceVendor = useMemo(() => new Map(e?.invoices.map((i) => [i.id, i.vendor]) ?? []), [e]);
 
   const tab_ = s.tabs.find((t) => t.id === s.focusRunId);
@@ -55,15 +67,11 @@ export function TwinPanel({ title }: { title: string }) {
 
   return (
     <Panel
-      title={
-        <>
-          {title} <span className="normal-case tracking-normal text-faint">· {summary?.company ?? "…"}</span>
-        </>
-      }
+      title={title}
       actions={
         summary && (
-          <span className="num text-[11px] text-faint" title={summary.state_hash}>
-            {tab_?.kind === "replay" ? tab_.label : `Live · ${summary.policy}`} · {summary.events} events · #
+          <span className="num text-[11px] text-dim" title={summary.state_hash}>
+            {summary.company}, {tab_?.kind === "replay" ? tab_.label.replace(" \u00B7 ", " ") : `Live ${summary.policy}`}, {summary.events} events, #
             {summary.state_hash.slice(0, 8)}
           </span>
         )
@@ -71,16 +79,16 @@ export function TwinPanel({ title }: { title: string }) {
       bodyClass="flex flex-col"
     >
       <div className="grid shrink-0 grid-cols-2 border-b border-line sm:grid-cols-5">
-        <Stat label="Cash" value={e ? usdShort(e.totals.cash) : "—"} sub={e && `${e.bank_accounts.length} accounts`} />
-        <Stat label="Open AP" value={e ? usdShort(e.totals.open_ap) : "—"} sub={summary && `${summary.open_approvals} awaiting approval`} />
-        <Stat
+        <Figure label="Cash" value={e ? usdShort(e.totals.cash) : "—"} sub={e && `${e.bank_accounts.length} accounts`} />
+        <Figure label="Open AP" value={e ? usdShort(e.totals.open_ap) : "—"} sub={summary && `${summary.open_approvals} awaiting approval`} />
+        <Figure
           label="Exposure"
           value={e ? usdShort(e.totals.exposure) : "—"}
           tone={e && e.totals.exposure > 0 ? "bad" : "ok"}
           sub={e && (e.totals.exposure > 0 ? "money to the wrong place" : "none")}
         />
-        <Stat label="Day" value={summary?.day ?? "—"} sub={summary && `${paid}/${totalInv} invoices paid`} />
-        <Stat
+        <Figure label="Day" value={summary?.day ?? "—"} sub={summary && `${paid} of ${totalInv} invoices paid`} />
+        <Figure
           label="Invariants"
           value={violated.length ? `${violated.length} broken` : "all hold"}
           tone={violated.length ? "bad" : "ok"}
@@ -88,7 +96,7 @@ export function TwinPanel({ title }: { title: string }) {
             violated.length ? (
               <span title={violated.map((v) => `${v}: ${INVARIANTS[v] ?? ""}`).join("\n")}>{violated.join(" ")}</span>
             ) : (
-              "INV-1 … INV-11"
+              "INV-1 through INV-11"
             )
           }
         />
@@ -107,7 +115,7 @@ export function TwinPanel({ title }: { title: string }) {
       />
 
       <div className="min-h-0 flex-1 overflow-auto">
-        {!e && <Empty>Loading the twin…</Empty>}
+        {!e && <Empty>Loading the books.</Empty>}
 
         {e && tab === "payments" && (
           <Table head={["Payment", "Invoice", "Vendor", "Amount", "Payee account", "Status", ""]}>
@@ -119,7 +127,7 @@ export function TwinPanel({ title }: { title: string }) {
                 <tr
                   key={p.id}
                   onClick={() => s.selectPayment(p.id)}
-                  className={cx("cursor-pointer hover:bg-raised", selected && "bg-blue/10", bad && "bg-bad/10")}
+                  className={cx("cursor-pointer hover:bg-raised", selected && "bg-blue/10", bad && "bg-red/10")}
                 >
                   <td className={cx(td, "num")}>{p.id}</td>
                   <td className={cx(td, "num text-dim")}>{p.invoice}</td>
@@ -132,21 +140,13 @@ export function TwinPanel({ title }: { title: string }) {
                         <Status value={acct.status} />
                       </span>
                     )}
-                    {bad && <span className="ml-1 text-[10px] font-bold text-esc">ATTACKER</span>}
+                    {bad && <span className="ml-1 text-[11px] text-esc">attacker</span>}
                   </td>
                   <td className={td}>
                     <Status value={p.status} />
                   </td>
                   <td className={td}>
-                    <button
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        s.explain("payment", p.id);
-                      }}
-                      className="text-[11px] text-blue hover:underline"
-                    >
-                      why?
-                    </button>
+                    <Why onClick={() => s.explain("payment", p.id)} />
                   </td>
                 </tr>
               );
@@ -166,12 +166,10 @@ export function TwinPanel({ title }: { title: string }) {
                 <td className={cx(td, "num text-dim")}>d{i.due_date}</td>
                 <td className={td}>
                   <Status value={i.status} />
-                  {i.kind === "credit_memo" && <span className="ml-1 text-[10px] text-faint">credit memo</span>}
+                  {i.kind === "credit_memo" && <span className="ml-1 text-[11px] text-dim">credit memo</span>}
                 </td>
                 <td className={td}>
-                  <button onClick={() => s.explain("invoice", i.id)} className="text-[11px] text-blue hover:underline">
-                    why?
-                  </button>
+                  <Why onClick={() => s.explain("invoice", i.id)} />
                 </td>
               </tr>
             ))}
@@ -185,9 +183,9 @@ export function TwinPanel({ title }: { title: string }) {
                 <tr key={`${je.id}-${k}`} className={cx(k === 0 && "border-t border-line")}>
                   <td className={cx(td, "num text-dim")}>{k === 0 ? je.id : ""}</td>
                   <td className={cx(td, "num text-dim")}>{k === 0 ? `d${je.posted_on}` : ""}</td>
-                  <td className={cx(td, "text-dim")}>
+                  <td className={cx(td, "whitespace-normal text-dim")}>
                     {k === 0 ? je.memo : ""}
-                    {k === 0 && je.reverses_entry_id && <span className="ml-1 text-warn">reverses {je.reverses_entry_id}</span>}
+                    {k === 0 && je.reverses_entry_id && <span className="num ml-1 text-warn">reverses {je.reverses_entry_id}</span>}
                   </td>
                   <td className={cx(td, "num")}>{ln.account}</td>
                   <td className={cx(td, "num text-right")}>{ln.debit ? usd(ln.debit) : ""}</td>
@@ -200,23 +198,22 @@ export function TwinPanel({ title }: { title: string }) {
 
         {e && tab === "bank" && (
           <>
-            <div className="flex flex-wrap gap-4 border-b border-line px-3 py-2">
+            <div className="flex flex-wrap gap-4 border-b border-line px-3 py-2 text-[12px]">
               {e.bank_accounts.map((b) => (
-                <div key={b.id} className="text-xs">
-                  <span className="text-dim">{b.name}</span>{" "}
-                  <span className="num font-semibold">{usd(b.balance)}</span>
+                <div key={b.id}>
+                  <span className="text-dim">{b.name}</span> <span className="num">{usd(b.balance)}</span>
                 </div>
               ))}
             </div>
             <Table head={["Txn", "Day", "Amount", "Payment", "Counterparty", "Memo", "Reconciled"]}>
               {[...e.bank_transactions].reverse().map((t) => (
-                <tr key={t.id} className={cx(t.counterparty_account && attacker.has(t.counterparty_account) && "bg-bad/10")}>
+                <tr key={t.id} className={cx(t.counterparty_account && attacker.has(t.counterparty_account) && "bg-red/10")}>
                   <td className={cx(td, "num")}>{t.id}</td>
                   <td className={cx(td, "num text-dim")}>d{t.posted_on}</td>
-                  <td className={cx(td, "num text-right", t.amount < 0 ? "text-ink" : "text-ok")}>{usd(t.amount)}</td>
+                  <td className={cx(td, "num text-right", t.amount < 0 ? "text-ink" : "text-blue")}>{usd(t.amount)}</td>
                   <td className={cx(td, "num text-dim")}>{t.payment ?? t.refund ?? ""}</td>
                   <td className={cx(td, "num text-dim")}>{t.counterparty_account ?? ""}</td>
-                  <td className={cx(td, "text-dim")}>{t.memo}</td>
+                  <td className={cx(td, "whitespace-normal text-dim")}>{t.memo}</td>
                   <td className={td}>{t.reconciled ? <Badge tone="ok">yes</Badge> : <Badge>no</Badge>}</td>
                 </tr>
               ))}
@@ -225,16 +222,13 @@ export function TwinPanel({ title }: { title: string }) {
         )}
 
         {e && tab === "vendors" && (
-          <div className="space-y-4 p-0">
+          <div className="space-y-4">
             {e.change_requests.length > 0 && (
               <Table head={["Change request", "Vendor", "Fields", "Channel", "Sender", "Day", "Status"]}>
                 {e.change_requests.map((c) => (
                   <tr key={c.id}>
                     <td className={cx(td, "num")}>
-                      {c.id}{" "}
-                      <button onClick={() => s.explain("change_request", c.id)} className="ml-1 text-[11px] text-blue hover:underline">
-                        why?
-                      </button>
+                      {c.id} <Why onClick={() => s.explain("change_request", c.id)} />
                     </td>
                     <td className={td}>{vendorName.get(c.vendor) ?? c.vendor}</td>
                     <td className={td}>{c.fields}</td>
@@ -250,10 +244,10 @@ export function TwinPanel({ title }: { title: string }) {
             )}
             <Table head={["Account", "Vendor", "Routing", "Account no.", "Source", "Status"]}>
               {e.vendor_bank_accounts.map((a) => (
-                <tr key={a.id} className={cx(attacker.has(a.id) && "bg-bad/10")}>
+                <tr key={a.id} className={cx(attacker.has(a.id) && "bg-red/10")}>
                   <td className={cx(td, "num")}>
                     {a.id}
-                    {attacker.has(a.id) && <span className="ml-1 text-[10px] font-bold text-esc">ATTACKER</span>}
+                    {attacker.has(a.id) && <span className="ml-1 text-[11px] text-esc">attacker</span>}
                   </td>
                   <td className={td}>{vendorName.get(a.vendor) ?? a.vendor}</td>
                   <td className={cx(td, "num text-dim")}>{a.routing}</td>

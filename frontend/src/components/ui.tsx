@@ -1,19 +1,21 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { cx, DECISION_STYLE } from "@/lib/format";
+import { cx } from "@/lib/format";
 import type { Decision } from "@/lib/types";
 
+/** A section of a page: a small heading on a hairline, then the body. */
 export function Panel({
   title,
-  tag,
+  note,
   actions,
   children,
   className,
   bodyClass,
 }: {
   title: ReactNode;
-  tag?: ReactNode;
+  /** Rarely: a few grey words after the title. Most sections need none. */
+  note?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
@@ -21,24 +23,14 @@ export function Panel({
 }) {
   return (
     <section className={cx("flex h-full min-h-0 min-w-0 flex-col bg-panel", className)}>
-      <header className="flex h-9 shrink-0 items-center gap-2 border-b border-line px-3">
-        {tag}
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-dim">{title}</h2>
-        <div className="ml-auto flex items-center gap-1.5">{actions}</div>
+      <header className="flex min-h-8 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line px-3 py-1">
+        <h2 className="text-[12.5px] font-semibold leading-none text-ink">{title}</h2>
+        {note && <span className="text-[11.5px] text-dim">{note}</span>}
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">{actions}</div>
       </header>
       <div className={cx("min-h-0 flex-1 overflow-auto", bodyClass)}>{children}</div>
     </section>
   );
-}
-
-export function SideTag({ side }: { side: "red" | "blue" | "op" }) {
-  const style = {
-    red: "bg-red/15 text-red",
-    blue: "bg-blue/15 text-blue",
-    op: "bg-ink/10 text-ink",
-  }[side];
-  const label = { red: "RED", blue: "BLUE", op: "AGENT" }[side];
-  return <span className={cx("rounded-sm px-1.5 py-0.5 text-[10px] font-bold tracking-wider", style)}>{label}</span>;
 }
 
 type Tone = "default" | "red" | "blue" | "ghost";
@@ -63,10 +55,10 @@ export function Button({
   type?: "button" | "submit";
 }) {
   const tones: Record<Tone, string> = {
-    default: "border-line bg-raised text-ink hover:border-dim",
-    red: "border-red/60 bg-red/15 text-red hover:bg-red/25",
-    blue: "border-blue/60 bg-blue/15 text-blue hover:bg-blue/25",
-    ghost: "border-transparent text-dim hover:text-ink",
+    default: "border border-ink/20 bg-transparent text-ink hover:border-ink/50",
+    red: "border border-red bg-red text-bg hover:bg-[#ff6b77]",
+    blue: "border border-blue bg-blue text-bg hover:bg-[#7fb3ff]",
+    ghost: "border border-transparent text-dim hover:text-ink",
   };
   return (
     <button
@@ -75,9 +67,8 @@ export function Button({
       onClick={onClick}
       disabled={disabled || busy}
       className={cx(
-        "inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded border px-2.5 text-xs font-medium transition-colors",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue",
-        "disabled:cursor-not-allowed disabled:opacity-40",
+        "inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded px-2.5 text-[12.5px] font-medium transition-colors",
+        "disabled:cursor-not-allowed disabled:opacity-35",
         tones[tone],
         className,
       )}
@@ -101,31 +92,98 @@ export function LiveDot({ className }: { className?: string }) {
   return <span aria-hidden className={cx("live-dot inline-block size-1.5 rounded-full bg-current", className)} />;
 }
 
-export function DecisionBadge({ decision }: { decision: Decision }) {
+export const DECISION_INK: Record<Decision, string> = {
+  allow: "text-blue",
+  hold: "text-warn",
+  escalate: "text-esc",
+  block: "text-red",
+};
+
+/** A status word in its colour. No box: the colour is the mark. */
+export function Badge({
+  children,
+  tone = "dim",
+  title,
+  className,
+}: {
+  children: ReactNode;
+  tone?: "dim" | "ok" | "warn" | "bad" | "blue" | "esc";
+  title?: string;
+  className?: string;
+}) {
+  const tones = {
+    dim: "text-dim",
+    ok: "text-blue",
+    blue: "text-blue",
+    warn: "text-warn",
+    bad: "text-red",
+    esc: "text-esc",
+  };
   return (
-    <span className={cx("inline-block rounded-sm border px-1.5 py-px text-[10px] font-semibold uppercase", DECISION_STYLE[decision])}>
+    <span title={title} className={cx("inline-block whitespace-nowrap text-[11px] font-medium leading-tight", tones[tone], className)}>
+      {children}
+    </span>
+  );
+}
+
+export function DecisionBadge({ decision, className }: { decision: Decision; className?: string }) {
+  const tone = { allow: "blue", hold: "warn", escalate: "esc", block: "red" } as const;
+  return (
+    <span className={cx("inline-block text-[11px] font-semibold leading-tight", DECISION_INK[decision], className)} data-tone={tone[decision]}>
       {decision}
     </span>
   );
 }
 
-export function Badge({ children, tone = "dim" }: { children: ReactNode; tone?: "dim" | "ok" | "warn" | "bad" | "blue" | "esc" }) {
-  const tones = {
-    dim: "border-line text-dim",
-    ok: "border-ok/40 text-ok",
-    warn: "border-warn/40 text-warn",
-    bad: "border-bad/40 text-bad",
-    blue: "border-blue/40 text-blue",
-    esc: "border-esc/40 text-esc",
+/** The one boxed word on a page: held, broken, misdirected, approved, applied. */
+export function Verdict({
+  children,
+  tone = "ink",
+  size = "sm",
+  land,
+  className,
+  title,
+}: {
+  children: ReactNode;
+  tone?: "ink" | "red" | "blue" | "warn" | "esc" | "dim";
+  size?: "sm" | "lg";
+  land?: boolean;
+  className?: string;
+  title?: string;
+}) {
+  const inks = {
+    ink: "text-ink border-ink/50",
+    red: "text-red border-red/60",
+    blue: "text-blue border-blue/60",
+    warn: "text-warn border-warn/60",
+    esc: "text-esc border-esc/60",
+    dim: "text-dim border-dim/50",
   };
-  return <span className={cx("inline-block rounded-sm border px-1.5 py-px text-[10px] font-medium", tones[tone])}>{children}</span>;
+  return (
+    <span
+      title={title}
+      className={cx(
+        "inline-block whitespace-nowrap rounded border font-semibold capitalize leading-none",
+        size === "lg" ? "px-2 py-1 text-[14px]" : "px-1.5 py-[3px] text-[11px]",
+        inks[tone],
+        land && "land",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
 }
 
-export function Stat({ label, value, tone, sub }: { label: string; value: ReactNode; tone?: "bad" | "ok"; sub?: ReactNode }) {
+/** @deprecated use Verdict */
+export const Stamp = Verdict;
+
+/** One column of totals: a grey label over a figure. */
+export function Figure({ label, value, tone, sub }: { label: string; value: ReactNode; tone?: "bad" | "ok"; sub?: ReactNode }) {
   return (
-    <div className="min-w-0 border-r border-line px-3 py-2 last:border-r-0">
-      <div className="text-[10px] uppercase tracking-wider text-faint">{label}</div>
-      <div className={cx("num truncate text-lg font-semibold", tone === "bad" ? "text-bad" : tone === "ok" ? "text-ok" : "text-ink")}>
+    <div className="min-w-0 border-r border-line px-3 py-1.5 last:border-r-0">
+      <div className="text-[11px] text-dim">{label}</div>
+      <div className={cx("num truncate text-[17px] font-semibold leading-tight", tone === "bad" ? "text-red" : tone === "ok" ? "text-blue" : "text-ink")}>
         {value}
       </div>
       {sub && <div className="truncate text-[11px] text-dim">{sub}</div>}
@@ -134,7 +192,7 @@ export function Stat({ label, value, tone, sub }: { label: string; value: ReactN
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="px-3 py-6 text-center text-xs text-faint">{children}</div>;
+  return <div className="mx-auto max-w-sm px-3 py-6 text-center text-[12px] leading-snug text-dim">{children}</div>;
 }
 
 export function Tabs<T extends string>({
@@ -147,7 +205,7 @@ export function Tabs<T extends string>({
   onChange: (id: T) => void;
 }) {
   return (
-    <div role="tablist" className="flex shrink-0 gap-0.5 border-b border-line px-2">
+    <div role="tablist" className="flex shrink-0 gap-3 border-b border-line px-3">
       {tabs.map((t) => (
         <button
           key={t.id}
@@ -155,8 +213,8 @@ export function Tabs<T extends string>({
           aria-selected={value === t.id}
           onClick={() => onChange(t.id)}
           className={cx(
-            "-mb-px border-b-2 px-2.5 py-1.5 text-xs",
-            value === t.id ? "border-blue text-ink" : "border-transparent text-dim hover:text-ink",
+            "-mb-px border-b-2 py-1.5 text-[12px]",
+            value === t.id ? "border-ink font-medium text-ink" : "border-transparent text-dim hover:text-ink",
           )}
         >
           {t.label}
@@ -166,6 +224,7 @@ export function Tabs<T extends string>({
   );
 }
 
+/** A sheet over the page. */
 export function Modal({
   title,
   onClose,
@@ -183,32 +242,33 @@ export function Modal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/60 p-4 pt-[8vh]" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/65 p-4 pt-[7vh]" onClick={onClose}>
       <div
         role="dialog"
         aria-modal
-        className={cx("w-full border border-line bg-panel shadow-2xl", wide ? "max-w-5xl" : "max-w-2xl")}
+        className={cx("w-full rounded border border-line bg-sheet text-ink shadow-[0_16px_48px_rgb(0_0_0_/_0.6)]", wide ? "max-w-5xl" : "max-w-2xl")}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-center border-b border-line px-4 py-2.5">
-          <h2 className="text-sm font-semibold">{title}</h2>
+          <h2 className="text-[14px] font-semibold">{title}</h2>
           <button onClick={onClose} aria-label="Close" className="ml-auto px-1 text-dim hover:text-ink">
             ✕
           </button>
         </header>
-        <div className="max-h-[75vh] overflow-auto p-4">{children}</div>
+        <div className="max-h-[78vh] overflow-auto p-4">{children}</div>
       </div>
     </div>
   );
 }
 
+/** Grey column heads on a hairline, rows on fainter hairlines. */
 export function Table({ head, children }: { head: ReactNode[]; children: ReactNode }) {
   return (
-    <table className="w-full border-collapse text-xs">
+    <table className="w-full border-collapse text-[12px]">
       <thead className="sticky top-0 z-10 bg-panel">
         <tr>
           {head.map((h, i) => (
-            <th key={i} className="border-b border-line px-2 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-faint">
+            <th key={i} className="border-b border-line px-2 py-1 text-left text-[11px] font-medium text-dim">
               {h}
             </th>
           ))}
@@ -219,4 +279,4 @@ export function Table({ head, children }: { head: ReactNode[]; children: ReactNo
   );
 }
 
-export const td = "border-b border-line/50 px-2 py-1 align-top";
+export const td = "whitespace-nowrap border-b border-line/60 px-2 py-1 align-top";

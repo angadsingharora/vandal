@@ -37,9 +37,9 @@ export function ScorecardDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title="Scorecard" onClose={onClose} wide>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
         {names.map((p) => (
-          <label key={p} className="flex items-center gap-1 text-xs">
+          <label key={p} className="flex items-center gap-1.5 text-[12px]">
             <input type="checkbox" checked={picked.includes(p)} onChange={() => toggle(p)} className="accent-blue" />
             <span className="num">{p}</span>
           </label>
@@ -47,17 +47,17 @@ export function ScorecardDialog({ onClose }: { onClose: () => void }) {
         <Button tone="blue" onClick={() => s.loadMetrics(picked)} busy={s.metrics.phase === "running"} disabled={!picked.length}>
           Score
         </Button>
-        <span className="text-[11px] text-faint">
-          Real runs at search depth {data?.depth ?? 1} so this stays interactive; the evidence pack has full-depth numbers.
+        <span className="text-[11px] text-dim" title="The evidence pack has full-depth numbers.">
+          Scored at search depth {data?.depth ?? 1} to stay interactive.
         </span>
       </div>
       {s.metrics.phase === "running" && !data && (
-        <div className="flex items-center gap-2 text-xs text-dim">
-          <Spinner /> running held-out variants and regression…
+        <div className="flex items-center gap-2 text-[12px] text-dim">
+          <Spinner /> Running held-out variants and regression.
         </div>
       )}
       {cards.length > 0 && (
-        <Table head={["", ...cards.map((c) => c.policy)]}>
+        <Table head={["", ...cards.map((c) => <span key={c.policy} className="num">{c.policy}</span>)]}>
           {ROWS.map((row) => (
             <tr key={row.label}>
               <td className={cx(td, "text-dim")}>{row.label}</td>
@@ -70,17 +70,17 @@ export function ScorecardDialog({ onClose }: { onClose: () => void }) {
           ))}
           {classes.length > 0 && (
             <tr>
-              <td className={cx(td, "text-faint")} colSpan={cards.length + 1}>
-                Attacks that got through, by threat class · succeeded / attempted held-out variants
+              <td className={cx(td, "pt-3 text-dim")} colSpan={cards.length + 1} title="Succeeded / attempted held-out variants">
+                Attacks through, by threat class
               </td>
             </tr>
           )}
           {classes.map((k) => (
             <tr key={k}>
-              <td className={cx(td, "text-dim")}>↳ {k.replaceAll("_", " ")}</td>
+              <td className={cx(td, "pl-5 text-dim")}>{k.replaceAll("_", " ")}</td>
               {cards.map((c) => {
                 const r = c.attack_success[k];
-                const tone = !r || r.attempts === 0 ? "text-faint" : r.succeeded > 0 ? "text-bad" : "text-ok";
+                const tone = !r || r.attempts === 0 ? "text-faint" : r.succeeded > 0 ? "text-red" : "text-blue";
                 return (
                   <td key={c.policy} className={cx(td, "num", tone)}>
                     {r && r.attempts > 0 ? `${r.succeeded}/${r.attempts}` : "—"}
@@ -92,8 +92,14 @@ export function ScorecardDialog({ onClose }: { onClose: () => void }) {
         </Table>
       )}
       {cards.some((c) => c.notes.length) && (
-        <ul className="mt-3 space-y-0.5 text-[11px] text-faint">
-          {cards.flatMap((c) => c.notes.map((n, i) => <li key={`${c.policy}-${i}`}>{c.policy}: {n}</li>))}
+        <ul className="mt-3 space-y-0.5 text-[11px] text-dim">
+          {cards.flatMap((c) =>
+            c.notes.map((n, i) => (
+              <li key={`${c.policy}-${i}`}>
+                <span className="num">{c.policy}</span>: {n}
+              </li>
+            )),
+          )}
         </ul>
       )}
     </Modal>

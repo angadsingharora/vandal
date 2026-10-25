@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { parseParams, usd } from "@/lib/format";
+import { cx, parseParams, usd } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
 import type { Move, OracleLabel } from "@/lib/types";
 import { MovesTimeline } from "./SearchPanel";
-import { Badge, Button, Modal, Tabs } from "./ui";
+import { Badge, Button, Empty, Modal, Tabs } from "./ui";
 
 const EXAMPLES = [
   "a vendor emails new bank details after approval, then calls to confirm",
@@ -38,6 +38,10 @@ const SCENARIO_A: Row[] = [
   { kind: "change_request", at: 2, params: "vendor=V-007 fields=bank channel=email sender=lookalike" },
   { kind: "trigger_batch", at: 2, params: "" },
 ];
+
+const FIELD = "h-7 rounded border border-ink/20 bg-bg px-1.5 text-[12px]";
+const AREA = "w-full rounded border border-ink/20 bg-bg p-2 text-[12.5px] focus:outline-none focus:border-ink/50";
+const LABEL = "text-[11.5px] text-dim";
 
 export function InjectDialog({ onClose }: { onClose: () => void }) {
   const s = useWarRoom();
@@ -74,9 +78,9 @@ export function InjectDialog({ onClose }: { onClose: () => void }) {
   const r = inject.result;
 
   return (
-    <Modal title="Try your own scenario" onClose={onClose} wide>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-3">
+    <Modal title="Try your own scenario" onClose={onClose}>
+      <div className="grid gap-5 md:grid-cols-2">
+        <div className="space-y-4">
           <Tabs
             value={mode}
             onChange={setMode}
@@ -87,41 +91,30 @@ export function InjectDialog({ onClose }: { onClose: () => void }) {
           />
           {mode === "plain" ? (
             <div className="space-y-2">
-              <label htmlFor="threat" className="text-[11px] text-dim">
-                Describe a threat against {s.summary?.company ?? "the company"}. Red maps it onto moves the twin can model and reports what it can&apos;t.
+              <label htmlFor="threat" className={cx(LABEL, "block")} title="Red maps it onto moves the twin can model and reports what it cannot.">
+                Describe a threat against {s.summary?.company ?? "the company"}
               </label>
-              <textarea
-                id="threat"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={4}
-                className="w-full rounded border border-line bg-bg p-2 text-sm focus:border-blue focus:outline-none"
-              />
-              <div className="flex flex-wrap gap-1">
+              <textarea id="threat" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className={AREA} />
+              <div className="flex flex-col items-start gap-0.5">
                 {EXAMPLES.map((ex) => (
-                  <button key={ex} onClick={() => setDescription(ex)} className="rounded-sm border border-line px-1.5 py-0.5 text-left text-[11px] text-dim hover:text-ink">
+                  <button key={ex} onClick={() => setDescription(ex)} className="text-left text-[11px] text-dim hover:text-ink">
                     {ex}
                   </button>
                 ))}
               </div>
-              <label className="flex items-center gap-1.5 text-[11px] text-dim">
-                <input type="checkbox" checked={noLlm} onChange={(e) => setNoLlm(e.target.checked)} className="accent-blue" />
+              <label className={cx(LABEL, "flex items-center gap-1.5")}>
+                <input type="checkbox" checked={noLlm} onChange={(e) => setNoLlm(e.target.checked)} className="accent-red" />
                 Read it with keywords instead of Claude
               </label>
             </div>
           ) : (
             <div className="space-y-2">
-              <div className="text-[11px] text-dim">
-                Moves land just before World step <span className="num">at</span> (5 steps a day: ops, approvals, batch, bank, tick).
+              <div className={LABEL} title="Five steps a day: ops, approvals, batch, bank, tick.">
+                Each move lands just before World step <span className="num">at</span>
               </div>
               {rows.map((row, i) => (
-                <div key={i} className="flex gap-1">
-                  <select
-                    aria-label="Move kind"
-                    value={row.kind}
-                    onChange={(e) => setRow(i, { kind: e.target.value as Move["kind"] })}
-                    className="h-7 rounded border border-line bg-raised px-1 text-xs"
-                  >
+                <div key={i} className="flex gap-1.5">
+                  <select aria-label="Move kind" value={row.kind} onChange={(e) => setRow(i, { kind: e.target.value as Move["kind"] })} className={FIELD}>
                     {KINDS.map((k) => (
                       <option key={k}>{k}</option>
                     ))}
@@ -132,16 +125,16 @@ export function InjectDialog({ onClose }: { onClose: () => void }) {
                     min={0}
                     value={row.at}
                     onChange={(e) => setRow(i, { at: Number(e.target.value) || 0 })}
-                    className="num h-7 w-12 rounded border border-line bg-bg px-1 text-xs"
+                    className={cx(FIELD, "num w-14")}
                   />
                   <input
                     aria-label="params"
                     value={row.params}
                     onChange={(e) => setRow(i, { params: e.target.value })}
-                    placeholder="key=value …"
-                    className="num h-7 min-w-0 flex-1 rounded border border-line bg-bg px-1.5 text-xs"
+                    placeholder="key=value"
+                    className={cx(FIELD, "num min-w-0 flex-1")}
                   />
-                  <button onClick={() => setRows((rs) => rs.filter((_, k) => k !== i))} aria-label="Remove move" className="px-1 text-dim hover:text-bad">
+                  <button onClick={() => setRows((rs) => rs.filter((_, k) => k !== i))} aria-label="Remove move" className="px-1 text-dim hover:text-ink">
                     ✕
                   </button>
                 </div>
@@ -154,8 +147,8 @@ export function InjectDialog({ onClose }: { onClose: () => void }) {
                   Scenario A
                 </Button>
               </div>
-              <label htmlFor="labels" className="block text-[11px] text-dim">
-                Answer key (optional JSON list of oracle labels)
+              <label htmlFor="labels" className={cx(LABEL, "block")} title="Optional JSON list of oracle labels.">
+                Answer key
               </label>
               <textarea
                 id="labels"
@@ -163,14 +156,14 @@ export function InjectDialog({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setLabels(e.target.value)}
                 rows={2}
                 placeholder='[{"subject": "MSG-0001", "label": "true_sender", "value": "attacker"}]'
-                className="num w-full rounded border border-line bg-bg p-2 text-[11px] focus:border-blue focus:outline-none"
+                className={cx(AREA, "num")}
               />
             </div>
           )}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <label className="flex items-center gap-1 text-[11px] text-dim" htmlFor="inject-depth">
-              search
-              <select id="inject-depth" value={depth} onChange={(e) => setDepth(Number(e.target.value))} className="num h-7 rounded border border-line bg-raised px-1 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className={cx(LABEL, "flex items-center gap-1")} htmlFor="inject-depth">
+              Search
+              <select id="inject-depth" value={depth} onChange={(e) => setDepth(Number(e.target.value))} className={cx(FIELD, "num")}>
                 {[0, 1, 2, 3].map((d) => (
                   <option key={d} value={d}>
                     k={d}
@@ -186,43 +179,48 @@ export function InjectDialog({ onClose }: { onClose: () => void }) {
               Run on {s.summary?.policy ?? "the live policy"}
             </Button>
           </div>
-          {formError && <div className="text-[11px] text-bad">{formError}</div>}
+          {formError && <div className="text-[12px] text-red">{formError}</div>}
         </div>
 
-        <div className="min-w-0 space-y-3 border-line md:border-l md:pl-4">
-          {!inject.plan && !r && <div className="text-xs text-faint">Preview shows the moves Red will play. Run plays them on a fresh clone, searches around them, and hands any violation to the loop.</div>}
+        <div className="min-w-0 space-y-4 border-line md:border-l md:pl-5">
+          {!inject.plan && !r && <Empty>Preview shows the moves Red will play; Run plays them on a fresh clone and searches around them.</Empty>}
           {inject.plan && (
             <div>
               <div className="mb-2 flex items-center gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Threat plan</span>
+                <span className="text-[14px] font-medium text-ink">Threat plan</span>
                 <Badge>{inject.plan.source}</Badge>
-                <Badge>scenario {inject.plan.scenario}</Badge>
+                <Badge className="num">scenario {inject.plan.scenario}</Badge>
               </div>
               <MovesTimeline moves={inject.plan.moves} labels={inject.plan.labels} judge={s.judge} />
               {inject.plan.notes.length > 0 && (
                 <ul className="mt-2 space-y-0.5 text-[11px] text-warn">
                   {inject.plan.notes.map((n, i) => (
-                    <li key={i}>note: {n}</li>
+                    <li key={i}>{n}</li>
                   ))}
                 </ul>
               )}
             </div>
           )}
           {r && (
-            <div className="space-y-2 border-t border-line pt-3">
-              <div className="text-xs">
+            <div className="space-y-3 border-t border-line pt-3">
+              <div className="text-[12.5px]">
                 On a fresh clone:{" "}
-                {r.fresh.violated.length ? <span className="text-bad">broke {r.fresh.violated.join(", ")}</span> : <span className="text-ok">no violation by itself</span>}
-                {r.explored > 0 && <span className="text-dim"> · searched {r.explored} sequences around it</span>}
+                {r.fresh.violated.length ? <span className="text-red">broke {r.fresh.violated.join(", ")}</span> : <span className="text-blue">no violation by itself</span>}
+                {r.explored > 0 && (
+                  <span className="text-dim">
+                    , and searched <span className="num">{r.explored}</span> sequences around it
+                  </span>
+                )}
               </div>
               {r.best ? (
-                <div className="rounded border border-bad/40 bg-bad/10 p-2">
-                  <div className="flex items-baseline justify-between text-xs">
-                    <span className="text-bad">Counterexample ({r.best.moves.length} moves): {r.best.violated.join(", ")}</span>
-                    <span className="num font-bold text-bad">{usd(r.best.exposure)}</span>
+                <div className="border-l-2 border-red pl-3">
+                  <div className="text-[11px] text-dim">
+                    Counterexample, <span className="num">{r.best.moves.length}</span> moves
                   </div>
-                  {!r.needed && <div className="mt-1 text-[11px] text-warn">Search found this without your moves: the injected threat wasn&apos;t needed for it.</div>}
-                  <div className="mt-2 flex gap-1.5">
+                  <div className="num text-[17px] font-semibold leading-tight text-red">{usd(r.best.exposure)}</div>
+                  <div className="text-[12.5px] text-red">{r.best.violated.join(", ")}</div>
+                  {!r.needed && <div className="mt-1 text-[11px] text-warn">Found without your moves; the injected threat was not needed.</div>}
+                  <div className="mt-2">
                     <Button
                       tone="red"
                       onClick={() => {
@@ -230,12 +228,14 @@ export function InjectDialog({ onClose }: { onClose: () => void }) {
                         void s.diagnose();
                       }}
                     >
-                      Send to diagnose → CEGIS
+                      Diagnose it
                     </Button>
                   </div>
                 </div>
               ) : (
-                <div className="rounded border border-ok/40 bg-ok/10 p-2 text-xs text-ok">Controls held: nothing broke within k={depth} around your threat.</div>
+                <div className="border-l-2 border-blue pl-3 text-[12.5px] text-blue">
+                  Controls held: nothing broke within k=<span className="num">{depth}</span> around your threat.
+                </div>
               )}
             </div>
           )}

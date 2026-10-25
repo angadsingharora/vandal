@@ -1,11 +1,11 @@
 # Vandal war room
 
-The frontend for Vandal (IMPLEMENTATION §8, slices F0–F6). Next.js, Tailwind, dark. The war room has two sides, switched in the top bar:
+The frontend for Vandal (IMPLEMENTATION §8, slices F0–F6). Next.js, Tailwind, dark: black, white, and two voices — red for Vandal, blue for Guard. Two facing pages; the focused one is wide, the other folds to a margin.
 
-- **Blue · Vandal Guard** is the live path. The Operator (the finance agent) works the books; Guard checks every tool call it makes and allows, holds, or escalates it; humans decide in the approvals inbox. Panels: the Operator, Guard's verdicts, the books, the enforced policy, and approvals.
-- **Red · Vandal Sandbox** is a clone, never the live books. Vandal attacks the twin, diagnoses the broken link, and synthesizes and verifies a fix, which it sends to Blue. Panels: the attack, the verdict (what the books say next to what actually happened), the sandbox twin, the diagnosis chain, and fix & prove.
+- **Red · Sandbox** (left) opens on the terminal: pick a threat and a depth, run Vandal, and read the result left to right as four columns — *Sequence* (the moves, each stamped valid), *Breakpoint* (the one move where an invariant flipped: the document line, approved vs executed, every id openable), *Rule* (the control as installed, its diff, who signed it), *Proof* (replay, re-search, held-out variants, regression, the enforce replay, "why was this held?") — with the verdict sentence under them. Below: the system map, the intercepted evidence, the diagnosis chain, the twin's books, and the full CEGIS log.
+- **Blue · Guard** (right) is the live path. The Operator works the books; Guard checks every tool call and allows, holds, or escalates it; humans decide in the approvals inbox. Panels: the Operator, Guard's verdicts, the books, the enforced policy, and approvals.
 
-A strip under the top bar shows the seven steps of the loop, coloured by the side that does each one, with the next thing to click. Click a step to go to its side.
+Across the bottom, the exchange band draws how the two agents interact: Vandal's lane in red, Guard's in blue, the seven loop steps on their owner's lane, and the thread crossing exactly twice — a copy of the books going down into the sandbox, the proven rule coming back up. Click a step to open its side.
 
 ## Run it
 
@@ -52,9 +52,13 @@ Also included:
 ```
 src/
   app/            Next.js app router: layout, page, theme
-  components/     WarRoom (the two sides), TopBar (side switch, loop strip), one file per area
-                  (SearchPanel, AttackVerdict, TwinPanel, ChainView, SynthesisPanel, BluePanels,
-                  InjectDialog, ScorecardDialog, ExplainDrawer)
+  components/     WarRoom (two facing pages + margins), TopBar (masthead; useLoop), BreakAndRule
+                  (Red's terminal: threat controls, four columns — Sequence, Breakpoint, Rule,
+                  Proof — and the sentence), SystemMap (how the three talk, pulses follow the
+                  live run), ExchangeBand (the red/blue thread at the bottom), EvidenceScan,
+                  one file per
+                  area (TwinPanel, ChainView, SynthesisPanel, BluePanels, InjectDialog,
+                  ScorecardDialog, ExplainDrawer; SearchPanel's pieces live on in MovesTimeline)
   lib/
     types.ts      the backend's shapes (contracts/, api/)
     api.ts        VandalApi: HttpApi (fetch + EventSource) or the mock

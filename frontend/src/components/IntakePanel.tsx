@@ -16,7 +16,7 @@ const FORMAT_LABEL: Record<MessyDocument["format"], string> = {
 function Field({ label, value }: { label: string; value: string | number | null | undefined }) {
   return (
     <span className="inline-flex items-baseline gap-1">
-      <span className="text-faint">{label}</span>
+      <span className="text-dim">{label}</span>
       <span className={value == null ? "text-faint" : "num text-ink"}>{value ?? "–"}</span>
     </span>
   );
@@ -24,11 +24,9 @@ function Field({ label, value }: { label: string; value: string | number | null 
 
 function ReadRow({ r }: { r: IntakeRead }) {
   return (
-    <li className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line/50 px-3 py-1.5 text-[11px] last:border-b-0">
-      <span className="num text-faint">{r.message}</span>
-      <Badge tone={r.intent === "invoice" || r.intent === "credit_memo" ? "blue" : r.intent === "other" ? "dim" : "warn"}>
-        {r.intent.replace("_", " ")}
-      </Badge>
+    <li className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line px-3 py-1.5 text-[12px] last:border-b-0">
+      <span className="num text-dim">{r.message}</span>
+      <Badge tone={r.intent === "invoice" || r.intent === "credit_memo" ? "blue" : r.intent === "other" ? "dim" : "warn"}>{r.intent.replace("_", " ")}</Badge>
       <Field label="vendor" value={r.vendor} />
       <Field label="no." value={r.number} />
       <Field label="amount" value={r.amount == null ? null : usd(r.amount)} />
@@ -40,8 +38,7 @@ function ReadRow({ r }: { r: IntakeRead }) {
   );
 }
 
-/** O1 in the war room: pick one of the planted messy documents, deliver it, and watch what the
- * LLM Operator's intake read before Blue gated the call. */
+/** Pick one of the planted messy documents, deliver it, and watch what intake read before Blue gated the call. */
 export function IntakePanel() {
   const s = useWarRoom();
   const pending = s.documents.filter((d) => !d.delivered);
@@ -53,20 +50,20 @@ export function IntakePanel() {
   return (
     <div className="border-b border-line">
       <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-dim">Intake</span>
+        <span className="text-[12.5px] font-semibold text-ink">Intake</span>
         <select
           value={doc?.id ?? ""}
           onChange={(e) => setPicked(e.target.value)}
           disabled={pending.length === 0}
-          className="h-6 min-w-0 flex-1 rounded border border-line bg-raised px-1 text-[11px]"
-          title="A planted messy document (DESIGN 5.6): the answer key stays on the server"
+          className="h-7 min-w-0 flex-1 rounded border border-ink/20 bg-bg px-1.5 text-[12px]"
+          title="A planted messy document. The answer key stays on the server."
         >
           {pending.map((d) => (
             <option key={d.id} value={d.id}>
-              {d.id} · {FORMAT_LABEL[d.format]} · {d.subject}
+              {d.id}, {FORMAT_LABEL[d.format]}: {d.subject}
             </option>
           ))}
-          {pending.length === 0 && <option value="">every document delivered</option>}
+          {pending.length === 0 && <option value="">Every document delivered</option>}
         </select>
         <Button tone="ghost" onClick={() => setOpen(!open)} disabled={!doc}>
           {open ? "Hide" : "Read"}
@@ -76,7 +73,7 @@ export function IntakePanel() {
         </Button>
       </div>
       {open && doc && (
-        <pre className="max-h-48 overflow-auto whitespace-pre-wrap border-t border-line/50 bg-raised/40 px-3 py-2 text-[11px] text-dim">
+        <pre className="max-h-48 overflow-auto whitespace-pre-wrap border-t border-line bg-raised/40 px-3 py-2 text-[12px] text-dim">
           From: {doc.sender}
           {"\n"}Subject: {doc.subject}
           {"\n\n"}
@@ -84,7 +81,7 @@ export function IntakePanel() {
         </pre>
       )}
       {s.intake.length === 0 ? (
-        <Empty>Deliver a document to watch intake classify it, extract its fields, match the vendor and PO, and code the GL.</Empty>
+        <Empty>Deliver a document to see what intake reads.</Empty>
       ) : (
         <ul>
           {[...s.intake].reverse().map((r) => (
