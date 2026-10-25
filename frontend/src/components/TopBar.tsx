@@ -23,6 +23,41 @@ function Toggle({ label, on, onChange, title }: { label: string; on: boolean; on
   );
 }
 
+const SIDES = [
+  { id: "blue", name: "BLUE", product: "Vandal Guard", blurb: "checks every action the agent takes" },
+  { id: "red", name: "RED", product: "Vandal Sandbox", blurb: "attacks a clone, finds the gap, builds the fix" },
+] as const;
+
+function SideSwitch() {
+  const view = useWarRoom((s) => s.view);
+  const setView = useWarRoom((s) => s.setView);
+  return (
+    <div role="tablist" aria-label="Side" className="flex rounded-md border border-line bg-bg p-0.5">
+      {SIDES.map((x) => {
+        const on = view === x.id;
+        const red = x.id === "red";
+        return (
+          <button
+            key={x.id}
+            role="tab"
+            aria-selected={on}
+            onClick={() => void setView(x.id)}
+            title={x.blurb}
+            className={cx(
+              "flex items-center gap-2 rounded px-3 py-1 text-left transition-colors",
+              on ? (red ? "bg-red/15 text-red" : "bg-blue/15 text-blue") : "text-dim hover:text-ink",
+            )}
+          >
+            <span className={cx("size-2 rounded-full", red ? "bg-red" : "bg-blue", !on && "opacity-50")} />
+            <span className="text-[11px] font-bold tracking-wider">{x.name}</span>
+            <span className={cx("text-xs", on ? "text-ink" : "")}>{x.product}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** The loop's state, read once for the gutter and the page heads. */
 export function useLoop() {
   const s = useWarRoom();
@@ -38,7 +73,7 @@ export function useLoop() {
   return { steps, now: currentStep(steps) };
 }
 
-export function TopBar({ onScorecard }: { onScorecard: () => void }) {
+export function TopBar({ onScorecard, onWelcome }: { onScorecard: () => void; onWelcome: () => void }) {
   const s = useWarRoom();
   const [policy, setPolicy] = useState("v0");
   const [resetting, setResetting] = useState(false);
@@ -51,8 +86,12 @@ export function TopBar({ onScorecard }: { onScorecard: () => void }) {
 
   return (
     <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-bg px-4 py-2">
-      <span className="text-[15px] font-semibold leading-none tracking-tight text-ink">Vandal</span>
-      <span className="text-[12px] text-dim">{s.summary?.company ?? "the company"}</span>
+      <button onClick={onWelcome} title="Back to the welcome screen" className="-mx-1 flex items-baseline gap-2.5 rounded px-1 hover:bg-raised">
+        <span className="text-[15px] font-semibold leading-none tracking-tight text-ink">Vandal</span>
+        <span className="text-[12px] text-dim">{s.summary?.company ?? "the company"}</span>
+      </button>
+
+      <SideSwitch />
 
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
         <label className="sr-only" htmlFor="policy">

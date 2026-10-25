@@ -15,6 +15,7 @@ import { SynthesisPanel } from "./SynthesisPanel";
 import { ExchangeBand } from "./ExchangeBand";
 import { TopBar, useLoop } from "./TopBar";
 import { TwinPanel } from "./TwinPanel";
+import { wantsWelcome, Welcome } from "./Welcome";
 import { Button, LiveDot, Verdict } from "./ui";
 
 /** The runs a side can look at: Blue watches Live (and a replay it asked for), Red its sandbox clones. */
@@ -322,16 +323,19 @@ export function WarRoom() {
   const ready = useWarRoom((s) => s.ready);
   const view = useWarRoom((s) => s.view);
   const [dialog, setDialog] = useState<"inject" | "scorecard" | null>(null);
+  const [welcome, setWelcome] = useState(false);
 
   useEffect(() => {
     void init();
+    setWelcome(wantsWelcome()); // after mount, so the server and first client render agree
   }, [init]);
 
   const red = view === "red";
 
   return (
     <div className="flex min-h-screen flex-col lg:h-screen lg:overflow-hidden">
-      <TopBar onScorecard={() => setDialog("scorecard")} />
+      {/* the exchange band at the bottom is this layout's loop strip */}
+      <TopBar onScorecard={() => setDialog("scorecard")} onWelcome={() => setWelcome(true)} />
       {error && (
         <div role="alert" className="flex items-center gap-3 border-b border-line bg-raised px-4 py-1.5 text-[12px] text-red">
           <span className="font-semibold">Error</span>
@@ -355,6 +359,7 @@ export function WarRoom() {
       <ExchangeBand />
       {dialog === "inject" && <InjectDialog onClose={() => setDialog(null)} />}
       {dialog === "scorecard" && <ScorecardDialog onClose={() => setDialog(null)} />}
+      {welcome && <Welcome onClose={() => setWelcome(false)} />}
       <ExplainDrawer />
     </div>
   );
