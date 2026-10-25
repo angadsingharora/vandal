@@ -130,28 +130,25 @@ export function Welcome({ onClose }: { onClose: () => void }) {
           </p>
 
           <div className="mt-8 text-[10px] uppercase tracking-[0.2em] text-faint">The loop</div>
-          <ol className="mt-3 grid gap-2 sm:grid-cols-2" aria-label="The loop">
-            {steps.map((st) => {
+          <ol className="mt-3 max-w-md" aria-label="The loop">
+            {steps.map((st, i) => {
               const red = st.side === "red";
+              const last = i === steps.length - 1;
               return (
-                <li
-                  key={st.n}
-                  className={cx(
-                    "flex items-start gap-3 rounded border border-l-4 bg-panel/70 px-3 py-2",
-                    red ? "border-line border-l-red" : "border-line border-l-blue",
-                  )}
-                >
+                <li key={st.n} className="relative flex gap-4 pb-3 last:pb-0">
+                  {!last && <span aria-hidden className="absolute left-[11px] top-6 h-[calc(100%-0.75rem)] w-px bg-line" />}
                   <span
                     className={cx(
-                      "num mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-bg",
-                      red ? "bg-red" : "bg-blue",
+                      "num relative mt-px flex size-6 shrink-0 items-center justify-center rounded-full border bg-bg text-[11px] font-bold",
+                      red ? "border-red/70 text-red" : "border-blue/70 text-blue",
                     )}
                   >
                     {st.n}
                   </span>
-                  <div className="min-w-0">
-                    <div className={cx("text-xs font-bold uppercase tracking-wider", red ? "text-red" : "text-blue")}>{st.label}</div>
-                    <div className="text-[11px] leading-snug text-dim">{st.next.split(". ")[0].replace(/\.$/, "")}</div>
+                  <div className="min-w-0 pt-0.5">
+                    <span className="text-sm font-semibold text-ink">{st.label}</span>
+                    <span className="ml-2 text-xs text-faint">{red ? "Red" : "Blue"}</span>
+                    <div className="text-xs leading-snug text-dim">{st.next.split(". ")[0].replace(/\.$/, "")}</div>
                   </div>
                 </li>
               );
