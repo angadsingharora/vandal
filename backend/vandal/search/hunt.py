@@ -2,8 +2,9 @@
 
 Bounded search (bfs.py) enumerates a fixed alphabet per threat family. The hunter plays the
 other role in the demo: it "studies" the company, then tries attacks drawn from a bank of
-hypotheses written in advance (PLAYBOOK), one per attempt, in the playbook's order. Nothing here
-calls a model: the pause before each attempt is for the audience, and the hypothesis text is canned.
+hypotheses written in advance (PLAYBOOK), one per attempt, in the playbook's order: some come up
+safe, some break the books. Nothing here calls a model: the pause before each attempt is for
+the audience, and the hypothesis text is canned.
 
 What stays real:
 - The twin executes the moves, the gate decides, the invariants judge. Whether an attempt
@@ -53,6 +54,7 @@ class Hypothesis(BaseModel):
     weak_spot: str  # one line: the gap it goes after
     target_invariant: str  # the INV-n it expects to break
     moves: tuple[Move, ...]
+    breaks: bool  # what the twin says under v0 at the seeded books; the tests hold it to this
 
 
 def _bank_change(at: int = 2) -> Move:
@@ -64,10 +66,50 @@ def _bank_change(at: int = 2) -> Move:
 
 
 # The bank of hypotheses, written against the seeded Bayline books (seed 7), in the order the
-# hunt tries them: the demo's story (the bank change after approval, which leads to the T1 and
-# T2 fix) comes first. Each breaks v0 in the twin; whether it still does under a later policy
-# is for the twin to say.
+# hunt tries them. Half come up safe under v0 (Guard held, or nothing broke) and half break it,
+# so a hunt reads like a hunt: misses, then the demo's story (the bank change after approval,
+# which leads to the T1 and T2 fix), then two more hits. `breaks` is what the twin is expected
+# to say under v0; the test suite holds every entry to it.
 PLAYBOOK: tuple[Hypothesis, ...] = (
+    Hypothesis(
+        weak_spot="swap the vendor's contact on file, then the callback goes to the attacker",
+        target_invariant="INV-5",
+        rationale=(
+            "Harbor Point Construction's $40,000 invoice is approved and due in today's run. "
+            "If a lookalike email can replace the vendor's contact on file, any callback to "
+            "verify a later change would reach the attacker instead of the vendor. Swap the "
+            "contact first and run the batch to see whether the payment follows."
+        ),
+        moves=(
+            Move(
+                kind="change_request",
+                at=2,
+                params={
+                    "vendor": "V-007",
+                    "fields": "contact",
+                    "channel": "email",
+                    "sender": "lookalike",
+                },
+            ),
+            Move(kind="trigger_batch", at=2, params={}),
+        ),
+        breaks=False,
+    ),
+    Hypothesis(
+        weak_spot="a payment that times out at the bank is retried and settles twice",
+        target_invariant="INV-3",
+        rationale=(
+            "Payments leave without an idempotency key under v0, and the Operator retries "
+            "whatever the bank has not confirmed. If the bank times out on the Harbor Point "
+            "payment and then processes it anyway, the retry should pay the same $40,000 "
+            "obligation a second time."
+        ),
+        moves=(
+            Move(kind="fault", at=2, params={"kind": "timeout"}),
+            Move(kind="retry", at=3, params={}),
+        ),
+        breaks=False,
+    ),
     Hypothesis(
         weak_spot="approval reads the vendor's current account, not the approved one",
         target_invariant="INV-2",
@@ -79,36 +121,26 @@ PLAYBOOK: tuple[Hypothesis, ...] = (
             "approval and the batch should redirect the whole payment."
         ),
         moves=(_bank_change(), Move(kind="trigger_batch", at=2, params={})),
+        breaks=True,
     ),
     Hypothesis(
-        weak_spot="an inbound call counts as verification of a bank change",
-        target_invariant="INV-5",
+        weak_spot="a refund of an overpayment can be steered away from where the money came from",
+        target_invariant="INV-11",
         rationale=(
-            "The same $40,000 Harbor Point payment, with cover: after the lookalike email asks "
-            "for new bank details, someone with the vendor contact's cloned voice calls in to "
-            "confirm them. If a call the attacker places is treated as a verification channel, "
-            "the change looks legitimate and the batch pays the new account."
+            "Tenant C-004 owes the most rent. If the tenant overpays and a refund is requested "
+            "for the excess, the refund should at least be checked against where the deposit "
+            "came from. Start with a refund request that points back at the source account to "
+            "see how refunds are handled at all."
         ),
         moves=(
-            _bank_change(),
+            Move(kind="deposit", at=3, params={"customer": "C-004", "amount": "overpay"}),
             Move(
-                kind="inbound_confirmation",
-                at=2,
-                params={"vendor": "V-007", "channel": "phone_in", "voice_match": 95},
+                kind="refund_request",
+                at=4,
+                params={"customer": "C-004", "party": "attacker", "dest": "source"},
             ),
-            Move(kind="trigger_batch", at=2, params={}),
         ),
-    ),
-    Hypothesis(
-        weak_spot="a retry after a lost acknowledgement is a second payment",
-        target_invariant="INV-3",
-        rationale=(
-            "Payments go to the bank without an idempotency key under v0, and the Operator "
-            "retries anything the bank hasn't acknowledged. If the bank processes the Harbor "
-            "Point payment but the acknowledgement is lost, the retry settles the same "
-            "$40,000 obligation twice."
-        ),
-        moves=(Move(kind="fault", at=2, params={"kind": "drop_ack"}),),
+        breaks=False,
     ),
     Hypothesis(
         weak_spot="a near-duplicate bill for a vendor with no PO is matched as new",
@@ -131,15 +163,17 @@ PLAYBOOK: tuple[Hypothesis, ...] = (
                 },
             ),
         ),
+        breaks=True,
     ),
     Hypothesis(
         weak_spot="an overpayment can be refunded to an account the tenant never used",
         target_invariant="INV-11",
         rationale=(
-            "Tenant C-004 owes the most rent, so a deposit from the attacker marked as that "
-            "tenant's overpayment lands as credit on its account. A refund request for the "
-            "excess, pointing at a new bank account, turns someone else's deposit into a "
-            "payout to the attacker if refunds aren't pinned to the source account."
+            "The refund to the source account went through cleanly, so try the other "
+            "destination: a deposit from the attacker marked as tenant C-004's overpayment, "
+            "then a refund request for the excess pointing at a new bank account. If refunds "
+            "are not pinned to the source account, someone else's deposit becomes a payout to "
+            "the attacker."
         ),
         moves=(
             Move(
@@ -153,6 +187,7 @@ PLAYBOOK: tuple[Hypothesis, ...] = (
                 params={"customer": "C-004", "party": "attacker", "dest": "new"},
             ),
         ),
+        breaks=True,
     ),
 )
 

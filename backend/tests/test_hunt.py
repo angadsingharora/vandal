@@ -23,6 +23,8 @@ BANK_CHANGE = Move(
     at=2,
     params={"vendor": "V-007", "fields": "bank", "channel": "email", "sender": "lookalike"},
 )
+BREAKS = [h for h in PLAYBOOK if h.breaks]
+HOLDS = [h for h in PLAYBOOK if not h.breaks]
 
 
 def test_snapshot_is_the_company_and_never_the_oracle() -> None:
@@ -45,43 +47,55 @@ def test_moves_the_twin_cant_run_are_dropped_with_a_reason() -> None:
     assert ran == [] and out.dropped and "V-999" in out.dropped[0]
 
 
-@pytest.mark.parametrize("hyp", PLAYBOOK, ids=lambda h: h.target_invariant)
-def test_every_playbook_entry_breaks_v0_in_the_twin(hyp) -> None:
-    """The playbook is canned; whether it works is not. Each entry must still break the
-    invariant it names at the seeded books, or the demo would show a hunt that finds nothing."""
+def test_the_playbook_is_half_misses_half_hits() -> None:
+    assert len(PLAYBOOK) == 6 and len(BREAKS) == 3 and len(HOLDS) == 3
+    assert PLAYBOOK[2].moves[0].kind == "change_request"  # the demo's story, after two misses
+
+
+@pytest.mark.parametrize("hyp", PLAYBOOK, ids=lambda h: h.weak_spot[:28])
+def test_every_playbook_entry_does_what_it_says_under_v0(hyp) -> None:
+    """The playbook is canned; the outcome is not. An entry marked `breaks` must still break
+    the invariant it names at the seeded books, and one marked safe must still come up safe,
+    or the hunt the audience sees would not match the story."""
     ran, out = run_hypothesis(hyp.moves, 7, FACTORY)
     assert ran and not out.dropped, (hyp.weak_spot, out.dropped)
-    assert hyp.target_invariant in out.violated and out.exposure > 0, (hyp.weak_spot, out)
+    if hyp.breaks:
+        assert hyp.target_invariant in out.violated and out.exposure > 0, (hyp.weak_spot, out)
+    else:
+        assert out.violated == [] and out.exposure == 0, (hyp.weak_spot, out)
 
 
-def test_the_hunt_is_deterministic_and_stops_at_the_first_hit() -> None:
-    """The demo lands on the same attack, and so the same fix, every time: attempt 1 is the
-    bank change after approval."""
+def test_the_hunt_is_deterministic_and_runs_every_attempt() -> None:
+    """The demo lands on the same attack, and so the same fix, every time: six attempts, three
+    held, three broke, and the best is the $40,000 bank change (attempt 3)."""
     seen = []
-    r = hunt(FACTORY, attempts=4, on_attempt=seen.append, pause=0)
-    assert [a.n for a in seen] == [1] and r.hits == 1
-    assert seen[0].weak_spot == PLAYBOOK[0].weak_spot
-    assert seen[0].moves[0].kind == "change_request"
-    assert r.best and r.best.attempt == 1 and r.best.violated == ["INV-2", "INV-4", "INV-5"]
+    r = hunt(FACTORY, attempts=6, keep_going=True, on_attempt=seen.append, pause=0)
+    assert [a.n for a in seen] == [1, 2, 3, 4, 5, 6]
+    assert [bool(a.outcome.violated) for a in seen] == [h.breaks for h in PLAYBOOK]
+    assert r.hits == 3 and r.reason == "3 of 6 attempts broke an invariant"
+    assert r.best and r.best.attempt == 3 and r.best.violated == ["INV-2", "INV-4", "INV-5"]
     assert r.best.exposure == 4_000_000 and len(r.best.moves) == 1  # minimized
-    assert r.reason == "attempt 1 broke INV-2, INV-4, INV-5"
-    again = hunt(FACTORY, attempts=4, pause=0)
+    again = hunt(FACTORY, attempts=6, keep_going=True, pause=0)
     assert again.model_dump() == r.model_dump()
+
+
+def test_without_keep_going_the_hunt_stops_at_the_first_hit() -> None:
+    r = hunt(FACTORY, attempts=6, pause=0)
+    assert len(r.attempts) == 3 and r.hits == 1 and r.reason.startswith("attempt 3 broke")
 
 
 def test_an_rng_shuffles_the_playbook_and_never_repeats_an_entry() -> None:
     first = {
-        hunt(FACTORY, attempts=1, pause=0, rng=random.Random(s)).attempts[0].weak_spot
+        hunt(FACTORY, attempts=1, keep_going=True, pause=0, rng=random.Random(s))
+        .attempts[0]
+        .weak_spot
         for s in range(8)
     }
     assert len(first) > 1
     r = hunt(FACTORY, attempts=12, keep_going=True, pause=0, rng=random.Random(1))
     spots = [a.weak_spot for a in r.attempts]
     assert len(spots) == len(PLAYBOOK) == len(set(spots))
-    assert r.hits == len(PLAYBOOK)
-    assert r.reason == f"{r.hits} of {len(PLAYBOOK)} attempts broke an invariant"
-    assert r.best.exposure == 4_000_000  # the costliest hit wins
-    assert r.best.outside_preset_search is False  # bank change or lost ack: both in a family
+    assert r.hits == 3 and r.best.exposure == 4_000_000  # the costliest hit wins
 
 
 def test_the_hunt_pauses_before_each_attempt() -> None:
@@ -91,13 +105,13 @@ def test_the_hunt_pauses_before_each_attempt() -> None:
 
 
 def test_under_a_stronger_policy_the_twin_decides() -> None:
-    """The same playbook against v3: whether an entry still lands is the twin's call, and the
-    hunt reports a miss as held rather than asserting a hit."""
+    """The same playbook against v3: whether an entry still lands is the twin's call. The
+    bank change is held, and the hunt reports it as held rather than asserting a hit."""
     v3 = partial(new_sandbox, "bayline", policy=load_policy("v3"))
     r = hunt(v3, attempts=12, keep_going=True, pause=0)
-    held = [a for a in r.attempts if not a.outcome.violated]
-    assert held, "v3 should stop at least one playbook entry"
-    assert all(a.outcome.guard for a in held)
+    bank = r.attempts[2]
+    assert bank.moves[0].kind == "change_request" and not bank.outcome.violated
+    assert bank.outcome.guard
 
 
 def test_window_for_picks_the_family() -> None:
@@ -117,13 +131,15 @@ def test_api_hunt_then_diagnose(monkeypatch) -> None:
     monkeypatch.setenv("VANDAL_HUNT_PAUSE", "0")
     with TestClient(create_app(persist=False)) as client:
         run = client.post("/runs", json={"policy": "v0"}).json()
-        job = client.post(f"/runs/{run['run_id']}/hunt", json={"attempts": 2}).json()
+        body = {"attempts": 6, "keep_going": True}  # what the war room sends
+        job = client.post(f"/runs/{run['run_id']}/hunt", json=body).json()
         assert job["kind"] == "hunt"
-        deadline = time.monotonic() + 60
+        deadline = time.monotonic() + 90
         while (done := client.get(f"/jobs/{job['id']}").json())["status"] not in ("done", "failed"):
             assert time.monotonic() < deadline
             time.sleep(0.05)
         assert done["status"] == "done", done.get("error")
+        assert done["result"]["hits"] == 3 and len(done["result"]["attempts"]) == 6
         assert done["result"]["best"]["exposure"] == 4_000_000
         assert done["result"]["scenario"] == "a"
         d = client.post("/diagnose", json={"search_id": job["id"]}).json()
