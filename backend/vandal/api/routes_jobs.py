@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from functools import partial
 from typing import Any
 
@@ -28,6 +29,16 @@ from vandal.verify.suite import collect, scorecard, verify
 router = APIRouter()
 
 
+def default_workers() -> int:
+    """Search processes for Verify when the request doesn't say: SEARCH_WORKERS, else one per
+    core up to 8. Verify's checks are full bounded searches over every family, so they gain the
+    most (measured: 137s on 1 process, 51s on 8)."""
+    env = os.environ.get("SEARCH_WORKERS")
+    if env:
+        return max(1, int(env))
+    return max(1, min(8, os.cpu_count() or 1))
+
+
 class SearchRequest(BaseModel):
     policy: str = "v0"
     scenario: str = "a"  # a threat family, or "all" for every family in one strike
@@ -46,6 +57,8 @@ class SynthesizeRequest(BaseModel):
     search_id: str | None = None  # repair this search's (or inject's) counterexample
     policy: str = "v0"  # otherwise, repair what search finds under this policy
     depth: int = Field(default=3, ge=1, le=6)
+    # One process: each candidate's search is small, and starting a process pool per search
+    # (spawn, on Windows) costs more than it saves. Measured: 57s on 1, 93s on 8.
     workers: int = Field(default=1, ge=1, le=32)
     max_iterations: int = Field(default=4, ge=1, le=8)
     no_llm: bool = False
@@ -59,7 +72,7 @@ class VerifyRequest(BaseModel):
     synthesis_id: str | None = None  # verify what this synthesis chose
     parent: str | None = None
     depth: int = Field(default=3, ge=1, le=6)
-    workers: int = Field(default=1, ge=1, le=32)
+    workers: int | None = Field(default=None, ge=1, le=32)  # None: default_workers()
     profile: str = "bayline"
     seed: int = 7
 
@@ -219,7 +232,7 @@ def start_verify(request: Request, body: VerifyRequest) -> dict[str, Any]:
             profile=body.profile,
             seed=body.seed,
             depth=body.depth,
-            workers=body.workers,
+            workers=body.workers or default_workers(),
             candidates=candidates,
             intake=intake_extractor(body.profile),
         )

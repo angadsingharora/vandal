@@ -207,3 +207,18 @@ def test_search_all_families_lands_on_the_costliest_break(client) -> None:
     assert {v for f in r["findings"] for v in f["violated"]} >= {"INV-2", "INV-3", "INV-11"}
     d = client.post("/diagnose", json={"search_id": job["id"]}).json()["diagnosis"]
     assert d["gap"] == "approval_binding"
+
+
+def test_verify_defaults_to_one_search_process_per_core(monkeypatch) -> None:
+    """Verify's checks are full searches; with no `workers` in the request it uses
+    SEARCH_WORKERS, else one process per core up to 8. Fix stays on one process."""
+    from vandal.api.routes_jobs import SynthesizeRequest, VerifyRequest, default_workers
+
+    assert VerifyRequest().workers is None and SynthesizeRequest().workers == 1
+    monkeypatch.setenv("SEARCH_WORKERS", "3")
+    assert default_workers() == 3
+    monkeypatch.delenv("SEARCH_WORKERS")
+    monkeypatch.setattr("os.cpu_count", lambda: 16)
+    assert default_workers() == 8
+    monkeypatch.setattr("os.cpu_count", lambda: None)
+    assert default_workers() == 1
