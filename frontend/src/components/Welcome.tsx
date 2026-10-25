@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cx } from "@/lib/format";
 import { loopSteps } from "@/lib/loop";
 import { useWarRoom, type View } from "@/lib/store";
@@ -70,7 +70,22 @@ export function Welcome({ onClose }: { onClose: () => void }) {
   const [scenario, setScenario] = useState(s.search.scenario);
   const [operator, setOperator] = useState<OperatorKind>(s.operator);
   const [entering, setEntering] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const steps = loopSteps(NOTHING_DONE);
+
+  // Fade out, then unmount. The card's leave animation is 200ms; the backdrop's 220ms.
+  const dismiss = () => setLeaving(true);
+  useEffect(() => {
+    if (!leaving) return;
+    const t = setTimeout(onClose, 230);
+    return () => clearTimeout(t);
+  }, [leaving, onClose]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && dismiss();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const enter = async () => {
     setEntering(true);
@@ -83,12 +98,17 @@ export function Welcome({ onClose }: { onClose: () => void }) {
     if (operator !== s.operator) await s.reset(s.summary?.policy ?? "v0", operator);
     await s.setView(side);
     setEntering(false);
-    onClose();
+    dismiss();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-bg/95 p-4 pt-[6vh] backdrop-blur-sm">
-      <div role="dialog" aria-modal aria-labelledby="welcome-title" className="w-full max-w-3xl border border-line bg-panel shadow-2xl">
+    <div
+      className={cx(
+        "fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-bg/95 p-4 pt-[6vh] backdrop-blur-sm",
+        leaving ? "welcome-leave" : "welcome-enter",
+      )}
+    >
+      <div role="dialog" aria-modal aria-labelledby="welcome-title" className="welcome-card w-full max-w-3xl border border-line bg-panel shadow-2xl">
         <header className="border-b border-line px-6 py-5">
           <div className="text-[10px] uppercase tracking-[0.2em] text-faint">Welcome to</div>
           <div className="mt-0.5 flex items-baseline gap-3">
@@ -171,7 +191,7 @@ export function Welcome({ onClose }: { onClose: () => void }) {
         <footer className="flex flex-wrap items-center gap-3 border-t border-line px-6 py-3">
           <span className="text-[11px] text-faint">All of this can be changed later from the top bar and the panels.</span>
           <div className="ml-auto flex items-center gap-2">
-            <Button tone="ghost" onClick={onClose}>
+            <Button tone="ghost" onClick={dismiss}>
               Skip
             </Button>
             <Button tone={side === "red" ? "red" : "blue"} onClick={enter} busy={entering} disabled={!s.ready}>
