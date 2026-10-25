@@ -11,7 +11,7 @@ A 2:45 shooting script for four speakers, about 370 spoken words over one contin
 | **Angad** | Cold open, the problem, the close | ~0:55 |
 | **Mohith** | The Operator and Guard, then approval and replay | ~0:45 |
 | **Dhruv** | Vandal Strike and Claude's threat hunter | ~0:35 |
-| **Teammate 4** | Diagnose and Fix | ~0:30 |
+| **Kashish** | Diagnose and Fix | ~0:30 |
 
 Names are matched to who built each part. Swap freely.
 
@@ -37,7 +37,7 @@ Meet Bayline, a property manager with twenty-five contractors and two million do
 
 Then we release Vandal Strike. Strike clones the company and attacks the copy, never the live books. It tries every short sequence of attacker moves and bank glitches, and in under a second it finds one: a fake bank-change email that lands after approval. Every step looks legit. Then we hand the attack to Claude. **It reads Bayline's books, studies Guard's rules, and invents attacks nobody wrote down.** Against rules we thought were fully fixed, it found a forty-thousand-dollar bill that gets paid twice. First try.
 
-### 1:32 – 2:02 · 3 · Diagnose · 4 · Fix · Teammate 4
+### 1:32 – 2:02 · 3 · Diagnose · 4 · Fix · Kashish
 > **On screen:** Diagnose page: the five-link chain with Execution in red. Then Fix: candidates streaming, one rejected, the survivor T2 + T1 highlighted.
 
 Finding the hole is half the job. Vandal walks the payment's chain, from the bill to the books, and names the broken link: the payment never checked it matched what was approved. Then it writes the fix. It proposes a rule, **attacks its own rule**, and learns from every attack that gets through. A rule a deepfake could beat gets thrown out automatically. The survivor passes six checks, including attacks it has never seen.
