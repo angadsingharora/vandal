@@ -1,5 +1,5 @@
-"""R13: the hunt. Attacks come from a written playbook, in a random order; the twin runs them,
-and everything about the outcome comes from the simulation. No model is involved."""
+"""R13: the hunt. Attacks come from a written playbook, in its order; the twin runs them, and
+everything about the outcome comes from the simulation. No model is involved."""
 
 from __future__ import annotations
 
@@ -54,17 +54,22 @@ def test_every_playbook_entry_breaks_v0_in_the_twin(hyp) -> None:
     assert hyp.target_invariant in out.violated and out.exposure > 0, (hyp.weak_spot, out)
 
 
-def test_the_hunt_picks_an_entry_and_stops_at_the_first_hit() -> None:
+def test_the_hunt_is_deterministic_and_stops_at_the_first_hit() -> None:
+    """The demo lands on the same attack, and so the same fix, every time: attempt 1 is the
+    bank change after approval."""
     seen = []
-    r = hunt(FACTORY, attempts=4, on_attempt=seen.append, pause=0, rng=random.Random(3))
+    r = hunt(FACTORY, attempts=4, on_attempt=seen.append, pause=0)
     assert [a.n for a in seen] == [1] and r.hits == 1
-    assert r.best and r.best.attempt == 1 and r.best.violated
-    assert len(r.best.moves) <= len(seen[0].moves)  # minimized
-    assert seen[0].rationale and seen[0].weak_spot in {h.weak_spot for h in PLAYBOOK}
-    assert r.reason.startswith("attempt 1 broke")
+    assert seen[0].weak_spot == PLAYBOOK[0].weak_spot
+    assert seen[0].moves[0].kind == "change_request"
+    assert r.best and r.best.attempt == 1 and r.best.violated == ["INV-2", "INV-4", "INV-5"]
+    assert r.best.exposure == 4_000_000 and len(r.best.moves) == 1  # minimized
+    assert r.reason == "attempt 1 broke INV-2, INV-4, INV-5"
+    again = hunt(FACTORY, attempts=4, pause=0)
+    assert again.model_dump() == r.model_dump()
 
 
-def test_the_order_is_random_and_never_repeats_an_entry() -> None:
+def test_an_rng_shuffles_the_playbook_and_never_repeats_an_entry() -> None:
     first = {
         hunt(FACTORY, attempts=1, pause=0, rng=random.Random(s)).attempts[0].weak_spot
         for s in range(8)
@@ -81,7 +86,7 @@ def test_the_order_is_random_and_never_repeats_an_entry() -> None:
 
 def test_the_hunt_pauses_before_each_attempt() -> None:
     t = time.monotonic()
-    hunt(FACTORY, attempts=1, pause=0.3, rng=random.Random(0))
+    hunt(FACTORY, attempts=1, pause=0.3)
     assert time.monotonic() - t >= 0.3
 
 
@@ -89,7 +94,7 @@ def test_under_a_stronger_policy_the_twin_decides() -> None:
     """The same playbook against v3: whether an entry still lands is the twin's call, and the
     hunt reports a miss as held rather than asserting a hit."""
     v3 = partial(new_sandbox, "bayline", policy=load_policy("v3"))
-    r = hunt(v3, attempts=12, keep_going=True, pause=0, rng=random.Random(0))
+    r = hunt(v3, attempts=12, keep_going=True, pause=0)
     held = [a for a in r.attempts if not a.outcome.violated]
     assert held, "v3 should stop at least one playbook entry"
     assert all(a.outcome.guard for a in held)
@@ -119,11 +124,10 @@ def test_api_hunt_then_diagnose(monkeypatch) -> None:
             assert time.monotonic() < deadline
             time.sleep(0.05)
         assert done["status"] == "done", done.get("error")
-        best = done["result"]["best"]
-        assert best and best["exposure"] > 0 and best["violated"]
-        assert done["result"]["scenario"] in ("a", "b", "f")
+        assert done["result"]["best"]["exposure"] == 4_000_000
+        assert done["result"]["scenario"] == "a"
         d = client.post("/diagnose", json={"search_id": job["id"]}).json()
-        assert d["diagnosis"]["gap"]
+        assert d["diagnosis"]["gap"] == "approval_binding"
 
 
 def test_a_bill_red_sends_is_booked_as_a_duplicate_by_the_harness() -> None:

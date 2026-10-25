@@ -2,8 +2,8 @@
 
 Bounded search (bfs.py) enumerates a fixed alphabet per threat family. The hunter plays the
 other role in the demo: it "studies" the company, then tries attacks drawn from a bank of
-hypotheses written in advance (PLAYBOOK), one per attempt, in a random order. Nothing here calls
-a model: the pause before each attempt is for the audience, and the hypothesis text is canned.
+hypotheses written in advance (PLAYBOOK), one per attempt, in the playbook's order. Nothing here
+calls a model: the pause before each attempt is for the audience, and the hypothesis text is canned.
 
 What stays real:
 - The twin executes the moves, the gate decides, the invariants judge. Whether an attempt
@@ -63,8 +63,10 @@ def _bank_change(at: int = 2) -> Move:
     )
 
 
-# The bank of hypotheses, written against the seeded Bayline books (seed 7). Each breaks v0 in
-# the twin; whether it still does under a later policy is for the twin to say.
+# The bank of hypotheses, written against the seeded Bayline books (seed 7), in the order the
+# hunt tries them: the demo's story (the bank change after approval, which leads to the T1 and
+# T2 fix) comes first. Each breaks v0 in the twin; whether it still does under a later policy
+# is for the twin to say.
 PLAYBOOK: tuple[Hypothesis, ...] = (
     Hypothesis(
         weak_spot="approval reads the vendor's current account, not the approved one",
@@ -408,17 +410,18 @@ def hunt(
     pause: float | None = None,
     rng: random.Random | None = None,
 ) -> HuntResult:
-    """Up to `attempts` rounds of: pause as if studying the company, pick an unused hypothesis
-    from the PLAYBOOK at random, the twin runs it. Stops at the first hit unless `keep_going`,
-    or when the playbook is used up. `pause` is seconds per attempt (default from
-    VANDAL_HUNT_PAUSE, else 3); `rng` fixes the order."""
+    """Up to `attempts` rounds of: pause as if studying the company, take the next hypothesis
+    from the PLAYBOOK, the twin runs it. Stops at the first hit unless `keep_going`, or when
+    the playbook is used up. Deterministic: the same run gives the same hunt, so the demo
+    lands on the same fix every time; pass `rng` to shuffle the playbook instead. `pause` is
+    seconds per attempt (default from VANDAL_HUNT_PAUSE, else 3)."""
     if pause is None:
         pause = float(os.environ.get(PAUSE_ENV, DEFAULT_PAUSE))
-    rng = rng or random.Random()
     sb = factory(seed)
     preset = _preset_alphabet(sb)
     order = list(PLAYBOOK)
-    rng.shuffle(order)
+    if rng is not None:
+        rng.shuffle(order)
     history: list[Attempt] = []
     best: Hit | None = None
     hits = 0
