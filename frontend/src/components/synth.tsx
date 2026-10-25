@@ -4,6 +4,7 @@
 // how a CEGIS iteration reads, and the before/after scorecard.
 
 import { cx, moveLine, pct, usd } from "@/lib/format";
+import { readRule } from "@/lib/rules";
 import type { Control, LogEntry, Policy, Scorecard } from "@/lib/types";
 import { Badge, Table, td } from "./ui";
 
@@ -52,24 +53,39 @@ function show(v: unknown): string {
   return String(v);
 }
 
-/** One control, spelled out: its code and template, then every parameter it was given. */
+/** One control, spelled out: its code and name, what it is for, what Guard does under it in
+ * plain English (one sentence per compiled check), and the exact parameters behind that. */
 export function ControlCard({ control, label }: { control: Control; label?: string }) {
   const entries = Object.entries(control.params ?? {});
+  const r = readRule(control);
   return (
-    <div className="rounded border border-line bg-raised/40 px-3 py-2">
-      <div className="flex items-baseline gap-2">
+    <div className="rounded border border-line bg-raised/40 px-3 py-2.5">
+      <div className="flex flex-wrap items-baseline gap-x-2">
         {label && <span className="num text-xs font-bold text-ok">{label}</span>}
-        <span className="text-xs font-semibold text-ink">{control.template}</span>
+        <span className="text-[13px] font-semibold text-ink">{r.name}</span>
+        <span className="num text-[10px] text-faint">{control.template}</span>
       </div>
+      {r.gist && <p className="mt-0.5 text-[11px] italic leading-snug text-dim">{r.gist}</p>}
+      <ul className="mt-1.5 space-y-1">
+        {r.does.map((line, i) => (
+          <li key={i} className="flex gap-2 text-xs leading-snug text-ink/90">
+            <span aria-hidden className="mt-[5px] size-1.5 shrink-0 rounded-full bg-ok/70" />
+            <span>{line}</span>
+          </li>
+        ))}
+      </ul>
       {entries.length > 0 && (
-        <dl className="num mt-1 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-[11px]">
-          {entries.map(([k, v]) => (
-            <div key={k} className="contents">
-              <dt className="text-faint">{k}</dt>
-              <dd className="break-all text-ink/90">{show(v)}</dd>
-            </div>
-          ))}
-        </dl>
+        <details className="mt-1.5 text-[11px]">
+          <summary className="cursor-pointer text-faint hover:text-dim">Parameters</summary>
+          <dl className="num mt-1 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5">
+            {entries.map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt className="text-faint">{k}</dt>
+                <dd className="break-all text-ink/90">{show(v)}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
       )}
     </div>
   );
