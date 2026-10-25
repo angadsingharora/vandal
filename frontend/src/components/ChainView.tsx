@@ -1,9 +1,12 @@
 "use client";
 
-import { cx, INVARIANTS, usd } from "@/lib/format";
+// The authorization chain for one payment: obligation → approval → execution → settlement →
+// books, each link covered or not, with the facts Guard evaluated at the first broken one.
+
+import { cx } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
 import type { Link } from "@/lib/types";
-import { Badge, Panel, SideTag, Spinner } from "./ui";
+import { Block, Spinner } from "./ui";
 
 const MARK: Record<Link["status"], { icon: string; style: string; label: string }> = {
   covered: { icon: "✓", style: "border-ok/40 text-ok", label: "covered" },
@@ -19,32 +22,23 @@ function fact(v: unknown): string {
 
 export function ChainView() {
   const s = useWarRoom();
-  const { chain, diagnosis } = s;
-  const d = diagnosis.data;
-  const showingDiagnosis = d && chain.payment === d.payment && chain.runId === null;
+  const { chain } = s;
   const firstBroken = chain.data?.links.find((l) => l.status === "uncovered");
 
+  if (!chain.payment) return null;
+
   return (
-    <Panel
-      title={
+    <Block
+      label={
         <>
-          Diagnose · authorization chain{" "}
-          {chain.payment && <span className="num normal-case tracking-normal text-ink">· {chain.payment}</span>}
+          Authorization chain · <span className="num normal-case tracking-normal text-ink">{chain.payment}</span>
           {chain.data?.invoice && <span className="num normal-case tracking-normal text-faint"> for {chain.data.invoice}</span>}
         </>
       }
-      tag={<SideTag side="red" />}
-      actions={showingDiagnosis && <Badge tone="bad">diagnosis</Badge>}
-      className={chain.payment ? "min-h-[220px] lg:max-h-[46vh]" : ""}
     >
-      {!chain.payment && (
-        <p className="px-3 py-2 text-[11px] text-faint">
-          Diagnose a counterexample, or click a payment, to walk obligation → approval → execution → settlement → books.
-        </p>
-      )}
-      {chain.payment && !chain.data && (
+      {!chain.data && (
         <div className="flex items-center gap-2 p-3 text-xs text-dim">
-          <Spinner /> building the chain…
+          <Spinner /> walking the chain…
         </div>
       )}
       {chain.data && (
@@ -54,7 +48,7 @@ export function ChainView() {
               const m = MARK[l.status];
               return (
                 <li key={l.name} className="relative flex">
-                  <div className={cx("flex-1 rounded border p-2", m.style)}>
+                  <div className={cx("flex-1 rounded border p-2.5", m.style)}>
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-semibold uppercase tracking-wider">{l.name}</span>
                       <span aria-label={m.label} className="text-sm font-bold">
@@ -96,26 +90,8 @@ export function ChainView() {
               </dl>
             </details>
           )}
-
-          {showingDiagnosis && (
-            <div className="rounded border border-bad/40 bg-bad/5 p-2.5">
-              <div className="text-[10px] uppercase tracking-wider text-bad">Root cause · {d.gap} at {d.link}</div>
-              <p className="mt-1 text-sm text-ink">{d.reason}</p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] text-dim">
-                {d.violated.map((v) => (
-                  <span key={v} title={INVARIANTS[v]}>
-                    <Badge tone="bad">{v}</Badge>
-                  </span>
-                ))}
-                <span className="num ml-1">exposure {usd(d.exposure)}</span>
-                {d.also.length > 0 && <span>· also uncovered: {d.also.join(", ")}</span>}
-              </div>
-              <div className="num mt-1 text-[10px] text-faint">cites {d.cites.join(" ")}</div>
-            </div>
-          )}
-          {diagnosis.phase === "done" && !d && diagnosis.reason && <p className="text-xs text-dim">{diagnosis.reason}</p>}
         </div>
       )}
-    </Panel>
+    </Block>
   );
 }

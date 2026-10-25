@@ -19,6 +19,7 @@ COMMANDS: dict[str, tuple[str, str]] = {
     "synth": ("Diagnose and synthesize a control (CEGIS)", "R8"),
     "verify": ("Run the verification suite against a policy", "R7"),
     "inject": ("Run a user-authored threat in plain language", "R9"),
+    "hunt": ("Claude studies the company and reasons out attacks of its own", "R13"),
     "rebuild": ("Rebuild a persisted run from its events and check its hash", "R12"),
     "intake": ("Score the LLM Operator's intake on the messy-document items", "O1"),
 }
@@ -604,11 +605,67 @@ def cmd_inject(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_hunt(args: argparse.Namespace) -> int:
+    from functools import partial
+
+    from vandal.sandbox import new_sandbox
+    from vandal.search.hunt import HuntUnavailable, hunt
+
+    policy = _policy(args)
+    _print_policy(policy)
+    factory = partial(new_sandbox, args.profile, policy=policy)
+
+    def show(a) -> None:
+        print(f"\nattempt {a.n}: {a.weak_spot}  (target {a.target_invariant})")
+        print(f"  rationale: {a.rationale}")
+        for m in a.moves:
+            params = " ".join(f"{k}={v}" for k, v in m.params.items() if k != "text")
+            print(f"  @{m.at:<3} {m.kind} {params}".rstrip())
+        o = a.outcome
+        for d in o.dropped:
+            print(f"  dropped  {d}")
+        for g in o.guard:
+            print(f"  guard    {g}")
+        if o.violated:
+            print(f"  BROKE    {', '.join(o.violated)}  exposure ${o.exposure / 100:,.2f}")
+        else:
+            print("  held: no invariant broken")
+
+    try:
+        r = hunt(
+            factory,
+            seed=args.seed,
+            attempts=args.attempts,
+            keep_going=args.keep_going,
+            on_attempt=show,
+        )
+    except HuntUnavailable as err:
+        print(err, file=sys.stderr)
+        return 2
+    print(f"\n{r.reason}")
+    if r.best is None:
+        return 0
+    b = r.best
+    print(f"minimal counterexample ({len(b.moves)} moves, from attempt {b.attempt}):")
+    for m in b.moves:
+        params = " ".join(f"{k}={v}" for k, v in m.params.items() if k != "text")
+        print(f"  @{m.at:<3} {m.kind} {params}".rstrip())
+    print(f"VIOLATED {', '.join(b.violated)}  exposure ${b.exposure / 100:,.2f}")
+    where = (
+        "outside every preset threat family"
+        if b.outside_preset_search
+        else "inside a preset family"
+    )
+    print(f"novelty: {where}")
+    return 1
+
+
 IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {
     "rebuild": cmd_rebuild,
     "synth": cmd_synth,
     "verify": cmd_verify,
     "inject": cmd_inject,
+    "hunt": cmd_hunt,
     "search": cmd_search,
     "seed": cmd_seed,
     "run": cmd_run,
@@ -624,7 +681,17 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="command", required=True)
     for name, (help_text, _slice) in COMMANDS.items():
         cmd = sub.add_parser(name, help=help_text)
-        if name in ("seed", "run", "attack", "search", "verify", "synth", "inject", "intake"):
+        if name in (
+            "seed",
+            "run",
+            "attack",
+            "search",
+            "verify",
+            "synth",
+            "inject",
+            "intake",
+            "hunt",
+        ):
             cmd.add_argument("--profile", default="bayline", help="profile name or YAML path")
             cmd.add_argument("--seed", type=int, default=DEFAULT_SEED)
         if name in ("run", "verify", "intake"):
@@ -634,7 +701,7 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "intake":
             cmd.add_argument("--target", type=float, default=0.9, help="accuracy to reach")
             cmd.add_argument("--show", help="print one item by id, e.g. MSY-003")
-        if name in ("run", "attack", "search", "verify", "synth", "inject"):
+        if name in ("run", "attack", "search", "verify", "synth", "inject", "hunt"):
             cmd.add_argument("--policy", help="v0, a name under policies/, or a JSON path")
         if name == "synth":
             cmd.add_argument("--no-llm", action="store_true", help="enumerative sweep only")
@@ -696,6 +763,11 @@ def build_parser() -> argparse.ArgumentParser:
             cmd.add_argument("--no-llm", action="store_true", help="keywords and templates")
             cmd.add_argument("--no-repair", action="store_true", help="diagnose, don't repair")
             cmd.add_argument("--dry-run", action="store_true", help="preview the moves only")
+        if name == "hunt":
+            cmd.add_argument("--attempts", type=int, default=6, help="hypotheses to test")
+            cmd.add_argument(
+                "--keep-going", action="store_true", help="keep hunting after the first hit"
+            )
     return parser
 
 

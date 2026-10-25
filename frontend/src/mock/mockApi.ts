@@ -312,6 +312,11 @@ export class MockApi implements VandalApi {
     return { depth, scorecards } as any;
   }
 
+  async hunt(runId: string, _body: { attempts: number; keep_going?: boolean }): Promise<never> {
+    this.run(runId);
+    throw new ApiError(400, "the threat hunter reasons with Claude: run it against the real backend");
+  }
+
   inject = (async (runId: string, body: InjectBody) => {
     this.run(runId);
     if (!body.moves?.length && !body.description?.trim()) throw new ApiError(400, "give a description or moves");

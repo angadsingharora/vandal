@@ -1,20 +1,21 @@
 @import "tailwindcss";
 
-/* War room palette: dark, technical, with one meaning per color. */
+/* War room palette: dark and quiet, one meaning per color. Red is Vandal, blue is Guard,
+   green/amber/violet are verdict tones. Everything is a step softer than a terminal. */
 @theme {
-  --color-bg: #0a0c10;
-  --color-panel: #10141b;
-  --color-raised: #161b24;
-  --color-line: #232a36;
-  --color-ink: #d7dde8;
-  --color-dim: #8590a3;
-  --color-faint: #566072;
-  --color-red: #ff4d5e;
-  --color-blue: #4da3ff;
-  --color-ok: #3ccf91;
-  --color-warn: #f5b942;
-  --color-esc: #c084fc;
-  --color-bad: #ff4d5e;
+  --color-bg: #0e1117;
+  --color-panel: #131821;
+  --color-raised: #1a2029;
+  --color-line: #242c38;
+  --color-ink: #d3d9e3;
+  --color-dim: #8b95a7;
+  --color-faint: #5c6677;
+  --color-red: #e4737e;
+  --color-blue: #6fa6e3;
+  --color-ok: #5fbd9b;
+  --color-warn: #d8b25f;
+  --color-esc: #b094e0;
+  --color-bad: #e4737e;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
@@ -54,8 +55,42 @@ body {
 .live-dot {
   animation: pulse-dot 1.2s ease-in-out infinite;
 }
+
+/* The nudge: a soft ring that breathes around the one thing to click next. */
+@keyframes nudge-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--nudge) 60%, transparent); }
+  70% { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.nudge {
+  --nudge: var(--color-blue);
+  animation: nudge-ring 1.8s ease-out infinite;
+}
+.nudge-red { --nudge: var(--color-red); }
+
+/* The reveal: new information rises in and glows for a moment so the eye lands on it. */
+@keyframes reveal-in {
+  0% { opacity: 0; transform: translateY(6px); box-shadow: 0 0 0 1px transparent; }
+  20% { opacity: 1; transform: none; box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-ink) 50%, transparent), 0 0 28px color-mix(in srgb, var(--color-ink) 10%, transparent); }
+  100% { box-shadow: 0 0 0 1px transparent, 0 0 0 transparent; }
+}
+.reveal {
+  animation: reveal-in 1.8s ease-out both;
+}
+
+/* Done with: what the current step no longer needs steps back. */
+.quiet {
+  opacity: 0.55;
+  transition: opacity 0.3s ease;
+}
+.quiet:hover,
+.quiet:focus-within {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .live-dot { animation: none; }
+  .live-dot, .nudge { animation: none; }
+  .reveal { animation-duration: 1ms; }
 }
 
 /* The welcome screen fades in with a small rise, and fades out before it unmounts. */
@@ -82,4 +117,52 @@ body {
   background-size: 48px 48px;
   mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
   opacity: 0.35;
+}
+
+/* Evidence: a scanline sweeps the intercepted message while its tells are pulled out. */
+.es-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -2px;
+  height: 1px;
+  background: var(--color-red);
+  animation: es-sweep 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  pointer-events: none;
+}
+@keyframes es-sweep {
+  0% { top: -2px; opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.es-mark {
+  background: transparent;
+  color: inherit;
+  transition: color 0.3s, box-shadow 0.3s;
+}
+.es-mark.on {
+  color: var(--color-red);
+  box-shadow: inset 0 -1px 0 var(--color-red);
+}
+.es-forged {
+  font-weight: 600;
+  color: var(--color-red);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.es-finding {
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.es-finding.off {
+  opacity: 0;
+  transform: translateY(4px);
+}
+.es-finding.on {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .es-scanline { animation: none; display: none; }
+  .es-finding, .es-mark { transition: none; }
 }

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { cx, usd } from "@/lib/format";
 import { CFO, CONTROLLER, OPERATOR, useWarRoom } from "@/lib/store";
-import type { Decision, ReplayOut, VerdictItem } from "@/lib/types";
+import type { Decision, VerdictItem } from "@/lib/types";
 import { IntakePanel } from "./IntakePanel";
 import { Badge, Button, DecisionBadge, Empty, LiveDot, Panel, SideTag } from "./ui";
 
@@ -33,7 +33,7 @@ export function RunOperations() {
         className="num h-7 w-12 rounded border border-line bg-raised px-1.5 text-xs"
         title="Business days to operate"
       />
-      <Button tone="blue" onClick={() => s.operateDays(days)} busy={operating} disabled={!s.ready}>
+      <Button tone="blue" onClick={() => s.operateDays(days)} busy={operating} disabled={!s.ready} nudge={s.operate.phase === "idle"}>
         Run operations
       </Button>
       {operating && s.operate.day != null && (
@@ -137,9 +137,9 @@ function VerdictRow({ v }: { v: VerdictItem }) {
 
 const FILTERS: (Decision | "all")[] = ["all", "allow", "hold", "escalate", "block"];
 
-export function VerdictFeed() {
+export function VerdictFeed({ initialFilter = "all" }: { initialFilter?: Decision | "all" } = {}) {
   const s = useWarRoom();
-  const [filter, setFilter] = useState<Decision | "all">("all");
+  const [filter, setFilter] = useState<Decision | "all">(initialFilter);
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: s.verdicts.length };
     for (const v of s.verdicts) c[v.decision] = (c[v.decision] ?? 0) + 1;
@@ -190,22 +190,51 @@ export function VerdictFeed() {
   );
 }
 
-export function ApprovalsInbox() {
+/** Payments Guard escalated, each waiting on a human. Shared by the Operate and Approve pages. */
+export function PaymentApprovals() {
   const s = useWarRoom();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const payments = s.approvals.payments;
-  // One row per policy version, the newest: a second loop in the same server resubmits
-  // v1-synth, and the older applied patch would only repeat it.
-  const patches = useMemo(() => {
-    const seen = new Set<string>();
-    return [...s.approvals.patches].reverse().filter((p) => !seen.has(p.version) && seen.add(p.version));
-  }, [s.approvals.patches]);
 
   const decide = async (runId: string, id: string, who: typeof CONTROLLER, approve: boolean) => {
     const msg = await s.decidePayment(runId, id, who, approve);
     setNotes((n) => ({ ...n, [id]: msg }));
   };
 
+  if (payments.length === 0) return <Empty>No payment is waiting on a human. Guard escalates over-threshold and unusual payments here.</Empty>;
+  return (
+    <ul>
+      {payments.map((p) => (
+        <li key={`${p.run_id}-${p.id}`} className="border-b border-line px-3 py-2 last:border-b-0">
+          <div className="flex items-center gap-2">
+            <Badge>payment</Badge>
+            <span className="num text-xs">{p.invoice}</span>
+            <span className="num ml-auto text-xs font-semibold">{usd(p.amount)}</span>
+          </div>
+          <div className="num mt-0.5 text-[11px] text-dim">
+            to {p.payee_account} · asked by {p.requested_by} · {p.id}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <Button tone="blue" onClick={() => decide(p.run_id, p.id, CONTROLLER, true)}>
+              Approve (Controller)
+            </Button>
+            <Button onClick={() => decide(p.run_id, p.id, CFO, false)}>Deny (CFO)</Button>
+            <Button tone="ghost" onClick={() => decide(p.run_id, p.id, OPERATOR, true)} title="Segregation of duties: Guard should refuse">
+              Operator tries to approve
+            </Button>
+          </div>
+          {notes[p.id] && <div className="mt-1 text-[11px] text-warn">{notes[p.id]}</div>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The inbox on the Operate page: escalated payments, and a pointer to a fix from Red when one
+ * is waiting on the Approve page. */
+export function ApprovalsInbox() {
+  const s = useWarRoom();
+  const patch = s.patch;
   return (
     <Panel
       title="Approvals · a human decides"
@@ -217,135 +246,35 @@ export function ApprovalsInbox() {
       }
       className="min-h-[160px]"
     >
-      {payments.length === 0 && patches.length === 0 && (
-        <Empty>Nothing waiting. Payments Guard escalates and fixes Strike sends over show up here.</Empty>
+      {patch && patch.status !== "applied" && (
+        <button onClick={() => void s.setStage("approve")} className="flex w-full items-center gap-2 border-b border-line bg-esc/[0.08] px-3 py-2 text-left hover:bg-esc/[0.14]">
+          <Badge tone="esc">fix from Strike</Badge>
+          <span className="num text-xs font-semibold">{patch.version}</span>
+          <Badge tone={patch.status === "denied" ? "bad" : patch.status === "approved" ? "blue" : "warn"}>{patch.status}</Badge>
+          <span className="ml-auto text-[11px] text-blue">open →</span>
+        </button>
       )}
-      <ul>
-        {patches.map((p) => (
-          <li key={p.id} className="border-b border-line px-3 py-2">
-            <div className="flex items-center gap-2">
-              <Badge tone="esc">fix from Strike</Badge>
-              <span className="num text-xs font-semibold">{p.version}</span>
-              <Badge tone={p.status === "applied" ? "ok" : p.status === "denied" ? "bad" : p.status === "approved" ? "blue" : "warn"}>
-                {p.status}
-              </Badge>
-            </div>
-            <div className="mt-1 text-[11px] text-dim">
-              from {p.submitted_by} ({p.submitter_role}) · evidence {p.evidence ?? "—"} · {p.approvable ? "approvable" : "not approvable"}
-            </div>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {p.checks.map((c) => (
-                <Badge key={c.name} tone={c.passed ? "ok" : "bad"}>
-                  {c.passed ? "✓" : "✗"} {c.name}
-                </Badge>
-              ))}
-            </div>
-            {p.decided_by && <div className="mt-1 text-[11px] text-dim">decided by {p.decided_by}</div>}
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {p.status === "pending" && s.patch?.id === p.id && (
-                <>
-                  <Button tone="blue" onClick={() => s.decidePatch(CONTROLLER, true)}>
-                    Approve as Controller
-                  </Button>
-                  <Button onClick={() => s.decidePatch(CONTROLLER, false, "declined in the war room")}>Deny</Button>
-                </>
-              )}
-              {p.status === "approved" && s.patch?.id === p.id && (
-                <Button tone="blue" onClick={s.applyPatch}>
-                  Apply {p.version} to Guard
-                </Button>
-              )}
-            </div>
-          </li>
-        ))}
-        {payments.map((p) => (
-          <li key={`${p.run_id}-${p.id}`} className="border-b border-line px-3 py-2">
-            <div className="flex items-center gap-2">
-              <Badge>payment</Badge>
-              <span className="num text-xs">{p.invoice}</span>
-              <span className="num ml-auto text-xs font-semibold">{usd(p.amount)}</span>
-            </div>
-            <div className="num mt-0.5 text-[11px] text-dim">
-              to {p.payee_account} · asked by {p.requested_by} · {p.id}
-            </div>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              <Button tone="blue" onClick={() => decide(p.run_id, p.id, CONTROLLER, true)}>
-                Approve (Controller)
-              </Button>
-              <Button onClick={() => decide(p.run_id, p.id, CFO, false)}>Deny (CFO)</Button>
-              <Button tone="ghost" onClick={() => decide(p.run_id, p.id, OPERATOR, true)} title="Segregation of duties: Guard should refuse">
-                Operator tries to approve
-              </Button>
-            </div>
-            {notes[p.id] && <div className="mt-1 text-[11px] text-warn">{notes[p.id]}</div>}
-          </li>
-        ))}
-      </ul>
+      <PaymentApprovals />
     </Panel>
   );
 }
 
-function Replayed({ title, out, policy }: { title: string; out: ReplayOut | null; policy?: string }) {
-  if (!out) {
-    return (
-      <div className="flex-1 rounded border border-dashed border-line p-2 text-[11px] text-faint">
-        {title}: not replayed yet{policy ? ` (${policy})` : ""}
-      </div>
-    );
-  }
-  const held = out.result.violations.length === 0;
-  return (
-    <div className={cx("flex-1 rounded border p-2", held ? "border-ok/40 bg-ok/5" : "border-bad/40 bg-bad/5")}>
-      <div className="flex items-baseline justify-between">
-        <span className="text-[10px] uppercase tracking-wider text-dim">
-          {title} · {out.run.policy}
-        </span>
-        <span className={cx("text-xs font-bold", held ? "text-ok" : "text-bad")}>{held ? "HELD" : "BROKEN"}</span>
-      </div>
-      <div className={cx("num text-lg font-semibold", held ? "text-ok" : "text-bad")}>{usd(out.result.exposure)}</div>
-      <div className="text-[11px] text-dim">
-        {held ? "no invariant broke" : out.result.violated.join(", ")} · payments{" "}
-        {Object.entries(out.run.payments)
-          .map(([k, v]) => `${v} ${k}`)
-          .join(", ")}
-      </div>
-    </div>
-  );
-}
-
-/** What Guard enforces on the live run, and the proof that a fix from Red works: Red's attack,
- * replayed before and after the policy changed. */
+/** What Guard enforces on the live run, in one line. The before/after proof lives on Enforce. */
 export function EnforcedPolicy() {
   const s = useWarRoom();
   const live = s.tabs.find((t) => t.kind === "live");
   const version = s.appliedPolicy ?? live?.policy ?? "v0";
   const info = s.policies.find((p) => p.name === version);
-  const attack = s.attack;
   return (
     <Panel title="Enforced policy" tag={<SideTag side="blue" />} className="h-auto" bodyClass="overflow-visible">
-      <div className="space-y-2 p-3">
-        <div className="flex flex-wrap items-baseline gap-2">
-          <span className="num text-sm font-semibold text-ink">{version}</span>
-          {s.appliedPolicy && <Badge tone="ok">applied from Strike</Badge>}
-          <span className="text-[11px] text-dim">{info?.controls.length ? info.controls.join(" · ") : "baseline: no extra controls"}</span>
-        </div>
-        {attack ? (
-          <>
-            <div className="flex gap-2">
-              <Replayed title="Before" out={s.replays.before} policy={attack.policy} />
-              <Replayed title="After" out={s.replays.after} policy={s.appliedPolicy ?? undefined} />
-            </div>
-            <Button
-              tone="blue"
-              disabled={!s.appliedPolicy}
-              onClick={() => s.appliedPolicy && s.replayAttack(s.appliedPolicy)}
-              title={!s.appliedPolicy ? "Approve and apply Strike's fix first" : "Run Strike's counterexample on a fresh clone under the new policy"}
-            >
-              Replay Strike&apos;s attack under {s.appliedPolicy ?? "the new policy"}
-            </Button>
-          </>
-        ) : (
-          <p className="text-[11px] text-faint">Once Strike finds an attack, its before and after replays show here.</p>
+      <div className="flex flex-wrap items-baseline gap-2 p-3">
+        <span className="num text-sm font-semibold text-ink">{version}</span>
+        {s.appliedPolicy && <Badge tone="ok">applied from Strike</Badge>}
+        <span className="text-[11px] text-dim">{info?.controls.length ? info.controls.join(" · ") : "baseline: no extra controls"}</span>
+        {s.attack && (
+          <button onClick={() => void s.setStage("enforce")} className="ml-auto text-[11px] text-blue hover:underline">
+            before / after →
+          </button>
         )}
       </div>
     </Panel>

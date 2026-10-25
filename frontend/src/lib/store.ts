@@ -6,6 +6,7 @@
 
 import { create } from "zustand";
 import { getApi, type Handlers, type InjectBody, type VandalApi } from "./api";
+import { landingStage, loopSteps, sideOf, type LoopInput, type Stage } from "./loop";
 import type {
   Actor,
   AlertItem,
@@ -18,6 +19,8 @@ import type {
   EvidencePack,
   Explanation,
   Finding,
+  HuntAttempt,
+  HuntResult,
   InjectResult,
   IntakeRead,
   Job,
@@ -59,7 +62,7 @@ export interface RunTab {
 /** The counterexample the loop is working on: from a search, or from an injected threat. */
 export interface Attack {
   jobId: string;
-  source: "search" | "inject";
+  source: "search" | "inject" | "hunt";
   policy: string;
   finding: Finding;
   labels: OracleLabel[];
@@ -72,6 +75,8 @@ interface State {
   settings: Settings | null;
   judge: boolean;
   view: View;
+  /** The page of the loop being looked at. Its side is `view`. */
+  stage: Stage;
   policies: PolicyInfo[];
 
   tabs: RunTab[];
@@ -115,6 +120,8 @@ interface State {
   approvals: Approvals;
   replays: { before: ReplayOut | null; after: ReplayOut | null };
   inject: { phase: Phase; plan: ThreatPlan | null; jobId: string | null; result: InjectResult | null };
+  /** R13: Red's threat hunter. Claude's attempts stream in as it reasons. */
+  hunt: { phase: Phase; jobId: string | null; attempts: HuntAttempt[]; result: HuntResult | null };
   metrics: { phase: Phase; data: Metrics | null };
   explanation: { phase: Phase; data: Explanation | null; subject: string | null };
 }
@@ -124,6 +131,9 @@ interface Actions {
   clearError(): void;
   toggleJudge(): void;
   setView(view: View): Promise<void>;
+  setStage(stage: Stage): Promise<void>;
+  /** Which steps of the loop are done, for the stepper and the pages. */
+  progress(): LoopInput;
   setPlayback(on: boolean): Promise<void>;
   reset(policy: string): Promise<void>;
   loadIntake(): Promise<void>;
@@ -147,6 +157,7 @@ interface Actions {
   decidePayment(runId: string, requestId: string, actor: Actor, approve: boolean): Promise<string>;
   previewInject(body: InjectBody): Promise<void>;
   runInject(body: InjectBody): Promise<void>;
+  runHunt(attempts?: number): Promise<void>;
   loadMetrics(policies: string[]): Promise<void>;
   explain(entityType: string, id: string, question?: string): Promise<void>;
   closeExplanation(): void;
@@ -237,6 +248,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     settings: null,
     judge: false,
     view: "blue",
+    stage: "operate",
     policies: [],
     tabs: [],
     liveRunId: null,
@@ -262,6 +274,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     approvals: { payments: [], patches: [] },
     replays: { before: null, after: null },
     inject: { ...idle, plan: null, jobId: null, result: null },
+    hunt: { ...idle, jobId: null, attempts: [], result: null },
     metrics: { ...idle, data: null },
     explanation: { ...idle, data: null, subject: null },
 
@@ -285,11 +298,37 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     clearError: () => set({ error: null }),
     toggleJudge: () => set((s) => ({ judge: !s.judge })),
 
-    // Blue watches the live run; Red looks at its latest sandbox replay, or the live run it clones.
-    setView: guard(async (view: View) => {
-      set({ view });
-      const { tabs, liveRunId, focusRunId } = get();
-      const target = view === "blue" ? liveRunId : (tabs.filter((t) => t.kind === "replay").at(-1)?.id ?? liveRunId);
+    progress: () => {
+      const s = get();
+      return {
+        operated: s.operate.phase === "done",
+        attacked: !!s.attack,
+        diagnosed: s.diagnosis.phase === "done" && !!s.diagnosis.data,
+        synthesized: !!s.synth.result?.policy,
+        submitted: !!s.patch,
+        applied: !!s.appliedPolicy,
+        enforced: !!s.replays.after,
+      };
+    },
+
+    // Switching sides opens that side's current page.
+    setView: async (view: View) => {
+      await get().setStage(landingStage(loopSteps(get().progress()), view));
+    },
+
+    // Blue's pages watch the live run (Enforce: the replay under the new policy, once there is
+    // one); Red's look at the latest sandbox clone of the attack, or the live run it clones.
+    setStage: guard(async (stage: Stage) => {
+      const view = sideOf(stage);
+      set({ stage, view });
+      const { tabs, liveRunId, focusRunId, replays } = get();
+      const afterId = replays.after?.run.run_id ?? null;
+      const target =
+        stage === "enforce"
+          ? (afterId ?? liveRunId)
+          : view === "blue"
+            ? liveRunId
+            : (tabs.filter((t) => t.kind === "replay" && t.id !== afterId).at(-1)?.id ?? liveRunId);
       if (target && target !== focusRunId) await get().focus(target);
     }),
 
@@ -346,8 +385,10 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         appliedPolicy: null,
         replays: { before: null, after: null },
         inject: { ...idle, plan: null, jobId: null, result: null },
+        hunt: { ...idle, jobId: null, attempts: [], result: null },
         explanation: { ...idle, data: null, subject: null },
         policies: await a.policies(),
+        stage: "operate",
       });
       await get().focus(run.run_id);
       await get().loadApprovals();
@@ -421,6 +462,8 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         set((s) => ({ search: { ...s.search, phase: "failed" } }));
         throw err;
       }
+      // Show the attack on a fresh clone right away: its books, and the message that did it.
+      if (get().search.result?.best) await get().replayAttack(policy);
     }),
 
     replayAttack: guard(async (policy: string) => {
@@ -510,11 +553,13 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       }
     }),
 
+    // The fix crosses to Blue: the war room follows it to the Approve page.
     submitPatch: guard(async () => {
       const jobId = get().verify.jobId;
       if (!jobId) return;
       set({ patch: await api().submitPatch(jobId, SYNTHESIZER) });
       await get().loadApprovals();
+      await get().setStage("approve");
     }),
 
     decidePatch: guard(async (actor: Actor, approve: boolean, reason = "") => {
@@ -531,6 +576,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       await a.applyPolicy(patch.version);
       set({ patch: { ...patch, status: "applied" }, appliedPolicy: patch.version, policies: await a.policies() });
       await get().loadApprovals();
+      await get().setStage("enforce");
     }),
 
     loadApprovals: guard(async () => {
@@ -564,6 +610,35 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       }
     }),
 
+    runHunt: guard(async (attempts = 6) => {
+      const a = api();
+      const runId = get().focusRunId;
+      if (!runId) return;
+      const policy = get().summary?.policy ?? "v0";
+      set({
+        hunt: { phase: "running", jobId: null, attempts: [], result: null },
+        diagnosis: { ...idle, data: null, reason: null },
+      });
+      const job = await a.hunt(runId, { attempts });
+      set((s) => ({ hunt: { ...s.hunt, jobId: job.id } }));
+      try {
+        const done = await finished<HuntResult>(a, job.id, {
+          log: (t: HuntAttempt) => set((s) => ({ hunt: { ...s.hunt, attempts: [...s.hunt.attempts, t] } })),
+        });
+        const result = done.result!;
+        set((s) => ({
+          hunt: { ...s.hunt, phase: "done", result, attempts: result.attempts },
+          attack: result.best
+            ? { jobId: job.id, source: "hunt", policy, finding: result.best, labels: [] }
+            : s.attack,
+        }));
+      } catch (err) {
+        set((s) => ({ hunt: { ...s.hunt, phase: "failed" } }));
+        throw err;
+      }
+      if (get().hunt.result?.best) await get().replayAttack(policy);
+    }),
+
     runInject: guard(async (body: InjectBody) => {
       const a = api();
       const runId = get().focusRunId ?? get().liveRunId;
@@ -586,6 +661,8 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         set((s) => ({ inject: { ...s.inject, phase: "failed" } }));
         throw err;
       }
+      const atk = get().attack;
+      if (get().inject.result?.best && atk) await get().replayAttack(atk.policy);
     }),
 
     loadMetrics: guard(async (policies: string[]) => {
