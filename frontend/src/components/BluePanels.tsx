@@ -15,24 +15,13 @@ function argsLine(args: Record<string, unknown>): string {
     .join(" ");
 }
 
-/** Blue's banner controls: which agent a new run gets, and how many days it works. */
+/** Blue's banner controls: how many days the Operator works. */
 export function RunOperations() {
   const s = useWarRoom();
   const [days, setDays] = useState(5);
   const operating = s.operate.phase === "running";
   return (
     <>
-      <label className="sr-only" htmlFor="operator">Operator</label>
-      <select
-        id="operator"
-        value={s.operator}
-        onChange={(e) => s.setOperator(e.target.value as "reference" | "llm")}
-        className="h-7 rounded border border-line bg-raised px-1.5 text-xs"
-        title="The agent Guard protects: the deterministic reference Operator, or the LLM Operator that reads messy documents (O1). Takes effect on Reset demo."
-      >
-        <option value="reference">reference Operator</option>
-        <option value="llm">LLM Operator</option>
-      </select>
       <label className="sr-only" htmlFor="days">Business days</label>
       <input
         id="days"
@@ -69,7 +58,7 @@ export function OperatorPanel() {
       tag={<SideTag side="op" />}
       actions={
         <span className="flex items-center gap-2 text-[11px] text-faint">
-          {s.summary?.operator === "llm" && <Badge tone="esc">LLM Operator</Badge>}
+          <Badge tone="esc">LLM Operator</Badge>
           {cases.filter((c) => c.status === "open").length} open cases
         </span>
       }
@@ -91,8 +80,8 @@ export function OperatorPanel() {
           ))}
         </ul>
       )}
-      {s.summary?.operator === "llm" && <IntakePanel />}
-      {activity.length === 0 && cases.length === 0 && s.summary?.operator !== "llm" && (
+      <IntakePanel />
+      {activity.length === 0 && cases.length === 0 && (
         <Empty>Run operations to watch the Operator pay invoices. Each of its actions goes through Guard first.</Empty>
       )}
       <ul className="num">

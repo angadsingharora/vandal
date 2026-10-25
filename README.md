@@ -53,7 +53,7 @@ uv run vandal synth --no-llm --scenario a                     # diagnose + CEGIS
 
 `synth` writes an evidence pack to `backend/evidence/`.
 
-The Operator's intake (O1) reads messy documents: invoices as email bodies, OCR'd scans with typos, forwarded threads, and line-item tables, each with a hidden answer key. `uv run vandal intake` scores it (the scorecard reports the same numbers), and `uv run vandal run --operator llm` runs the company with the LLM Operator; without a model configured, its deterministic reader does the reading.
+The Operator's intake (O1) reads messy documents: invoices as email bodies, OCR'd scans with typos, forwarded threads, and line-item tables, each with a hidden answer key. `uv run vandal intake` scores it (the scorecard reports the same numbers), and `uv run vandal run` runs the company with the LLM Operator, the only Operator; without a model configured (or with `--no-llm`), its deterministic reader does the reading.
 
 ## CLI
 
@@ -167,7 +167,7 @@ backend/
     synth/       root cause (coverage), control templates, lints, CEGIS
     verify/      invariants, oracle, replay, regression, variants, evidence pack
     guard/       Vandal Guard: gate, checks, authorization chain, SoD, approvals, explanations
-    operator/    the reference Operator (and the LLM Operator)
+    operator/    the LLM Operator and the reference logic it extends
     api/         FastAPI, SSE, persistence
     cli.py
   profiles/      company profiles (bayline.yaml)

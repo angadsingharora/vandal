@@ -1,11 +1,11 @@
-"""O1: the LLM Operator used in the live demo.
+"""O1: the LLM Operator, the only Operator the sandbox builds.
 
-The same Operator as the reference one (operations, treasury, cash application, recovery,
-approvals: O0, O2, O3), with one difference: a message that arrives with no structured fields is
-read by intake (operator/intake.py: Claude through vandal/llm.py, with a deterministic reader
-behind it) rather than taken from `meta`. Messages that do carry structured fields take the
-reference path, so search and verification, which always run the reference Operator, see
-identical money outcomes (IMPLEMENTATION §0).
+It runs the company through the reference logic it extends (operations, treasury, cash
+application, recovery, approvals: O0, O2, O3), with one addition: a message that arrives with no
+structured fields is read by intake (operator/intake.py: Claude through vandal/llm.py, with a
+deterministic reader behind it) rather than taken from `meta`. Messages that do carry structured
+fields take the reference path, and search and verification clones keep intake on the
+deterministic reader, so their money outcomes never depend on a model (IMPLEMENTATION §0).
 
 Every action intake proposes is a tool call through Blue; intake never moves money itself.
 """

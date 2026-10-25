@@ -137,7 +137,7 @@ export function TopBar({ onScorecard, onWelcome }: { onScorecard: () => void; on
 
   const reset = async () => {
     setResetting(true);
-    await s.reset(policy, s.operator);
+    await s.reset(policy);
     setResetting(false);
   };
 

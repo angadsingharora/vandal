@@ -99,7 +99,7 @@ Every counterexample that beats a candidate goes back into the next proposal. Li
 - **Claude Sonnet** is the Operator's intake. It reads the messy invoices and writes Guard's cited explanations.
 - **Claude Opus** proposes controls inside the CEGIS loop and turns a judge's plain-language threat ("a vendor emails new bank details, then calls to confirm") into moves Strike can run.
 - Every call goes through one wrapper with structured output and a content-keyed cache. `DEMO_PLAYBACK` replays the whole demo offline with zero cache misses.
-- Search and verification always run the deterministic reference Operator, so money outcomes never depend on a model's sampling.
+- Search and verification run the Operator on its deterministic reader, so money outcomes never depend on a model's sampling.
 
 **The stack:**
 - **Backend:** Python 3.12, FastAPI, Pydantic, and SQLAlchemy (SQLite or Postgres for persistence), managed with uv and tested with pytest and ruff.
@@ -211,4 +211,4 @@ These aren't Devpost fields. They're here for recording the video and answering 
 | The synthesizer proposing controls, and search refuting or accepting them | Bank behavior and faults (timeouts, dropped acks, late feeds) | The scorecard: before-and-after rates from actual runs |
 | Replay of any recorded trace | Approvers, when no human is present | Replay-determinism tests |
 
-Models propose; code decides. Search and verification always run the deterministic reference Operator, so money outcomes never depend on a model's mood.
+Models propose; code decides. Search and verification run the Operator on its deterministic reader, so money outcomes never depend on a model's mood.

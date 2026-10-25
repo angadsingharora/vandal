@@ -8,7 +8,7 @@ import { cx, INVARIANTS, moveLine, usd } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
 import { EvidenceScan } from "./EvidenceScan";
 import { HuntPanel } from "./HuntPanel";
-import { MovesTimeline, SCENARIOS } from "./SearchPanel";
+import { MovesTimeline } from "./SearchPanel";
 import { StagePage } from "./Stage";
 import { Badge, Block, Button, LiveDot, Reveal, Stat } from "./ui";
 
@@ -58,7 +58,7 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
     >
       {/* 1 · the threat */}
       <Block
-        label="1 · Pick a threat"
+        label="1 · The threat"
         quiet={!!attack && !running}
         aside={
           <span>
@@ -67,28 +67,11 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
         }
       >
         <div className="flex flex-wrap items-end gap-3 p-3">
-          <div role="radiogroup" aria-label="Scenario" className="grid flex-1 basis-[30rem] grid-cols-1 gap-1.5 sm:grid-cols-3">
-            {SCENARIOS.map((x) => {
-              const on = search.scenario === x.id;
-              return (
-                <button
-                  key={x.id}
-                  role="radio"
-                  aria-checked={on}
-                  onClick={() => s.setSearch({ scenario: x.id })}
-                  className={cx(
-                    "rounded border px-3 py-2 text-left transition-colors",
-                    on ? "border-red/60 bg-red/10" : "border-line hover:border-dim",
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={cx("num text-[10px] font-bold uppercase", on ? "text-red" : "text-faint")}>{x.id}</span>
-                    <span className={cx("text-xs font-medium", on ? "text-ink" : "text-dim")}>{x.label}</span>
-                  </div>
-                  <div className="mt-0.5 text-[11px] leading-snug text-faint">{x.hint}</div>
-                </button>
-              );
-            })}
+          <div className="flex-1 basis-[30rem] rounded border border-red/60 bg-red/10 px-3 py-2">
+            <div className="text-xs font-medium text-ink">Bank change after approval</div>
+            <div className="mt-0.5 text-[11px] leading-snug text-faint">
+              A vendor&apos;s bank details change between approval and the payment run
+            </div>
           </div>
           <label className="flex items-center gap-1.5 text-[11px] text-dim" title="How many attacker moves or faults per sequence">
             Moves per sequence

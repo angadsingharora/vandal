@@ -74,8 +74,7 @@ export function Welcome({ onClose }: { onClose: () => void }) {
       /* private mode: show it again next time */
     }
     try {
-      if (s.operator !== "llm" || s.summary?.operator !== "llm") await s.reset(s.summary?.policy ?? "v0", "llm");
-      await s.setView("blue");
+      await s.reset("v0");
     } finally {
       setEntering(false);
       setLeaving(true);

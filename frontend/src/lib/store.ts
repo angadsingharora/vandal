@@ -28,7 +28,6 @@ import type {
   LogEntry,
   MessyDocument,
   Metrics,
-  OperatorKind,
   OracleLabel,
   PatchRequest,
   PolicyInfo,
@@ -91,8 +90,7 @@ interface State {
   activity: VandalEvent[];
 
   operate: { phase: Phase; day: number | null; events: number | null };
-  /** O1: which Operator a new run gets, the documents it can receive, and what intake read. */
-  operator: OperatorKind;
+  /** O1: the documents the LLM Operator can receive, and what intake read. */
   documents: MessyDocument[];
   intake: IntakeRead[];
   delivering: Phase;
@@ -137,14 +135,13 @@ interface Actions {
   /** Which steps of the loop are done, for the stepper and the pages. */
   progress(): LoopInput;
   setPlayback(on: boolean): Promise<void>;
-  reset(policy: string, operator?: OperatorKind): Promise<void>;
-  setOperator(operator: OperatorKind): void;
+  reset(policy: string): Promise<void>;
   loadIntake(): Promise<void>;
   deliverDocument(documentId: string): Promise<void>;
   operateDays(days: number): Promise<void>;
   focus(runId: string): Promise<void>;
   refresh(): Promise<void>;
-  setSearch(p: Partial<Pick<State["search"], "scenario" | "depth">>): void;
+  setSearch(p: Partial<Pick<State["search"], "depth">>): void;
   runSearch(): Promise<void>;
   replayAttack(policy: string): Promise<void>;
   diagnose(): Promise<void>;
@@ -263,7 +260,6 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     alerts: [],
     activity: [],
     operate: { ...idle, day: null, events: null },
-    operator: "reference",
     documents: [],
     intake: [],
     delivering: "idle",
@@ -340,11 +336,9 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       set({ settings: await api().setSettings({ playback: on }) });
     }),
 
-    setOperator: (operator: OperatorKind) => set({ operator }),
-
     loadIntake: guard(async () => {
       const runId = get().focusRunId;
-      if (!runId || get().summary?.operator !== "llm") {
+      if (!runId) {
         set({ documents: [], intake: [] });
         return;
       }
@@ -369,13 +363,14 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       }
     }),
 
-    reset: guard(async (policy: string, operator: OperatorKind = get().operator) => {
+    // The demo has one path: a reset starts over on Blue at step 1.
+    reset: guard(async (policy: string) => {
       const a = api();
-      const run = await a.reset(policy, operator);
+      const run = await a.reset(policy);
       set({
+        view: "blue",
         tabs: [{ id: run.run_id, label: "Live", policy: run.policy, kind: "live" }],
         liveRunId: run.run_id,
-        operator,
         documents: [],
         intake: [],
         delivering: "idle",
@@ -393,7 +388,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         hunt: { ...idle, jobId: null, attempts: [], result: null },
         explanation: { ...idle, data: null, subject: null },
         policies: await a.policies(),
-        stage: get().view === "blue" ? "operate" : "attack",
+        stage: "operate",
       });
       await get().focus(run.run_id);
       await get().loadApprovals();
@@ -411,7 +406,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       const a = api();
       const [summary, entities, ledger] = await Promise.all([a.state(runId), a.entities(runId), a.ledger(runId)]);
       if (get().focusRunId === runId) set({ summary, entities, ledger });
-      if (summary.operator === "llm" && get().documents.length === 0) await get().loadIntake();
+      if (get().documents.length === 0) await get().loadIntake();
     }),
 
     operateDays: guard(async (days: number) => {

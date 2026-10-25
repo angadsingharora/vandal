@@ -64,7 +64,6 @@ class RunHandle:
     writer: EventWriter | None = None
     labels: list[OracleLabel] = field(default_factory=list)  # answer key of a replayed trace
     lock: threading.RLock = field(default_factory=threading.RLock)
-    operator: str = "reference"  # or "llm": the LLM Operator with document intake (O1)
 
     @property
     def state(self):
@@ -109,7 +108,6 @@ class Registry:
         seed: int,
         policy: Policy,
         kind: str = "operate",
-        operator: str = "reference",
     ) -> RunHandle:
         run_id = _id("run")
         channel = Channel()
@@ -137,11 +135,10 @@ class Registry:
             policy=policy,
             sink=sink,
             monitor=True,
-            operator="llm" if operator == "llm" else "reference",
+            # Live runs let intake ask Claude; replays stay on the reader search used.
+            use_llm=kind == "operate",
         )
-        handle = RunHandle(
-            run_id, profile, seed, policy, sb, channel, verdicts, writer, operator=operator
-        )
+        handle = RunHandle(run_id, profile, seed, policy, sb, channel, verdicts, writer)
         self.runs[run_id] = handle
         return handle
 

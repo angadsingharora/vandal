@@ -1,16 +1,10 @@
 "use client";
 
-// The attack's building blocks, shared by the Attack page, the inject dialog and the welcome
-// screen: the three threats Red knows how to search, and a sequence of moves drawn as a timeline.
+// A sequence of attacker moves drawn as a timeline, shared by the Attack page and the inject
+// dialog.
 
 import { atLabel, moveLine, moveTitle } from "@/lib/format";
 import type { Move, OracleLabel } from "@/lib/types";
-
-export const SCENARIOS = [
-  { id: "a", label: "Bank change after approval", hint: "A vendor's bank details change between approval and the payment run" },
-  { id: "b", label: "Bank fault, retry", hint: "The bank drops an ack, the Operator retries, the vendor is paid twice" },
-  { id: "f", label: "Refund redirection", hint: "An overpayment, then a refund request to a different account" },
-];
 
 export function MovesTimeline({ moves, labels, judge }: { moves: Move[]; labels?: OracleLabel[]; judge?: boolean }) {
   return (

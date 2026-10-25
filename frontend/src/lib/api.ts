@@ -24,7 +24,6 @@ import type {
   DeliverOut,
   IntakeRead,
   MessyDocument,
-  OperatorKind,
   RunSummary,
   SearchResult,
   Settings,
@@ -61,8 +60,8 @@ export interface VandalApi {
   setSettings(s: { playback: boolean }): Promise<Settings>;
   policies(): Promise<PolicyInfo[]>;
 
-  reset(policy: string, operator?: OperatorKind): Promise<RunSummary>;
-  createRun(policy: string, operator?: OperatorKind): Promise<RunSummary>;
+  reset(policy: string): Promise<RunSummary>;
+  createRun(policy: string): Promise<RunSummary>;
   state(runId: string): Promise<RunSummary>;
   /** O1: the planted messy documents, what intake read, and delivering one to the LLM Operator. */
   documents(runId: string): Promise<MessyDocument[]>;
@@ -149,10 +148,8 @@ export class HttpApi implements VandalApi {
   setSettings = (s: { playback: boolean }) => this.call<Settings>("POST", "/settings", s);
   policies = () => this.call<PolicyInfo[]>("GET", "/policies");
 
-  reset = (policy: string, operator: OperatorKind = "reference") =>
-    this.call<RunSummary>("POST", "/demo/reset", { policy, operator });
-  createRun = (policy: string, operator: OperatorKind = "reference") =>
-    this.call<RunSummary>("POST", "/runs", { policy, operator });
+  reset = (policy: string) => this.call<RunSummary>("POST", "/demo/reset", { policy });
+  createRun = (policy: string) => this.call<RunSummary>("POST", "/runs", { policy });
   state = (runId: string) => this.call<RunSummary>("GET", `/runs/${runId}/state`);
   documents = (runId: string) => this.call<MessyDocument[]>("GET", `/runs/${runId}/documents`);
   deliver = (runId: string, documentId: string) =>

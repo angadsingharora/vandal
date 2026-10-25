@@ -4,7 +4,7 @@ R3, R5)."""
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Literal
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -27,7 +27,6 @@ class NewRun(BaseModel):
     profile: str = "bayline"
     seed: int = 7
     policy: str = "v0"
-    operator: Literal["reference", "llm"] = "reference"
 
 
 class Operate(BaseModel):
@@ -63,7 +62,6 @@ def summary(handle: RunHandle) -> dict[str, Any]:
             "profile": handle.profile,
             "seed": handle.seed,
             "policy": handle.policy.version,
-            "operator": handle.operator,
             "day": state.day,
             "invoices": dict(Counter(i.status for i in state.invoices.values())),
             "payments": dict(Counter(p.status for p in state.payments.values())),
@@ -82,7 +80,7 @@ def summary(handle: RunHandle) -> dict[str, Any]:
 
 def _create(request: Request, body: NewRun) -> dict[str, Any]:
     handle = deps.registry(request).create_run(
-        body.profile, body.seed, deps.policy(body.policy, request), operator=body.operator
+        body.profile, body.seed, deps.policy(body.policy, request)
     )
     return summary(handle)
 
@@ -122,10 +120,6 @@ def deliver_document(request: Request, run_id: str, item_id: str) -> dict[str, A
     """Make a planted document arrive: its structured copy leaves the twin and the Operator
     has to read the message. Returns what intake read and what Blue did with it."""
     handle = deps.get_run(request, run_id)
-    if handle.operator != "llm":
-        raise HTTPException(
-            400, "this run uses the reference Operator; start one with the LLM Operator"
-        )
     with handle.lock:
         item = next((it for it in _documents(handle) if it.id == item_id), None)
         if item is None:
