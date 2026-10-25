@@ -172,10 +172,9 @@ def test_metrics(client) -> None:
 
 
 def test_llm_operator_reads_a_delivered_document(client) -> None:
-    """O1 in the war room: a run with the LLM Operator lists the planted documents, delivering
-    one makes intake read it and Blue gate the receive, and the reference run refuses."""
-    run = client.post("/runs", json={"policy": "v0", "operator": "llm"}).json()
-    assert run["operator"] == "llm"
+    """O1 in the war room: a run lists the planted documents, and delivering one makes the LLM
+    Operator's intake read it and Blue gate the receive."""
+    run = client.post("/runs", json={"policy": "v0"}).json()
     docs = client.get(f"/runs/{run['run_id']}/documents").json()
     assert len(docs) == 24 and {d["format"] for d in docs} == {
         "email_body",
@@ -195,6 +194,3 @@ def test_llm_operator_reads_a_delivered_document(client) -> None:
     assert (
         client.post(f"/runs/{run['run_id']}/documents/{docs[0]['id']}/deliver").status_code == 409
     )
-    ref = client.post("/runs").json()
-    assert ref["operator"] == "reference"
-    assert client.post(f"/runs/{ref['run_id']}/documents/MSY-001/deliver").status_code == 400

@@ -101,7 +101,7 @@ def test_llm_operator_receives_a_messy_invoice_through_blue(items) -> None:
     pays it like any other invoice."""
     _, planted = items
     item = next(it for it in planted if it.twisted)
-    sb = new_sandbox(operator="llm", policy=V0)
+    sb = new_sandbox(policy=V0, use_llm=True)
     reopen_as_message(sb.run.state, item)
     assert isinstance(sb.operator, LLMOperator)
     sb.operator.on_event(item.message, sb.tools)
@@ -136,16 +136,17 @@ def test_llm_operator_receives_a_messy_invoice_through_blue(items) -> None:
     assert ledger.balance(final, t.gl_account) >= t.amount
 
 
-def test_llm_operator_runs_the_company_like_the_reference() -> None:
-    """Structured events take the reference path, so legitimate operations end the same way."""
-    ref = new_sandbox().operate(5).run.state
-    llm = new_sandbox(operator="llm").operate(5).run.state
-    assert ref.entity_hash() == llm.entity_hash()
-    assert check(llm) == []
+def test_live_and_clone_operators_run_the_company_the_same_way() -> None:
+    """Structured events take the reference path, so whether intake may ask Claude (live) or
+    not (search and verification clones), legitimate operations end the same way."""
+    clone = new_sandbox().operate(5).run.state
+    live = new_sandbox(use_llm=True).operate(5).run.state
+    assert clone.entity_hash() == live.entity_hash()
+    assert check(live) == []
 
 
 def test_a_message_nobody_can_act_on_moves_nothing() -> None:
-    sb = new_sandbox(operator="llm")
+    sb = new_sandbox(use_llm=True)
     before = sb.tools.calls
     sb.operator.on_event(
         ChannelEvent(

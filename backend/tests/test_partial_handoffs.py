@@ -36,7 +36,7 @@ def test_an_invoice_before_its_receipt_is_held_by_the_3_way_match() -> None:
 
 
 def test_a_bank_change_without_an_account_number_opens_a_case_and_changes_nothing() -> None:
-    sb = new_sandbox(operator="llm", use_llm=False)
+    sb = new_sandbox()
     vendor = sb.run.state.vendors["V-007"]
     ev = ChannelEvent(
         id="MSG-9001",

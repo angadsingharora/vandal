@@ -90,11 +90,11 @@ def test_cegis_lands_on_t3() -> None:
 
 
 def test_v0_retry_policy_is_keyless_and_query_first_is_safe() -> None:
-    from vandal.operator.reference import ReferenceOperator
+    from vandal.operator.llm_operator import LLMOperator
 
     def careful(seed):
         sb = new_sandbox(seed=seed, policy=V0)
-        sb.operator = ReferenceOperator(sb.profile, retry="query_first")
+        sb.operator = LLMOperator(sb.profile, retry="query_first", use_llm=False)
         return sb
 
     assert "INV-3" in replay(7, [fault("drop_ack")], sandbox=factory_for(V0)).violated

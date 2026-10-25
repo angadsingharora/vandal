@@ -131,7 +131,7 @@ interface Actions {
   operateDays(days: number): Promise<void>;
   focus(runId: string): Promise<void>;
   refresh(): Promise<void>;
-  setSearch(p: Partial<Pick<State["search"], "scenario" | "depth">>): void;
+  setSearch(p: Partial<Pick<State["search"], "depth">>): void;
   runSearch(): Promise<void>;
   replayAttack(policy: string): Promise<void>;
   diagnose(): Promise<void>;
@@ -299,7 +299,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
 
     loadIntake: guard(async () => {
       const runId = get().focusRunId;
-      if (!runId || get().summary?.operator !== "llm") {
+      if (!runId) {
         set({ documents: [], intake: [] });
         return;
       }
@@ -324,10 +324,10 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       }
     }),
 
-    // The demo has one path: every run gets the LLM Operator, and a reset starts over on Blue at step 1.
+    // The demo has one path: a reset starts over on Blue at step 1.
     reset: guard(async (policy: string) => {
       const a = api();
-      const run = await a.reset(policy, "llm");
+      const run = await a.reset(policy);
       set({
         view: "blue",
         tabs: [{ id: run.run_id, label: "Live", policy: run.policy, kind: "live" }],
@@ -365,7 +365,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       const a = api();
       const [summary, entities, ledger] = await Promise.all([a.state(runId), a.entities(runId), a.ledger(runId)]);
       if (get().focusRunId === runId) set({ summary, entities, ledger });
-      if (summary.operator === "llm" && get().documents.length === 0) await get().loadIntake();
+      if (get().documents.length === 0) await get().loadIntake();
     }),
 
     operateDays: guard(async (days: number) => {

@@ -52,8 +52,6 @@ export interface VandalEvent {
 
 // --- runs ---------------------------------------------------------------------------------
 
-export type OperatorKind = "reference" | "llm";
-
 /** A planted messy document (DESIGN 5.6) the company can receive; the answer key stays server-side. */
 export interface MessyDocument {
   id: string;
@@ -94,7 +92,6 @@ export interface RunSummary {
   profile: string;
   seed: number;
   policy: string;
-  operator?: OperatorKind;
   day: number;
   invoices: Record<string, number>;
   payments: Record<string, number>;

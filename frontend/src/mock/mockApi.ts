@@ -13,7 +13,6 @@ import type {
   Job,
   MessyDocument,
   Move,
-  OperatorKind,
   OracleLabel,
   PatchRequest,
   ReplayOut,
@@ -172,13 +171,13 @@ export class MockApi implements VandalApi {
 
   // --- runs -------------------------------------------------------------------------------
 
-  async reset(policy: string, operator: OperatorKind = "reference") {
+  async reset(policy: string) {
     this.runs.clear();
-    return this.createRun(policy, operator);
+    return this.createRun(policy);
   }
 
-  async createRun(policy: string, operator: OperatorKind = "reference") {
-    const run = this.newRun({ ...F.fresh, policy, operator }, F.fresh_entities);
+  async createRun(policy: string) {
+    const run = this.newRun({ ...F.fresh, policy }, F.fresh_entities);
     return clone(run.summary);
   }
 

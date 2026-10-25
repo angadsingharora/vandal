@@ -8,14 +8,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
 
 from vandal.contracts.events import Event
 from vandal.contracts.interfaces import FinanceOperator
 from vandal.guard.chain import RuntimeMonitor
 from vandal.guard.gate import Gate
 from vandal.operator.llm_operator import LLMOperator, extractor
-from vandal.operator.reference import ReferenceOperator, SimulatedApprover
+from vandal.operator.reference import SimulatedApprover
 from vandal.synth.templates import V0, Policy
 from vandal.twin.flows import GatedTools
 from vandal.twin.profile import Profile, load_profile
@@ -47,14 +46,13 @@ def new_sandbox(
     policy: Policy | None = None,
     sink: Callable[[Event], None] | None = None,
     monitor: bool = False,
-    operator: Literal["reference", "llm"] = "reference",
-    use_llm: bool = True,
+    use_llm: bool = False,
 ) -> Sandbox:
     """A fresh company under `policy` (v0 when omitted). `sink` sees every event. `monitor`
     turns on Blue's runtime invariant monitor (B2); search leaves it off for speed, since it
-    checks the invariants at the end of every run anyway. `operator` picks the reference Operator
-    (search and verification always use it) or the LLM Operator (O1, the live demo); `use_llm`
-    False keeps the LLM Operator on its deterministic reader."""
+    checks the invariants at the end of every run anyway. The Operator is always the LLM
+    Operator (O1). `use_llm` lets its intake ask Claude: live runs turn it on, while search and
+    verification clones leave it off, so their money outcomes come from the deterministic reader."""
     profile = load_profile(profile) if isinstance(profile, str) else profile
     watcher = None
     if monitor:
@@ -69,11 +67,7 @@ def new_sandbox(
         run=run,
         gate=gate,
         tools=GatedTools(run, gate),
-        operator=(
-            LLMOperator(profile, use_llm=use_llm)
-            if operator == "llm"
-            else ReferenceOperator(profile)
-        ),
+        operator=LLMOperator(profile, use_llm=use_llm),
         approver=SimulatedApprover(profile),
     )
 
@@ -84,7 +78,7 @@ def intake_extractor(profile: Profile | str = "bayline", *, use_llm: bool = True
     return extractor(loaded, use_llm=use_llm)
 
 
-def replay_with_reference(trace: Trace, profile: Profile | str = "bayline") -> RunResult:
-    """Replay a trace with the deterministic reference Operator (IMPLEMENTATION 0)."""
+def replay_deterministic(trace: Trace, profile: Profile | str = "bayline") -> RunResult:
+    """Replay a trace with the Operator on its deterministic reader (IMPLEMENTATION 0)."""
     loaded = load_profile(profile) if isinstance(profile, str) else profile
     return replay_trace(trace, sandbox=lambda seed: new_sandbox(loaded, seed=seed))

@@ -81,7 +81,6 @@ def cmd_run(args: argparse.Namespace) -> int:
         seed=args.seed,
         policy=policy,
         sink=writer,
-        operator=args.operator,
         use_llm=not args.no_llm,
     )
     sb.operate(args.days)
@@ -658,12 +657,6 @@ def build_parser() -> argparse.ArgumentParser:
             cmd.add_argument("--scenario", default="a", help="threat family to repair")
         if name == "run":
             cmd.add_argument("--days", type=int, default=5)
-            cmd.add_argument(
-                "--operator",
-                choices=("reference", "llm"),
-                default="reference",
-                help="the deterministic reference Operator, or the LLM Operator (O1)",
-            )
             cmd.add_argument(
                 "--persist",
                 action="store_true",

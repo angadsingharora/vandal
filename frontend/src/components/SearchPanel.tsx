@@ -1,15 +1,9 @@
 "use client";
 
-import { atLabel, cx, INVARIANTS, moveLine, moveTitle, usd } from "@/lib/format";
+import { atLabel, INVARIANTS, moveLine, moveTitle, usd } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
 import type { Move, OracleLabel } from "@/lib/types";
 import { Badge, Button, Empty, LiveDot, Panel, SideTag } from "./ui";
-
-export const SCENARIOS = [
-  { id: "a", label: "Bank change after approval", hint: "A vendor's bank details change between approval and the payment run" },
-  { id: "b", label: "Bank fault, retry", hint: "The bank drops an ack, the Operator retries, the vendor is paid twice" },
-  { id: "f", label: "Refund redirection", hint: "An overpayment, then a refund request to a different account" },
-];
 
 export function MovesTimeline({ moves, labels, judge }: { moves: Move[]; labels?: OracleLabel[]; judge?: boolean }) {
   return (
@@ -65,27 +59,10 @@ export function SearchPanel() {
     >
       <div className="space-y-2 border-b border-line p-3">
         <div className="text-[10px] uppercase tracking-wider text-faint">Threat to search</div>
-        <div role="radiogroup" aria-label="Scenario" className="flex flex-col gap-1">
-          {SCENARIOS.map((x) => {
-            const on = search.scenario === x.id;
-            return (
-              <button
-                key={x.id}
-                role="radio"
-                aria-checked={on}
-                onClick={() => s.setSearch({ scenario: x.id })}
-                title={x.hint}
-                className={cx(
-                  "flex items-center gap-2 rounded border px-2 py-1 text-left text-xs transition-colors",
-                  on ? "border-red/70 bg-red/10 text-ink" : "border-line text-dim hover:border-dim hover:text-ink",
-                )}
-              >
-                <span className={cx("num text-[10px] font-bold uppercase", on ? "text-red" : "text-faint")}>{x.id}</span>
-                {x.label}
-              </button>
-            );
-          })}
-        </div>
+        <p className="text-xs leading-snug text-ink">
+          Bank change after approval{" "}
+          <span className="text-dim">· a vendor&apos;s bank details change between approval and the payment run</span>
+        </p>
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] text-dim" title="How many attacker moves or faults per sequence">Moves per sequence</span>
           <label className="sr-only" htmlFor="depth">Depth</label>

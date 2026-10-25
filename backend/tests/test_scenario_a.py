@@ -9,7 +9,7 @@ import pytest
 
 from vandal.cli import main
 from vandal.contracts.moves import Move
-from vandal.sandbox import new_sandbox, replay_with_reference
+from vandal.sandbox import new_sandbox, replay_deterministic
 from vandal.verify.replay import IllegalMove, Trace, lookalike, replay, replay_detailed
 
 TRACE = Path(__file__).resolve().parents[1] / "scenarios" / "a_manual.json"
@@ -22,7 +22,7 @@ def trace() -> Trace:
 
 @pytest.fixture(scope="module")
 def result(trace):
-    return replay_with_reference(trace)
+    return replay_deterministic(trace)
 
 
 def test_scenario_a_violates_inv2_and_inv4(result) -> None:
@@ -38,7 +38,7 @@ def test_scenario_a_matches_design_and_books_balance(result) -> None:
 
 
 def test_same_trace_same_hash(trace, result) -> None:
-    again = replay_with_reference(trace)
+    again = replay_deterministic(trace)
     assert again.state_hash == result.state_hash
     assert again.violations == result.violations
 
