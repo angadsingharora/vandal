@@ -1,8 +1,9 @@
 "use client";
 
-// Step 2, Red. One column, top to bottom: pick a threat and run; what the search found (the safe
+// Step 2, Red. One column, top to bottom: release the strike; what the search found (the safe
 // sequences as a number, the ones that broke the books in full); the minimal counterexample; the
-// evidence. The footer carries the attack to Diagnose.
+// evidence. The footer carries the attack to Diagnose. The strike never says what it is looking
+// for: it searches every threat family and reports what broke.
 
 import { cx, INVARIANTS, moveLine, usd } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
@@ -56,18 +57,21 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
         hint: attack ? "Next: walk the payment's authorization chain and name the link Guard never checked." : "Find a sequence that breaks the books first.",
       }}
     >
-      {/* 1 · the threat */}
+      {/* 1 · the strike */}
       <Block
-        label={`1 · The threat: release Vandal Strike on ${policy}`}
+        label="1 · Release Vandal Strike"
         quiet={!!attack && !running}
+        aside={
+          <span>
+            against <span className="num text-ink">{policy}</span>
+          </span>
+        }
       >
-        <div className="flex flex-wrap items-end gap-3 p-3">
-          <div className="flex-1 basis-[30rem] rounded border border-red/60 bg-red/10 px-3 py-2">
-            <div className="text-xs font-medium text-ink">Bank change after approval</div>
-            <div className="mt-0.5 text-[11px] leading-snug text-faint">
-              A vendor&apos;s bank details change between approval and the payment run
-            </div>
-          </div>
+        <div className="flex flex-wrap items-center gap-3 p-3">
+          <p className="min-w-0 flex-1 basis-[24rem] text-xs leading-snug text-dim">
+            Every short sequence of vendor-master changes, bank faults, deposits and refund requests, on a clone of the books.
+            Strike reports what broke; it is not told what to look for.
+          </p>
           <label className="flex items-center gap-1.5 text-[11px] text-dim" title="How many attacker moves or faults per sequence">
             Moves per sequence
             <select

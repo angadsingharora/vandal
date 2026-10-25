@@ -194,3 +194,16 @@ def test_llm_operator_reads_a_delivered_document(client) -> None:
     assert (
         client.post(f"/runs/{run['run_id']}/documents/{docs[0]['id']}/deliver").status_code == 409
     )
+
+
+def test_search_all_families_lands_on_the_costliest_break(client) -> None:
+    """One strike, every threat family (the war room's default): the merged result names the
+    family its best finding came from, so diagnosis repairs it in the right window."""
+    job = client.post("/search", json={"policy": "v0", "scenario": "all", "depth": 2}).json()
+    done = wait(client, job["id"])
+    r = done["result"]
+    assert done["status"] == "done" and r["families"] == ["a", "b", "f"]
+    assert r["best"]["exposure"] == 4_000_000 and r["scenario"] == "a"
+    assert {v for f in r["findings"] for v in f["violated"]} >= {"INV-2", "INV-3", "INV-11"}
+    d = client.post("/diagnose", json={"search_id": job["id"]}).json()["diagnosis"]
+    assert d["gap"] == "approval_binding"

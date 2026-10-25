@@ -14,7 +14,7 @@ from vandal.contracts.entities import OracleLabel
 from vandal.contracts.moves import Move
 from vandal.sandbox import intake_extractor, new_sandbox
 from vandal.search.alphabet import SCENARIOS
-from vandal.search.bfs import search
+from vandal.search.bfs import search, search_all
 from vandal.synth.cegis import cegis
 from vandal.synth.coverage import diagnose
 from vandal.synth.propose import LLMProposer, SweepProposer
@@ -30,7 +30,7 @@ router = APIRouter()
 
 class SearchRequest(BaseModel):
     policy: str = "v0"
-    scenario: str = "a"
+    scenario: str = "a"  # a threat family, or "all" for every family in one strike
     depth: int = Field(default=3, ge=0, le=6)
     workers: int = Field(default=1, ge=1, le=32)
     exhaustive: bool = False
@@ -91,7 +91,7 @@ def job_events(request: Request, job_id: str, start: int | None = None, follow: 
 
 @router.post("/search")
 def start_search(request: Request, body: SearchRequest) -> dict[str, Any]:
-    if body.scenario not in SCENARIOS:
+    if body.scenario != "all" and body.scenario not in SCENARIOS:
         raise HTTPException(400, f"unknown scenario {body.scenario!r}")
     policy = deps.policy(body.policy, request)
     reg = deps.registry(request)
@@ -100,15 +100,18 @@ def start_search(request: Request, body: SearchRequest) -> dict[str, Any]:
         def progress(depth: int, explored: int) -> None:
             job.channel.publish("progress", {"depth": depth, "explored": explored})
 
-        result = search(
-            partial(new_sandbox, body.profile, policy=policy),
-            SCENARIOS[body.scenario],
+        factory = partial(new_sandbox, body.profile, policy=policy)
+        options = dict(
             seed=body.seed,
             depth=body.depth,
             workers=body.workers,
             exhaustive=body.exhaustive,
             progress=progress,
         )
+        if body.scenario == "all":
+            result = search_all(factory, **options)
+        else:
+            result = search(factory, SCENARIOS[body.scenario], **options)
         out = result.model_dump(mode="json")
         out |= {"runs_per_second": result.runs_per_second, "ms_per_run": result.ms_per_run}
         if reg.store is not None:

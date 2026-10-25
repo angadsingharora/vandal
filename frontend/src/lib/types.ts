@@ -264,7 +264,9 @@ export interface Finding {
 }
 
 export interface SearchResult {
+  /** The family the best finding came from (every family is searched). */
   scenario: string;
+  families?: string[];
   depth: number;
   alphabet: number;
   explored: number;

@@ -29,7 +29,7 @@ from pydantic import BaseModel, ConfigDict
 
 from vandal.contracts.entities import Cents, OracleLabel
 from vandal.contracts.moves import Move
-from vandal.search.alphabet import Scenario, build_alphabet, independent
+from vandal.search.alphabet import SCENARIOS, Scenario, build_alphabet, independent
 from vandal.twin.state import State
 from vandal.twin.world import run_step, schedule
 from vandal.verify.invariants import Limits, check, exposure
@@ -51,7 +51,8 @@ class Finding(BaseModel):
 class SearchResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    scenario: str
+    scenario: str  # the family the best finding came from (search_all), or the one searched
+    families: list[str] = []  # every family searched, in order (search_all)
     depth: int
     alphabet: int
     explored: int  # sequences run
@@ -329,6 +330,72 @@ def search(
         levels=levels,
         findings=findings,
         best=min(findings, key=rank) if findings else None,
+        seconds=time.perf_counter() - started,
+        workers=workers,
+    )
+
+
+def search_all(
+    factory: SandboxFactory,
+    scenarios: Sequence[Scenario] = (),
+    *,
+    seed: int = 7,
+    depth: int = 4,
+    workers: int = 1,
+    exhaustive: bool = False,
+    progress: Callable[[int, int], None] | None = None,
+) -> SearchResult:
+    """One strike, every threat family: `search` over each scenario in turn (all of SCENARIOS
+    when none are given), merged into a single result. `explored`, `deduped`, `pruned` and the
+    findings add up; `levels` adds up per depth; `best` is the best finding across families by
+    the same rank, and `scenario` names the family it came from, so diagnosis and synthesis
+    repair it in its own window. Deterministic for a fixed order of families."""
+    scenarios = tuple(scenarios) or tuple(SCENARIOS.values())
+    started = time.perf_counter()
+    explored = deduped = pruned = alphabet = 0
+    levels: list[int] = []
+    findings: list[Finding] = []
+    origin: dict[int, str] = {}
+    for scenario in scenarios:
+        before = explored
+
+        def report(d: int, n: int, before: int = before) -> None:
+            if progress:
+                progress(d, before + n)
+
+        r = search(
+            factory,
+            scenario,
+            seed=seed,
+            depth=depth,
+            workers=workers,
+            exhaustive=exhaustive,
+            progress=report,
+        )
+        explored += r.explored
+        deduped += r.deduped
+        pruned += r.pruned
+        alphabet += r.alphabet
+        for i, n in enumerate(r.levels):
+            if i < len(levels):
+                levels[i] += n
+            else:
+                levels.append(n)
+        for f in r.findings:
+            origin[id(f)] = scenario.name
+        findings += r.findings
+    best = min(findings, key=rank) if findings else None
+    return SearchResult(
+        scenario=origin[id(best)] if best else scenarios[0].name,
+        families=[s.name for s in scenarios],
+        depth=depth,
+        alphabet=alphabet,
+        explored=explored,
+        deduped=deduped,
+        pruned=pruned,
+        levels=levels,
+        findings=findings,
+        best=best,
         seconds=time.perf_counter() - started,
         workers=workers,
     )
