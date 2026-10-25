@@ -32,7 +32,7 @@ We kept asking what a controller would need to see before letting an AI run acco
 
 Vandal has three parts:
 
-| | **The Operator** | **Blue: Vandal Guard** | **Red: Vandal Sandbox** |
+| | **The Operator** | **Blue: Vandal Guard** | **Red: Vandal Strike** |
 |---|---|---|---|
 | Role | The AI finance agent doing the work | The security checkpoint in front of the money | The ethical hacker |
 | Does | Reads messy invoices (email bodies, OCR'd scans, forwarded threads), codes the GL, gets approvals, runs payments, reconciles, recovers misdirected money | Checks every tool call (pay, change vendor bank details, refund, post an entry) against independent records, then **allows, holds, or escalates**, with an audit trail and cited explanations | Clones the company into a deterministic *financial twin*, searches for attack sequences, diagnoses the root cause, synthesizes a control, and proves it |
