@@ -1,0 +1,22 @@
+# Render Blueprint for the Vandal API (the Next.js frontend is on Vercel).
+# Deploy: https://render.com/deploy?repo=https://github.com/angadsingharora/vandal
+services:
+  - type: web
+    name: vandal-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /policies
+    envVars:
+      # The frontend's origin; add more comma-separated if you deploy it elsewhere.
+      - key: VANDAL_CORS_ORIGINS
+        value: https://frontend-dusky-eight-92.vercel.app,http://localhost:3000
+      # Serve model calls from the recorded cache, so the demo needs no API key.
+      - key: DEMO_PLAYBACK
+        value: "true"
+      - key: SEARCH_WORKERS
+        value: "1"
+      # Optional: set it in the dashboard for live model calls, then turn playback off.
+      - key: ANTHROPIC_API_KEY
+        sync: false
