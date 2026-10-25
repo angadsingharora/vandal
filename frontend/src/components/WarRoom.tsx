@@ -16,7 +16,7 @@ import { LoopStrip, TopBar } from "./TopBar";
 import { wantsWelcome, Welcome } from "./Welcome";
 
 /** DESIGN §14 as seven pages, one per step of the loop. Blue (Guard) operates, approves and
- * enforces; Red (Sandbox) attacks a clone, diagnoses, fixes and proves. The stepper under the
+ * enforces; Red (Strike) attacks a clone, diagnoses, fixes and proves. The stepper under the
  * top bar moves between them, and each page's footer carries the loop forward. */
 export function WarRoom() {
   const init = useWarRoom((s) => s.init);

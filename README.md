@@ -4,7 +4,7 @@
 
 Vandal is a red team and a blue team for AI that runs a company's money. It was built for Cal Hacks 13.0 (Hyphenate track: *The Hyphenated Enterprise: Autonomous Systems for Finance*).
 
-- **Red (Vandal Sandbox)** clones the company's financial system into a deterministic *financial twin*. It then searches for sequences of events that break financial invariants, finds the root cause, and synthesizes a control that closes the gap. Before anyone sees that control, Red has already verified it.
+- **Red (Vandal Strike)** clones the company's financial system into a deterministic *financial twin*. It then searches for sequences of events that break financial invariants, finds the root cause, and synthesizes a control that closes the gap. Before anyone sees that control, Red has already verified it.
 - **Blue (Vandal Guard)** sits in the live path. Before any money moves, it checks each action the finance agent takes (pay, change vendor bank details, refund, post an entry) against an independent source of truth. It allows, holds, or escalates the action and records the evidence.
 - **The Operator** is the finance agent that Blue protects and Red tests. It plugs in through the `FinanceOperator` interface, so any agent can take its place.
 
@@ -182,7 +182,7 @@ docs/            spec, design, implementation plan, reviews
 
 ## Status
 
-The Sandbox (twin, search, root cause, CEGIS, verification), fault injection, money in, persistence, the API skeleton, the Operator (reference and LLM intake, recovery, approvers), and the war-room frontend (F0–F6) are in. The LLM layer (L0, `vandal/llm.py`) is in: Claude through one wrapper with structured output and a content-keyed cache under `backend/llm_cache/`. `DEMO_PLAYBACK=true` serves every call from that cache with no API key, and any miss, timeout, or missing key makes the caller take its deterministic path (`--no-llm` forces it). See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the slice plan.
+Strike (twin, search, root cause, CEGIS, verification), fault injection, money in, persistence, the API skeleton, the Operator (reference and LLM intake, recovery, approvers), and the war-room frontend (F0–F6) are in. The LLM layer (L0, `vandal/llm.py`) is in: Claude through one wrapper with structured output and a content-keyed cache under `backend/llm_cache/`. `DEMO_PLAYBACK=true` serves every call from that cache with no API key, and any miss, timeout, or missing key makes the caller take its deterministic path (`--no-llm` forces it). See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the slice plan.
 
 ## Docs
 

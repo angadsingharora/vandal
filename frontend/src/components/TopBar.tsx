@@ -28,7 +28,7 @@ function Toggle({ label, on, onChange, title }: { label: string; on: boolean; on
 
 const SIDES: { id: View; name: string; product: string; blurb: string }[] = [
   { id: "blue", name: "BLUE", product: "Vandal Guard", blurb: "checks every action the agent takes" },
-  { id: "red", name: "RED", product: "Vandal Sandbox", blurb: "attacks a clone, finds the gap, builds the fix" },
+  { id: "red", name: "RED", product: "Vandal Strike", blurb: "attacks a clone, finds the gap, builds the fix" },
 ];
 
 function SideSwitch() {
@@ -81,7 +81,7 @@ export function LoopStrip() {
               <button
                 onClick={() => void s.setStage(st.id)}
                 aria-current={viewing ? "page" : undefined}
-                title={`${red ? "Red · Sandbox" : "Blue · Guard"}: ${st.next}`}
+                title={`${red ? "Red · Strike" : "Blue · Guard"}: ${st.next}`}
                 className={cx(
                   "flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] transition-colors",
                   viewing

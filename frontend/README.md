@@ -3,7 +3,7 @@
 The frontend for Vandal (IMPLEMENTATION §8, slices F0–F6). Next.js, Tailwind, dark. The war room is one page per step of the loop, seven in all, on two sides:
 
 - **Blue · Vandal Guard** is the live path: Operate, Approve, Enforce. The Operator (the finance agent) works the books; Guard checks every tool call it makes and allows, holds, or escalates it; humans decide.
-- **Red · Vandal Sandbox** is a clone, never the live books: Attack, Diagnose, Fix, Prove. Vandal attacks the twin, names the broken link, synthesizes and verifies a fix, and sends it to Blue.
+- **Red · Vandal Strike** is a clone, never the live books: Attack, Diagnose, Fix, Prove. Vandal attacks the twin, names the broken link, synthesizes and verifies a fix, and sends it to Blue.
 
 The stepper under the top bar is the navigation. The page being looked at is outlined; the step to do next breathes until it is done. Every page ends in a footer with one way forward, which also breathes once the page's work is done, and new information rises in with a brief glow. The side switch opens that side's current page.
 
