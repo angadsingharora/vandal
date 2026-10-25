@@ -5,7 +5,7 @@
 // remembers which job or run each panel is looking at.
 
 import { create } from "zustand";
-import { getApi, type Handlers, type InjectBody, type VandalApi } from "./api";
+import { ApiError, getApi, type Handlers, type InjectBody, type VandalApi } from "./api";
 import { landingStage, loopSteps, sideOf, type LoopInput, type Stage } from "./loop";
 import type {
   Actor,
@@ -215,9 +215,25 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       try {
         await fn(...args);
       } catch (err) {
+        if (err instanceof ApiError && err.status === 404 && /^no run /.test(err.message) && get().ready) {
+          // The backend keeps runs in memory: after a restart the tab's run is gone. Start over on
+          // a fresh one rather than leaving every button failing with "no run".
+          const policy = get().tabs.find((t) => t.kind === "live")?.policy ?? "v0";
+          await recover(policy);
+          return;
+        }
         set({ error: err instanceof Error ? err.message : String(err) });
       }
     };
+
+  let recovering: Promise<void> | null = null;
+  const recover = (policy: string) =>
+    (recovering ??= get()
+      .reset(policy)
+      .then(() => set({ error: `The backend restarted, so its runs were lost. Started a fresh run under ${policy}.` }))
+      .finally(() => {
+        recovering = null;
+      }));
 
   const openRunStreams = (runId: string) => {
     stopRunStreams?.();
@@ -263,7 +279,8 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     documents: [],
     intake: [],
     delivering: "idle",
-    search: { ...idle, scenario: "a", depth: 3, jobId: null, explored: 0, atDepth: 0, result: null },
+    // "all": one strike searches every threat family; the result names the family that broke first
+    search: { ...idle, scenario: "all", depth: 3, jobId: null, explored: 0, atDepth: 0, result: null },
     attack: null,
     diagnosis: { ...idle, data: null, reason: null },
     chain: { payment: null, data: null, runId: null },
