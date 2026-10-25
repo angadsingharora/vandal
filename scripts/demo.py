@@ -66,9 +66,7 @@ def main() -> int:
             mode = " (playback)" if args.playback else ""
             print(f">> API on http://localhost:{args.api_port}{mode}")
             uvicorn = ["uvicorn", "vandal.api.main:app", "--port", str(args.api_port)]
-            # A standalone uv on PATH (the installer's default) first, else the pip module.
-            uv = [shutil.which("uv")] if shutil.which("uv") else [sys.executable, "-m", "uv"]
-            cmd = [*uv, "run", *uvicorn]
+            cmd = [sys.executable, "-m", "uv", "run", *uvicorn]
             procs.append(subprocess.Popen(cmd, cwd=BACKEND, env=env, **GROUP))
             wait_for(f"http://localhost:{args.api_port}/settings", 60, "the API")
 
