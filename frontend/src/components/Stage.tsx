@@ -63,7 +63,7 @@ export function StagePage({
         <div className="min-w-0 flex-1 basis-80">
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className={cx("num text-[10px] font-bold uppercase tracking-[0.18em]", red ? "text-red" : "text-blue")}>
-              Step {step.n} of {steps.length} · {red ? "Red · Strike" : "Blue · Guard"}
+              Step {step.n} of {steps.length} · {red ? "Vandal Strike" : "Vandal Guard"}
             </span>
             {step.done ? (
               <span className="text-[10px] uppercase tracking-wider text-ok">done</span>

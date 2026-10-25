@@ -20,7 +20,7 @@ export function ProvePage() {
   return (
     <StagePage
       stage="prove"
-      lede="Six checks, all from runs: the counterexample replayed under the new policy, the whole bounded search again, held-out variants the synthesizer never saw, legitimate cases, every seeded invoice, every invariant. Only an approvable pack can cross to Blue."
+      lede="Six checks, all from runs: the counterexample replayed under the new policy, the whole bounded search again, held-out variants the synthesizer never saw, legitimate cases, every seeded invoice, every invariant. Only an approvable pack can cross to Guard."
       actions={
         <Button tone="red" onClick={s.verifyChoice} busy={running} disabled={!synth.jobId || !policy} nudge={!pack && !running && !!policy}>
           {pack ? "Verify again" : "Verify"}
@@ -29,22 +29,22 @@ export function ProvePage() {
       next={
         patch
           ? {
-              label: "Open it in Blue →",
+              label: "Open it in Guard →",
               onClick: () => void s.setStage("approve"),
               ready: true,
               tone: "blue",
-              hint: `${patch.id} is ${patch.status} in Blue's inbox.`,
+              hint: `${patch.id} is ${patch.status} in Guard's inbox.`,
               nudge: patch.status !== "applied",
             }
           : {
-              label: "Send to Blue for approval →",
+              label: "Send to Guard for approval →",
               onClick: () => void s.submitPatch(),
               ready: !!pack?.approvable,
               tone: "blue",
               nudge: !!pack?.approvable,
               hint: pack
                 ? pack.approvable
-                  ? `Next: ${pack.version} and its evidence pack land in Blue's inbox for the Controller.`
+                  ? `Next: ${pack.version} and its evidence pack land in Guard's inbox for the Controller.`
                   : "Not approvable: a check failed. Synthesize again, or deepen the search."
                 : policy
                   ? "Verify the control first."
@@ -63,7 +63,7 @@ export function ProvePage() {
             <span className="num text-xs text-dim">
               {passed}/{verify.checks.length} checks passed
             </span>
-            <span className="text-xs text-dim">{pack.approvable ? "The evidence pack travels with the rule." : "A failed check keeps it out of Blue's inbox."}</span>
+            <span className="text-xs text-dim">{pack.approvable ? "The evidence pack travels with the rule." : "A failed check keeps it out of Guard's inbox."}</span>
           </div>
         </Reveal>
       )}

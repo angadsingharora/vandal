@@ -12,7 +12,7 @@ import { Badge, Table, td } from "./ui";
 export const CHECK_HELP: Record<string, string> = {
   replay: "The minimal counterexample, replayed under the new policy, is held or blocked",
   "re-search": "The whole bounded search space under the new policy finds no violation within k",
-  variants: "Held-out Red content (other vendors, amounts, channels, deepfake confirmations) the synthesizer never saw",
+  variants: "Held-out Strike content (other vendors, amounts, channels, deepfake confirmations) the synthesizer never saw",
   regression: "About 25 legitimate cases, including a real bank change verified by callback, all still complete",
   "legit ops": "All 80 seeded invoices replayed: holds and blocks on legitimate payments",
   invariants: "Every invariant holds in every legitimate run",

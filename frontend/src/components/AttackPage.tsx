@@ -105,7 +105,7 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
             </select>
           </label>
           <Button tone="red" onClick={s.runSearch} busy={running} disabled={!s.ready} nudge={!attack} className="h-8 px-4 text-[13px] font-semibold">
-            Unleash Vandal on {policy}
+            Release Vandal Strike on {policy}
           </Button>
         </div>
       </Block>

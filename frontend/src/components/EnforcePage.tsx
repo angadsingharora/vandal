@@ -55,7 +55,7 @@ export function EnforcePage() {
       stage="enforce"
       lede={
         <>
-          Guard now enforces <span className="num text-ink">{version}</span> on the live path. The proof that matters is Red&apos;s exact attack, replayed on a
+          Guard now enforces <span className="num text-ink">{version}</span> on the live path. The proof that matters is Strike&apos;s exact attack, replayed on a
           fresh clone under the new policy.
         </>
       }
@@ -67,11 +67,11 @@ export function EnforcePage() {
         nudge: !!after,
         hint: after
           ? held
-            ? `Loop closed. Red found the gap, built and proved ${version}, and Guard now holds the attack. Keep operating, or attack ${version} next.`
-            : `${version} did not hold Red's attack. Back to Fix: synthesize with a deeper search.`
+            ? `Loop closed. Strike found the gap, built and proved ${version}, and Guard now holds the attack. Keep operating, or attack ${version} next.`
+            : `${version} did not hold Strike's attack. Back to Fix: synthesize with a deeper search.`
           : s.appliedPolicy
             ? "Replay the attack first to see the policy hold."
-            : "Approve and apply Red's fix first.",
+            : "Approve and apply Strike's fix first.",
       }}
     >
       <Block
@@ -79,7 +79,7 @@ export function EnforcePage() {
         quiet={!!after}
         aside={
           <>
-            {s.appliedPolicy && <Badge tone="ok">applied from Red</Badge>}
+            {s.appliedPolicy && <Badge tone="ok">applied from Strike</Badge>}
             {live && (
               <span>
                 live run <span className="num">{live.id}</span>
@@ -107,7 +107,7 @@ export function EnforcePage() {
       </Block>
 
       {attack ? (
-        <Block label="Red's attack, before and after">
+        <Block label="Strike's attack, before and after">
           <div className="grid grid-cols-1 gap-px bg-line md:grid-cols-2">
             <Replayed title="Before" out={before} policy={attack.policy} />
             <Reveal k={after?.run.run_id ?? "none"} className="rounded-none">
@@ -122,11 +122,11 @@ export function EnforcePage() {
               className="h-9 px-4 text-[13px] font-semibold"
               onClick={() => s.appliedPolicy && s.replayAttack(s.appliedPolicy)}
             >
-              {after ? "Replay again" : `Replay Red's attack under ${version}`}
+              {after ? "Replay again" : `Replay Strike's attack under ${version}`}
             </Button>
             <span className="text-xs text-dim">
               {!s.appliedPolicy
-                ? "Approve and apply Red's fix first."
+                ? "Approve and apply Strike's fix first."
                 : after
                   ? held
                     ? `Held before execution. ${usd(after.result.exposure)} moved.`
@@ -136,8 +136,8 @@ export function EnforcePage() {
           </div>
         </Block>
       ) : (
-        <Block label="Red's attack">
-          <Empty>Once Red finds an attack, its before and after replays show here.</Empty>
+        <Block label="Strike's attack">
+          <Empty>Once Strike finds an attack, its before and after replays show here.</Empty>
         </Block>
       )}
 

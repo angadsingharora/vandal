@@ -88,7 +88,7 @@ export function InjectDialog({ onClose }: { onClose: () => void }) {
           {mode === "plain" ? (
             <div className="space-y-2">
               <label htmlFor="threat" className="text-[11px] text-dim">
-                Describe a threat against {s.summary?.company ?? "the company"}. Red maps it onto moves the twin can model and reports what it can&apos;t.
+                Describe a threat against {s.summary?.company ?? "the company"}. Strike maps it onto moves the twin can model and reports what it can&apos;t.
               </label>
               <textarea
                 id="threat"
@@ -190,7 +190,7 @@ export function InjectDialog({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="min-w-0 space-y-3 border-line md:border-l md:pl-4">
-          {!inject.plan && !r && <div className="text-xs text-faint">Preview shows the moves Red will play. Run plays them on a fresh clone, searches around them, and hands any violation to the loop.</div>}
+          {!inject.plan && !r && <div className="text-xs text-faint">Preview shows the moves Strike will play. Run plays them on a fresh clone, searches around them, and hands any violation to the loop.</div>}
           {inject.plan && (
             <div>
               <div className="mb-2 flex items-center gap-2">

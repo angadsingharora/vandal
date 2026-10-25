@@ -230,7 +230,7 @@ export function PaymentApprovals() {
               Approve (Controller)
             </Button>
             <Button onClick={() => decide(p.run_id, p.id, CFO, false)}>Deny (CFO)</Button>
-            <Button tone="ghost" onClick={() => decide(p.run_id, p.id, OPERATOR, true)} title="Segregation of duties: Blue should refuse">
+            <Button tone="ghost" onClick={() => decide(p.run_id, p.id, OPERATOR, true)} title="Segregation of duties: Guard should refuse">
               Operator tries to approve
             </Button>
           </div>
@@ -259,7 +259,7 @@ export function ApprovalsInbox() {
     >
       {patch && patch.status !== "applied" && (
         <button onClick={() => void s.setStage("approve")} className="flex w-full items-center gap-2 border-b border-line bg-esc/[0.08] px-3 py-2 text-left hover:bg-esc/[0.14]">
-          <Badge tone="esc">fix from Red</Badge>
+          <Badge tone="esc">fix from Strike</Badge>
           <span className="num text-xs font-semibold">{patch.version}</span>
           <Badge tone={patch.status === "denied" ? "bad" : patch.status === "approved" ? "blue" : "warn"}>{patch.status}</Badge>
           <span className="ml-auto text-[11px] text-blue">open →</span>
@@ -280,7 +280,7 @@ export function EnforcedPolicy() {
     <Panel title="Enforced policy" tag={<SideTag side="blue" />} className="h-auto" bodyClass="overflow-visible">
       <div className="flex flex-wrap items-baseline gap-2 p-3">
         <span className="num text-sm font-semibold text-ink">{version}</span>
-        {s.appliedPolicy && <Badge tone="ok">applied from Red</Badge>}
+        {s.appliedPolicy && <Badge tone="ok">applied from Strike</Badge>}
         <span className="text-[11px] text-dim">{info?.controls.length ? info.controls.join(" · ") : "baseline: no extra controls"}</span>
         {s.attack && (
           <button onClick={() => void s.setStage("enforce")} className="ml-auto text-[11px] text-blue hover:underline">

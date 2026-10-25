@@ -22,7 +22,7 @@ export function ApprovePage() {
   return (
     <StagePage
       stage="approve"
-      lede="A human decides. Red's rule arrives with its evidence pack; the Controller approves or denies it, then applies it to Guard. Payments Guard escalated wait here too."
+      lede="A human decides. Strike's rule arrives with its evidence pack; the Controller approves or denies it, then applies it to Guard. Payments Guard escalated wait here too."
       actions={
         <button onClick={s.loadApprovals} className="text-[11px] text-dim hover:text-ink">
           refresh
@@ -33,12 +33,12 @@ export function ApprovePage() {
         onClick: () => void s.setStage("enforce"),
         ready: !!s.appliedPolicy,
         tone: "blue",
-        hint: s.appliedPolicy ? `Next: replay Red's attack under ${s.appliedPolicy}. Guard should hold it.` : patch ? "Approve and apply the fix first." : "Nothing from Red yet.",
+        hint: s.appliedPolicy ? `Next: replay Strike's attack under ${s.appliedPolicy}. Guard should hold it.` : patch ? "Approve and apply the fix first." : "Nothing from Strike yet.",
       }}
     >
       {!patch && (
-        <Block label="Fix from Red">
-          <Empty>Nothing from Red yet. Prove a control on the Red side and send it over.</Empty>
+        <Block label="Fix from Strike">
+          <Empty>Nothing from Strike yet. Prove a control on the Strike side and send it over.</Empty>
         </Block>
       )}
 
@@ -47,7 +47,7 @@ export function ApprovePage() {
           <Block
             label={
               <>
-                Fix from Red · <span className="num normal-case tracking-normal text-ink">{patch.version}</span>
+                Fix from Strike · <span className="num normal-case tracking-normal text-ink">{patch.version}</span>
               </>
             }
             aside={
@@ -134,7 +134,7 @@ export function ApprovePage() {
                   </p>
                 )}
                 {patch.status === "denied" && (
-                  <p className="text-xs text-bad">Denied{patch.decided_by ? ` by ${patch.decided_by}` : ""}. Red can synthesize again.</p>
+                  <p className="text-xs text-bad">Denied{patch.decided_by ? ` by ${patch.decided_by}` : ""}. Strike can synthesize again.</p>
                 )}
               </div>
             </div>

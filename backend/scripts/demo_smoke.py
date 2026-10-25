@@ -4,11 +4,12 @@
     cd backend && uv run python scripts/demo_smoke.py --in-process    # no server needed
     cd backend && uv run pytest --slow tests/test_demo_smoke.py       # the same, as a test
 
-Reset -> Run operations -> Unleash Vandal -> Replay on twin -> Diagnose -> Synthesize -> Verify
--> Submit for approval -> the Operator tries to approve (refused) -> approve as Controller ->
-Apply -> Replay under the new policy -> inject a never-seen threat -> why? -> push back ->
-Scorecard -> Judge view -> Playback toggle. Exposure must be $40,000 under v0, HELD and $0 under
-the synthesized policy, with zero legitimate payments blocked and every scorecard field filled.
+Reset -> Run operations -> Release Vandal Strike -> Replay on twin -> Diagnose -> Synthesize ->
+Verify -> Submit for approval -> the Operator tries to approve (refused) -> approve as
+Controller -> Apply -> Replay under the new policy -> inject a never-seen threat -> why? -> push
+back -> Scorecard -> Judge view -> Playback toggle. Exposure must be $40,000 under v0, HELD and
+$0 under the synthesized policy, with zero legitimate payments blocked and every scorecard field
+filled.
 """
 
 from __future__ import annotations
