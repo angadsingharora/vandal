@@ -120,9 +120,7 @@ export function Welcome({ onClose }: { onClose: () => void }) {
           <h1 id="welcome-title" className="mt-2 text-6xl font-black leading-none tracking-[0.2em] text-ink sm:text-7xl lg:text-8xl">
             VANDAL
           </h1>
-          <p className="mt-4 text-base font-medium text-dim sm:text-lg">
-            Break it. <span className="text-ink">Fix it.</span> Prove it.
-          </p>
+          <p className="mt-3 text-sm tracking-wide text-faint">Break it. Fix it. Prove it.</p>
           <p className="mt-6 max-w-xl text-sm leading-relaxed text-dim sm:text-[15px]">
             A finance agent pays the bills. <span className="font-semibold text-blue">Guard</span> checks every action it takes
             against the books. <span className="font-semibold text-red">Vandal</span> attacks a clone until the books break, names
