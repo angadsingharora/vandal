@@ -125,7 +125,7 @@ export function LoopStrip() {
   );
 }
 
-export function TopBar({ onScorecard }: { onScorecard: () => void }) {
+export function TopBar({ onScorecard, onWelcome }: { onScorecard: () => void; onWelcome: () => void }) {
   const s = useWarRoom();
   const [policy, setPolicy] = useState("v0");
   const [resetting, setResetting] = useState(false);
@@ -141,6 +141,9 @@ export function TopBar({ onScorecard }: { onScorecard: () => void }) {
       <div className="flex items-baseline gap-2.5">
         <span className="text-[15px] font-black tracking-[0.25em] text-ink">VANDAL</span>
         <span className="hidden text-[11px] text-dim 2xl:inline">Break it. Fix it. Prove it.</span>
+        <button onClick={onWelcome} className="text-[11px] text-faint underline-offset-2 hover:text-ink hover:underline" title="What this is and where to start">
+          Start here
+        </button>
       </div>
 
       <SideSwitch />

@@ -5,7 +5,7 @@ import { useWarRoom } from "@/lib/store";
 import type { Move, OracleLabel } from "@/lib/types";
 import { Badge, Button, Empty, LiveDot, Panel, SideTag } from "./ui";
 
-const SCENARIOS = [
+export const SCENARIOS = [
   { id: "a", label: "Bank change after approval", hint: "A vendor's bank details change between approval and the payment run" },
   { id: "b", label: "Bank fault, retry", hint: "The bank drops an ack, the Operator retries, the vendor is paid twice" },
   { id: "f", label: "Refund redirection", hint: "An overpayment, then a refund request to a different account" },
