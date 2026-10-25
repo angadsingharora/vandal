@@ -58,13 +58,8 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
     >
       {/* 1 · the threat */}
       <Block
-        label="1 · The threat"
+        label={`1 · The threat: release Vandal Strike on ${policy}`}
         quiet={!!attack && !running}
-        aside={
-          <span>
-            searched under <span className="num text-ink">{policy}</span>
-          </span>
-        }
       >
         <div className="flex flex-wrap items-end gap-3 p-3">
           <div className="flex-1 basis-[30rem] rounded border border-red/60 bg-red/10 px-3 py-2">
