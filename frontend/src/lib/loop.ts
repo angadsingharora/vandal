@@ -26,12 +26,12 @@ export interface LoopInput {
 export function loopSteps(x: LoopInput): LoopStep[] {
   return [
     { n: 1, side: "blue", label: "Operate", done: x.operated, next: "Run operations. The Operator works the books while Guard checks every action." },
-    { n: 2, side: "red", label: "Attack", done: x.attacked, next: "Unleash Vandal. Search the sandbox for a sequence of events that breaks the books." },
+    { n: 2, side: "red", label: "Attack", done: x.attacked, next: "Release Vandal Strike. Search the sandbox for a sequence of events that breaks the books." },
     { n: 3, side: "red", label: "Diagnose", done: x.diagnosed, next: "Diagnose. Find the broken link in the authorization chain." },
     { n: 4, side: "red", label: "Fix", done: x.synthesized, next: "Synthesize a control that closes the gap." },
-    { n: 5, side: "red", label: "Prove", done: x.submitted, next: "Verify the control, then send it to Blue for approval." },
+    { n: 5, side: "red", label: "Prove", done: x.submitted, next: "Verify the control, then send it to Guard for approval." },
     { n: 6, side: "blue", label: "Approve", done: x.applied, next: "Approve the fix as the Controller, then apply it to Guard." },
-    { n: 7, side: "blue", label: "Enforce", done: x.enforced, next: "Replay Red's attack against the new policy. Guard should hold it." },
+    { n: 7, side: "blue", label: "Enforce", done: x.enforced, next: "Replay Strike's attack against the new policy. Guard should hold it." },
   ];
 }
 

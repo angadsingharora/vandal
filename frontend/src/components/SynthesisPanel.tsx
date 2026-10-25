@@ -9,7 +9,7 @@ import { Badge, Button, Empty, LiveDot, Panel, SideTag, Table, td } from "./ui";
 const CHECK_HELP: Record<string, string> = {
   replay: "The minimal counterexample, replayed under the new policy, is held or blocked",
   "re-search": "The whole bounded search space under the new policy finds no violation within k",
-  variants: "Held-out Red content (other vendors, amounts, channels, deepfake confirmations) the synthesizer never saw",
+  variants: "Held-out Strike content (other vendors, amounts, channels, deepfake confirmations) the synthesizer never saw",
   regression: "About 25 legitimate cases, including a real bank change verified by callback, all still complete",
   "legit ops": "All 80 seeded invoices replayed: holds and blocks on legitimate payments",
   invariants: "Every invariant holds in every legitimate run",
@@ -200,8 +200,8 @@ export function SynthesisPanel() {
               <Button tone="red" onClick={s.verifyChoice} busy={verify.phase === "running"} disabled={!synth.jobId}>
                 Verify
               </Button>
-              <Button tone="blue" onClick={sendToBlue} disabled={verify.phase !== "done" || !!patch} title="Put the verified policy and its evidence pack in Blue's approvals inbox">
-                Send to Blue for approval →
+              <Button tone="blue" onClick={sendToBlue} disabled={verify.phase !== "done" || !!patch} title="Put the verified policy and its evidence pack in Guard's approvals inbox">
+                Send to Guard for approval →
               </Button>
               {patch && (
                 <span className="text-[11px] text-dim">
@@ -210,7 +210,7 @@ export function SynthesisPanel() {
                     <>
                       {" · "}
                       <button onClick={() => void s.setView("blue")} className="text-blue hover:underline">
-                        approve it in Blue
+                        approve it in Guard
                       </button>
                     </>
                   )}

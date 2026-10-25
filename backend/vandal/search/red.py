@@ -139,9 +139,9 @@ def dress(plan: ThreatPlan, use_llm: bool = True) -> ThreatPlan:
             if len(reply.texts) == len(needs):
                 texts = reply.texts
             else:
-                notes.append("Red content: wrong number of texts from the model; templates")
+                notes.append("Strike content: wrong number of texts from the model; templates")
         except LLMUnavailable as err:
-            notes.append(f"Red content: LLM unavailable ({err}); templates")
+            notes.append(f"Strike content: LLM unavailable ({err}); templates")
     moves = list(plan.moves)
     for i, text in zip(needs, texts, strict=True):
         title = str(moves[i].params.get("poses_as", "{title}"))  # known now; the rest at replay

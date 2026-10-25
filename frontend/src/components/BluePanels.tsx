@@ -229,13 +229,13 @@ export function ApprovalsInbox() {
       className="min-h-[160px]"
     >
       {payments.length === 0 && patches.length === 0 && (
-        <Empty>Nothing waiting. Payments Guard escalates and fixes Red sends over show up here.</Empty>
+        <Empty>Nothing waiting. Payments Guard escalates and fixes Strike sends over show up here.</Empty>
       )}
       <ul>
         {patches.map((p) => (
           <li key={p.id} className="border-b border-line px-3 py-2">
             <div className="flex items-center gap-2">
-              <Badge tone="esc">fix from Red</Badge>
+              <Badge tone="esc">fix from Strike</Badge>
               <span className="num text-xs font-semibold">{p.version}</span>
               <Badge tone={p.status === "applied" ? "ok" : p.status === "denied" ? "bad" : p.status === "approved" ? "blue" : "warn"}>
                 {p.status}
@@ -284,7 +284,7 @@ export function ApprovalsInbox() {
                 Approve (Controller)
               </Button>
               <Button onClick={() => decide(p.run_id, p.id, CFO, false)}>Deny (CFO)</Button>
-              <Button tone="ghost" onClick={() => decide(p.run_id, p.id, OPERATOR, true)} title="Segregation of duties: Blue should refuse">
+              <Button tone="ghost" onClick={() => decide(p.run_id, p.id, OPERATOR, true)} title="Segregation of duties: Guard should refuse">
                 Operator tries to approve
               </Button>
             </div>
@@ -337,7 +337,7 @@ export function EnforcedPolicy() {
       <div className="space-y-2 p-3">
         <div className="flex flex-wrap items-baseline gap-2">
           <span className="num text-sm font-semibold text-ink">{version}</span>
-          {s.appliedPolicy && <Badge tone="ok">applied from Red</Badge>}
+          {s.appliedPolicy && <Badge tone="ok">applied from Strike</Badge>}
           <span className="text-[11px] text-dim">{info?.controls.length ? info.controls.join(" · ") : "baseline: no extra controls"}</span>
         </div>
         {attack ? (
@@ -350,13 +350,13 @@ export function EnforcedPolicy() {
               tone="blue"
               disabled={!s.appliedPolicy}
               onClick={() => s.appliedPolicy && s.replayAttack(s.appliedPolicy)}
-              title={!s.appliedPolicy ? "Approve and apply Red's fix first" : "Run Red's counterexample on a fresh clone under the new policy"}
+              title={!s.appliedPolicy ? "Approve and apply Strike's fix first" : "Run Strike's counterexample on a fresh clone under the new policy"}
             >
-              Replay Red&apos;s attack under {s.appliedPolicy ?? "the new policy"}
+              Replay Strike&apos;s attack under {s.appliedPolicy ?? "the new policy"}
             </Button>
           </>
         ) : (
-          <p className="text-[11px] text-faint">Once Red finds an attack, its before and after replays show here.</p>
+          <p className="text-[11px] text-faint">Once Strike finds an attack, its before and after replays show here.</p>
         )}
       </div>
     </Panel>

@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Vandal War Room",
-  description: "Break it. Fix it. Prove it. Red finds the gap, Blue enforces the fix.",
+  description: "Vandal Strike finds the gap in an AI finance agent's controls; Vandal Guard enforces the fix.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,20 +1,18 @@
 # Vandal
 
-**Break it. Fix it. Prove it.**
+Vandal is a security layer for AI that runs a company's money: Vandal Strike attacks it, and Vandal Guard defends it. It was built for Cal Hacks 13.0 (Hyphenate track: *The Hyphenated Enterprise: Autonomous Systems for Finance*).
 
-Vandal is a red team and a blue team for AI that runs a company's money. It was built for Cal Hacks 13.0 (Hyphenate track: *The Hyphenated Enterprise: Autonomous Systems for Finance*).
+- **Vandal Strike** clones the company's financial system into a deterministic *financial twin*. It then searches for sequences of events that break financial invariants, finds the root cause, and synthesizes a control that closes the gap. Before anyone sees that control, Strike has already verified it.
+- **Vandal Guard** sits in the live path. Before any money moves, it checks each action the finance agent takes (pay, change vendor bank details, refund, post an entry) against an independent source of truth. It allows, holds, or escalates the action and records the evidence.
+- **The Operator** is the finance agent that Guard protects and Strike tests. It plugs in through the `FinanceOperator` interface, so any agent can take its place.
 
-- **Red (Vandal Sandbox)** clones the company's financial system into a deterministic *financial twin*. It then searches for sequences of events that break financial invariants, finds the root cause, and synthesizes a control that closes the gap. Before anyone sees that control, Red has already verified it.
-- **Blue (Vandal Guard)** sits in the live path. Before any money moves, it checks each action the finance agent takes (pay, change vendor bank details, refund, post an entry) against an independent source of truth. It allows, holds, or escalates the action and records the evidence.
-- **The Operator** is the finance agent that Blue protects and Red tests. It plugs in through the `FinanceOperator` interface, so any agent can take its place.
-
-Every gap Red finds becomes a control that Blue enforces. Fixes go into Blue's controls. The agent itself is never retrained, and its prompts are never edited.
+Every gap Strike finds becomes a control that Guard enforces. Fixes go into Guard's controls. The agent itself is never retrained, and its prompts are never edited.
 
 > Your books can balance perfectly while the money goes to the wrong person.
 
 ## How the loop works
 
-1. **Operate.** The Operator does a 12-property real-estate manager's AP work (intake, approvals, payment runs, ledger, reconciliation), and Blue gates every tool call.
+1. **Operate.** The Operator does a 12-property real-estate manager's AP work (intake, approvals, payment runs, ledger, reconciliation), and Guard gates every tool call.
 2. **Search.** Bounded search over the attacker and fault alphabet finds a minimal counterexample. In it, every step looks valid and the ledger balances, but $40,000 goes to an attacker's account.
 3. **Diagnose.** Authorization-coverage analysis walks the chain (obligation → approval → execution → settlement → books) and names the broken link, e.g. *"executed payee ≠ approved payee; nothing binds execution to the approval."*
 4. **Synthesize.** A CEGIS loop proposes controls from a fixed set of templates (T1–T6). Search attacks each candidate. A candidate fails if the attack gets through or if it blocks legitimate payments.
@@ -30,7 +28,7 @@ python scripts/demo.py --playback
 
 That starts the API on `:8000` and the war room on `:3000` (running `npm install` the first time), with **playback** on: every Claude call is served from the recordings in `backend/llm_cache/`, so the demo needs no network and no API key. Drop `--playback` to call Claude live (put `ANTHROPIC_API_KEY` in `backend/.env`), or use `--mock` for the war room alone, replaying fixtures recorded from the backend. The Playback switch in the top bar flips the same flag on a running server.
 
-The loop a judge sees, in order: **Reset demo → Run operations → Unleash Vandal → Replay on twin → Diagnose → Synthesize a control → Verify → Submit for approval → Approve as Controller → Apply → Replay under the new policy**, then **Try your own scenario**, **why?** on any payment, and the **Scorecard**. `backend/scripts/demo_smoke.py` drives the same loop over the API and asserts the numbers below; `uv run pytest --slow` runs it.
+The loop a judge sees, in order: **Reset demo → Run operations → Release Vandal Strike → Replay on twin → Diagnose → Synthesize a control → Verify → Submit for approval → Approve as Controller → Apply → Replay under the new policy**, then **Try your own scenario**, **why?** on any payment, and the **Scorecard**. `backend/scripts/demo_smoke.py` drives the same loop over the API and asserts the numbers below; `uv run pytest --slow` runs it.
 
 ## Quickstart (CLI)
 
@@ -91,7 +89,7 @@ cd backend
 uv run uvicorn vandal.api.main:app --reload
 ```
 
-FastAPI app with SSE for live updates. It covers runs (`/demo/reset`, `/runs`, `/runs/{id}/operate`, `/state`, `/entities`, `/ledger`, `/chain/{payment}`, `/events`, `/inject`), jobs (`/search`, `/diagnose`, `/synthesize`, `/verify`, `/jobs/{id}/events`), Blue (`/runs/{id}/verdicts`, `/approvals`, `/policies/{version}/apply`, `/explain/{type}/{id}`), `/replay`, `/metrics`, `/policies`, and `/settings`. Runs live in memory. When `DATABASE_URL` is set (SQLite, or Postgres/Supabase through the `postgres` extra), runs, events, searches, syntheses, and evidence packs are also persisted. CORS origins come from `VANDAL_CORS_ORIGINS`, which defaults to `http://localhost:3000`.
+FastAPI app with SSE for live updates. It covers runs (`/demo/reset`, `/runs`, `/runs/{id}/operate`, `/state`, `/entities`, `/ledger`, `/chain/{payment}`, `/events`, `/inject`), jobs (`/search`, `/diagnose`, `/synthesize`, `/verify`, `/jobs/{id}/events`), Guard (`/runs/{id}/verdicts`, `/approvals`, `/policies/{version}/apply`, `/explain/{type}/{id}`), `/replay`, `/metrics`, `/policies`, and `/settings`. Runs live in memory. When `DATABASE_URL` is set (SQLite, or Postgres/Supabase through the `postgres` extra), runs, events, searches, syntheses, and evidence packs are also persisted. CORS origins come from `VANDAL_CORS_ORIGINS`, which defaults to `http://localhost:3000`.
 
 ## War room
 
@@ -155,7 +153,7 @@ Every number comes from `backend/vandal/verify/` running on fresh clones against
 
 - **Deterministic.** Every run is `fold(seed, events)`, so the same seed and the same events give the same `state_hash`. Time comes only from the sim clock, and money is always integer cents.
 - **Models never change state.** Money math, gating, search, and verification are deterministic code. The AI proposes. Search and verification decide.
-- **Every state change passes Blue's gate**, in search, in verification, and in the live demo.
+- **Every state change passes Guard's gate**, in search, in verification, and in the live demo.
 - **Bounded claims.** "No violation" means none within the searched depth and alphabet, verified by replay and re-search. It is not a proof beyond that.
 
 ## Repo layout
@@ -165,10 +163,10 @@ backend/
   vandal/
     contracts/   shared entities, events, moves, controls, verdicts, interfaces
     twin/        financial twin: state, reducer, seed, bank simulator, ledger, flows
-    search/      action alphabet, BFS, partial-order reduction, minimization, Red content
+    search/      action alphabet, BFS, partial-order reduction, minimization, Strike content
     synth/       root cause (coverage), control templates, lints, CEGIS
     verify/      invariants, oracle, replay, regression, variants, evidence pack
-    guard/       Blue: gate, checks, authorization chain, SoD, approvals, explanations
+    guard/       Vandal Guard: gate, checks, authorization chain, SoD, approvals, explanations
     operator/    the reference Operator (and the LLM Operator)
     api/         FastAPI, SSE, persistence
     cli.py
@@ -182,7 +180,7 @@ docs/            spec, design, implementation plan, reviews
 
 ## Status
 
-The Sandbox (twin, search, root cause, CEGIS, verification), fault injection, money in, persistence, the API skeleton, the Operator (reference and LLM intake, recovery, approvers), and the war-room frontend (F0–F6) are in. The LLM layer (L0, `vandal/llm.py`) is in: Claude through one wrapper with structured output and a content-keyed cache under `backend/llm_cache/`. `DEMO_PLAYBACK=true` serves every call from that cache with no API key, and any miss, timeout, or missing key makes the caller take its deterministic path (`--no-llm` forces it). See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the slice plan.
+Vandal Strike (twin, search, root cause, CEGIS, verification), fault injection, money in, persistence, the API skeleton, the Operator (reference and LLM intake, recovery, approvers), and the war-room frontend (F0–F6) are in. The LLM layer (L0, `vandal/llm.py`) is in: Claude through one wrapper with structured output and a content-keyed cache under `backend/llm_cache/`. `DEMO_PLAYBACK=true` serves every call from that cache with no API key, and any miss, timeout, or missing key makes the caller take its deterministic path (`--no-llm` forces it). See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the slice plan.
 
 ## Docs
 

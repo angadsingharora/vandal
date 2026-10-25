@@ -65,10 +65,10 @@ function BlueView() {
   const s = useWarRoom();
   return (
     <>
-      <Banner side="blue" title="BLUE · VANDAL GUARD — the live path" actions={<RunOperations />}>
+      <Banner side="blue" title="VANDAL GUARD — the live path" actions={<RunOperations />}>
         The <span className="text-ink">Operator</span> is the finance agent doing {s.summary?.company ?? "the company"}&apos;s payables.
         Guard sits between it and the money: every tool call is checked against an independent source of truth and allowed, held,
-        or escalated to a human. Fixes from Red land in the approvals inbox.
+        or escalated to a human. Fixes from Strike land in the approvals inbox.
       </Banner>
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-line lg:grid-cols-[minmax(300px,26%)_minmax(0,1fr)_minmax(340px,28%)] lg:grid-rows-[minmax(0,1fr)_minmax(0,40%)]">
         <div className="flex min-h-0 min-w-0 flex-col lg:row-span-2">
@@ -96,14 +96,14 @@ function RedView({ onInject }: { onInject: () => void }) {
     <>
       <Banner
         side="red"
-        title="RED · VANDAL SANDBOX — a clone, never the live books"
+        title="VANDAL STRIKE — a sandbox clone, never the live books"
         actions={
           <Button tone="red" onClick={onInject} disabled={!s.ready}>
             Try your own scenario
           </Button>
         }
       >
-        Vandal clones the company into a deterministic financial twin and attacks it under{" "}
+        Strike clones the company into a deterministic financial twin and attacks it under{" "}
         <span className="num text-ink">{s.summary?.policy ?? focused?.policy ?? "v0"}</span>: it searches for events that break the
         books, names the broken link, then builds and proves a control. Nothing here moves real money; the fix only reaches Guard
         once a human approves it.

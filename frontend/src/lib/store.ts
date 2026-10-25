@@ -547,7 +547,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         const out = await api().decidePayment(runId, requestId, actor, approve);
         await get().loadApprovals();
         await get().refresh();
-        return out.ok ? `${approve ? "approved" : "denied"} by ${actor.id}` : `Blue ${out.decision}: ${out.error ?? out.fired.join(", ")}`;
+        return out.ok ? `${approve ? "approved" : "denied"} by ${actor.id}` : `Guard ${out.decision}: ${out.error ?? out.fired.join(", ")}`;
       } catch (err) {
         return err instanceof Error ? err.message : String(err);
       }

@@ -26,9 +26,9 @@ function Toggle({ label, on, onChange, title }: { label: string; on: boolean; on
   );
 }
 
-const SIDES: { id: View; name: string; product: string; blurb: string }[] = [
-  { id: "blue", name: "BLUE", product: "Vandal Guard", blurb: "checks every action the agent takes" },
-  { id: "red", name: "RED", product: "Vandal Sandbox", blurb: "attacks a clone, finds the gap, builds the fix" },
+const SIDES: { id: View; product: string; blurb: string }[] = [
+  { id: "blue", product: "Vandal Guard", blurb: "checks every action the agent takes" },
+  { id: "red", product: "Vandal Strike", blurb: "attacks a sandbox clone, finds the gap, builds the fix" },
 ];
 
 function SideSwitch() {
@@ -52,8 +52,7 @@ function SideSwitch() {
             )}
           >
             <span className={cx("size-2 rounded-full", red ? "bg-red" : "bg-blue", !on && "opacity-50")} />
-            <span className="text-[11px] font-bold tracking-wider">{x.name}</span>
-            <span className={cx("text-xs", on ? "text-ink" : "")}>{x.product}</span>
+            <span className={cx("text-xs font-semibold", on ? "text-ink" : "")}>{x.product}</span>
           </button>
         );
       })}
@@ -87,7 +86,7 @@ export function LoopStrip() {
               <button
                 onClick={() => void s.setView(st.side)}
                 aria-current={current ? "step" : undefined}
-                title={`${red ? "Red · Sandbox" : "Blue · Guard"}: ${st.next}`}
+                title={`${red ? "Vandal Strike" : "Vandal Guard"}: ${st.next}`}
                 className={cx(
                   "flex h-6 items-center gap-1.5 rounded-full border px-2 text-[11px] transition-colors",
                   st.done && (red ? "border-red/40 text-red" : "border-blue/40 text-blue"),
@@ -113,12 +112,12 @@ export function LoopStrip() {
         {now ? (
           <>
             <span className={cx("font-semibold", now.side === "red" ? "text-red" : "text-blue")}>
-              Next{s.view !== now.side && ` (${now.side === "red" ? "Red" : "Blue"})`}:
+              Next{s.view !== now.side && ` (${now.side === "red" ? "Strike" : "Guard"})`}:
             </span>{" "}
             {now.next}
           </>
         ) : (
-          <span className="text-ok">Loop closed: Red found the gap, built and proved a fix, and Guard now holds the attack.</span>
+          <span className="text-ok">Loop closed: Strike found the gap, built and proved a fix, and Guard now holds the attack.</span>
         )}
       </p>
     </div>
@@ -140,7 +139,6 @@ export function TopBar({ onScorecard, onWelcome }: { onScorecard: () => void; on
     <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-panel px-4 py-2">
       <button onClick={onWelcome} title="Back to the welcome screen" className="flex items-baseline gap-2.5 rounded px-1 -mx-1 hover:bg-raised">
         <span className="text-[15px] font-black tracking-[0.25em] text-ink">VANDAL</span>
-        <span className="hidden text-[11px] text-dim 2xl:inline">Break it. Fix it. Prove it.</span>
       </button>
 
       <SideSwitch />

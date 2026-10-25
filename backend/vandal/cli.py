@@ -621,7 +621,7 @@ IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {
 def build_parser() -> argparse.ArgumentParser:
     from vandal.twin.seed import DEFAULT_SEED
 
-    parser = argparse.ArgumentParser(prog="vandal", description="Vandal Sandbox CLI")
+    parser = argparse.ArgumentParser(prog="vandal", description="Vandal CLI")
     sub = parser.add_subparsers(dest="command", metavar="command", required=True)
     for name, (help_text, _slice) in COMMANDS.items():
         cmd = sub.add_parser(name, help=help_text)

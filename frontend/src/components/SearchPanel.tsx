@@ -104,7 +104,7 @@ export function SearchPanel() {
           </select>
         </div>
         <Button tone="red" className="w-full justify-center" onClick={s.runSearch} busy={running} disabled={!s.ready}>
-          Unleash Vandal on {policy}
+          Release Vandal Strike on {policy}
         </Button>
       </div>
 
@@ -133,7 +133,7 @@ export function SearchPanel() {
       <div className="flex-1 p-3">
         {!attack && !running && (
           <Empty>
-            {r ? `No violation within depth ${r.depth} under ${policy}. Bounded claim: not a proof beyond it.` : "Vandal tries every short sequence of attacker moves and bank faults against the twin, looking for one that sends money to the wrong place."}
+            {r ? `No violation within depth ${r.depth} under ${policy}. Bounded claim: not a proof beyond it.` : "Strike tries every short sequence of attacker moves and bank faults against the twin, looking for one that sends money to the wrong place."}
           </Empty>
         )}
         {attack && (

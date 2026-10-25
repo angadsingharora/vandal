@@ -29,7 +29,7 @@ export function ExplainDrawer() {
       className="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-line bg-panel shadow-2xl"
     >
       <header className="flex items-center gap-2 border-b border-line px-4 py-2.5">
-        <span className="rounded-sm bg-blue/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-blue">BLUE</span>
+        <span className="rounded-sm bg-blue/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-blue">GUARD</span>
         <h2 className="text-sm font-semibold">
           Why? <span className="num text-dim">{explanation.subject}</span>
         </h2>
@@ -85,7 +85,7 @@ export function ExplainDrawer() {
           ref={input}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask Blue, or push back: “just release it”"
+          placeholder="Ask Guard, or push back: “just release it”"
           aria-label="Question"
           className="h-7 min-w-0 flex-1 rounded border border-line bg-bg px-2 text-xs focus:border-blue focus:outline-none"
         />
