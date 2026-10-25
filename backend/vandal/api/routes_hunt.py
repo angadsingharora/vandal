@@ -1,8 +1,8 @@
-"""Red's threat hunter over the API: Claude studies a run's company and reasons out attacks that
-aren't in any preset threat family, testing each in the twin (search/hunt.py). Every attempt
-streams as a `log` message on /jobs/{id}/events. The result has a `best` counterexample like a
-search's, so /diagnose and /synthesize take a hunt job's id too. With no API key (and no
-recording), the job fails with HuntUnavailable: there is no deterministic stand-in for reasoning."""
+"""The hunt over the API: attacks from outside the preset threat families, drawn from a written
+playbook and tested in the twin (search/hunt.py), with a pause before each attempt for the
+audience. Every attempt streams as a `log` message on /jobs/{id}/events. The result has a `best`
+counterexample like a search's, so /diagnose and /synthesize take a hunt job's id too. No model
+is involved, so the hunt runs with or without an API key."""
 
 from __future__ import annotations
 

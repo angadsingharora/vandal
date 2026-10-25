@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from vandal import llm
 from vandal.guard import explain
 from vandal.operator import intake
-from vandal.search import hunt, red
+from vandal.search import red
 from vandal.synth import propose
 
 CACHE = llm.BACKEND / "llm_cache"
@@ -25,7 +25,6 @@ SCHEMAS: list[tuple[str, str, type[BaseModel]]] = [
     ("operator", r"intake", intake._LLMExtraction),
     ("red", r"plan", red._LLMPlan),
     ("red", r"content", red._LLMTexts),
-    ("red", r"hunt-\d+", hunt._Hypothesis),
     ("synth", r"propose-\d+", propose._LLMProposal),
     ("blue", r"explain", explain._LLMExplanation),
 ]

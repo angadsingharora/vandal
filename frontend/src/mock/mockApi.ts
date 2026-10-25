@@ -314,7 +314,7 @@ export class MockApi implements VandalApi {
 
   async hunt(runId: string, _body: { attempts: number; keep_going?: boolean }): Promise<never> {
     this.run(runId);
-    throw new ApiError(400, "the threat hunter reasons with Claude: run it against the real backend");
+    throw new ApiError(400, "the hunt runs on the twin: run it against the real backend");
   }
 
   inject = (async (runId: string, body: InjectBody) => {

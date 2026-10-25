@@ -120,7 +120,7 @@ interface State {
   approvals: Approvals;
   replays: { before: ReplayOut | null; after: ReplayOut | null };
   inject: { phase: Phase; plan: ThreatPlan | null; jobId: string | null; result: InjectResult | null };
-  /** R13: Red's threat hunter. Claude's attempts stream in as it reasons. */
+  /** R13: the hunt. Its attempts stream in one at a time. */
   hunt: { phase: Phase; jobId: string | null; attempts: HuntAttempt[]; result: HuntResult | null };
   metrics: { phase: Phase; data: Metrics | null };
   explanation: { phase: Phase; data: Explanation | null; subject: string | null };

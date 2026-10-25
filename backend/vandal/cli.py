@@ -19,7 +19,7 @@ COMMANDS: dict[str, tuple[str, str]] = {
     "synth": ("Diagnose and synthesize a control (CEGIS)", "R8"),
     "verify": ("Run the verification suite against a policy", "R7"),
     "inject": ("Run a user-authored threat in plain language", "R9"),
-    "hunt": ("Claude studies the company and reasons out attacks of its own", "R13"),
+    "hunt": ("try attacks beyond the preset search, drawn from a written playbook", "R13"),
     "rebuild": ("Rebuild a persisted run from its events and check its hash", "R12"),
     "intake": ("Score the LLM Operator's intake on the messy-document items", "O1"),
 }
@@ -609,7 +609,7 @@ def cmd_hunt(args: argparse.Namespace) -> int:
     from functools import partial
 
     from vandal.sandbox import new_sandbox
-    from vandal.search.hunt import HuntUnavailable, hunt
+    from vandal.search.hunt import hunt
 
     policy = _policy(args)
     _print_policy(policy)
@@ -631,17 +631,13 @@ def cmd_hunt(args: argparse.Namespace) -> int:
         else:
             print("  held: no invariant broken")
 
-    try:
-        r = hunt(
-            factory,
-            seed=args.seed,
-            attempts=args.attempts,
-            keep_going=args.keep_going,
-            on_attempt=show,
-        )
-    except HuntUnavailable as err:
-        print(err, file=sys.stderr)
-        return 2
+    r = hunt(
+        factory,
+        seed=args.seed,
+        attempts=args.attempts,
+        keep_going=args.keep_going,
+        on_attempt=show,
+    )
     print(f"\n{r.reason}")
     if r.best is None:
         return 0
