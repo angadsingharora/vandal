@@ -69,8 +69,7 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
       >
         <div className="flex flex-wrap items-center gap-3 p-3">
           <p className="min-w-0 flex-1 basis-[24rem] text-xs leading-snug text-dim">
-            Every short sequence of vendor-master changes, bank faults, deposits and refund requests, on a clone of the books.
-            Strike reports what broke; it is not told what to look for.
+            Runs every short attack sequence against a clone of the books and reports only what broke.
           </p>
           <label className="flex items-center gap-1.5 text-[11px] text-dim" title="How many attacker moves or faults per sequence">
             Moves per sequence

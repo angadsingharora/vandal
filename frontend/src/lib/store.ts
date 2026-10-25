@@ -637,7 +637,8 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         diagnosis: { ...idle, data: null, reason: null },
       });
       try {
-        const job = await a.hunt(runId, { attempts });
+        // Run every attempt, hits included: a hunt is a set of hypotheses, not a race to one.
+        const job = await a.hunt(runId, { attempts, keep_going: true });
         set((s) => ({ hunt: { ...s.hunt, jobId: job.id } }));
         const done = await finished<HuntResult>(a, job.id, {
           log: (t: HuntAttempt) => set((s) => ({ hunt: { ...s.hunt, attempts: [...s.hunt.attempts, t] } })),
