@@ -18,6 +18,8 @@ import type {
   EvidencePack,
   Explanation,
   Finding,
+  HuntAttempt,
+  HuntResult,
   InjectResult,
   IntakeRead,
   Job,
@@ -60,7 +62,7 @@ export interface RunTab {
 /** The counterexample the loop is working on: from a search, or from an injected threat. */
 export interface Attack {
   jobId: string;
-  source: "search" | "inject";
+  source: "search" | "inject" | "hunt";
   policy: string;
   finding: Finding;
   labels: OracleLabel[];
@@ -117,6 +119,8 @@ interface State {
   approvals: Approvals;
   replays: { before: ReplayOut | null; after: ReplayOut | null };
   inject: { phase: Phase; plan: ThreatPlan | null; jobId: string | null; result: InjectResult | null };
+  /** R13: Red's threat hunter. Claude's attempts stream in as it reasons. */
+  hunt: { phase: Phase; jobId: string | null; attempts: HuntAttempt[]; result: HuntResult | null };
   metrics: { phase: Phase; data: Metrics | null };
   explanation: { phase: Phase; data: Explanation | null; subject: string | null };
 }
@@ -150,6 +154,7 @@ interface Actions {
   decidePayment(runId: string, requestId: string, actor: Actor, approve: boolean): Promise<string>;
   previewInject(body: InjectBody): Promise<void>;
   runInject(body: InjectBody): Promise<void>;
+  runHunt(attempts?: number): Promise<void>;
   loadMetrics(policies: string[]): Promise<void>;
   explain(entityType: string, id: string, question?: string): Promise<void>;
   closeExplanation(): void;
@@ -266,6 +271,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     approvals: { payments: [], patches: [] },
     replays: { before: null, after: null },
     inject: { ...idle, plan: null, jobId: null, result: null },
+    hunt: { ...idle, jobId: null, attempts: [], result: null },
     metrics: { ...idle, data: null },
     explanation: { ...idle, data: null, subject: null },
 
@@ -351,6 +357,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         appliedPolicy: null,
         replays: { before: null, after: null },
         inject: { ...idle, plan: null, jobId: null, result: null },
+        hunt: { ...idle, jobId: null, attempts: [], result: null },
         explanation: { ...idle, data: null, subject: null },
         policies: await a.policies(),
       });
@@ -565,6 +572,34 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         set({ inject: { phase: "idle", plan, jobId: null, result: null } });
       } catch (err) {
         set((s) => ({ inject: { ...s.inject, phase: "failed" } }));
+        throw err;
+      }
+    }),
+
+    runHunt: guard(async (attempts = 6) => {
+      const a = api();
+      const runId = get().focusRunId;
+      if (!runId) return;
+      const policy = get().summary?.policy ?? "v0";
+      set({
+        hunt: { phase: "running", jobId: null, attempts: [], result: null },
+        diagnosis: { ...idle, data: null, reason: null },
+      });
+      const job = await a.hunt(runId, { attempts });
+      set((s) => ({ hunt: { ...s.hunt, jobId: job.id } }));
+      try {
+        const done = await finished<HuntResult>(a, job.id, {
+          log: (t: HuntAttempt) => set((s) => ({ hunt: { ...s.hunt, attempts: [...s.hunt.attempts, t] } })),
+        });
+        const result = done.result!;
+        set((s) => ({
+          hunt: { ...s.hunt, phase: "done", result, attempts: result.attempts },
+          attack: result.best
+            ? { jobId: job.id, source: "hunt", policy, finding: result.best, labels: [] }
+            : s.attack,
+        }));
+      } catch (err) {
+        set((s) => ({ hunt: { ...s.hunt, phase: "failed" } }));
         throw err;
       }
     }),

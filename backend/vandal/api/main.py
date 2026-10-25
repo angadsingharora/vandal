@@ -20,7 +20,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from vandal.api import routes_blue, routes_inject, routes_jobs, routes_policies, routes_runs
+from vandal.api import (
+    routes_blue,
+    routes_hunt,
+    routes_inject,
+    routes_jobs,
+    routes_policies,
+    routes_runs,
+)
 from vandal.api.db import Store
 from vandal.api.registry import Registry
 from vandal.llm import load_env
@@ -79,6 +86,7 @@ def create_app(store: Store | None = None, persist: bool | None = None) -> FastA
 
     app.include_router(routes_runs.router)
     app.include_router(routes_inject.router)
+    app.include_router(routes_hunt.router)
     app.include_router(routes_jobs.router)
     app.include_router(routes_policies.router)
     app.include_router(routes_blue.router)
