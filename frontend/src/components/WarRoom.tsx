@@ -7,6 +7,7 @@ import { AttackVerdict } from "./AttackVerdict";
 import { ApprovalsInbox, EnforcedPolicy, OperatorPanel, RunOperations, VerdictFeed } from "./BluePanels";
 import { ChainView } from "./ChainView";
 import { ExplainDrawer } from "./ExplainDrawer";
+import { HuntPanel } from "./HuntPanel";
 import { InjectDialog } from "./InjectDialog";
 import { ScorecardDialog } from "./ScorecardDialog";
 import { SearchPanel } from "./SearchPanel";
@@ -108,8 +109,9 @@ function RedView({ onInject }: { onInject: () => void }) {
         once a human approves it.
       </Banner>
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-line lg:grid-cols-[minmax(300px,24%)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)_minmax(0,38%)]">
-        <div className="flex min-h-0 min-w-0 flex-col lg:row-span-2">
+        <div className="flex min-h-0 min-w-0 flex-col gap-px overflow-y-auto bg-line lg:row-span-2">
           <SearchPanel />
+          <HuntPanel />
         </div>
         {/* The twin keeps at least a few table rows on screen; a tall chain (diagnosis open) scrolls instead. */}
         <div className="flex min-h-0 min-w-0 flex-col gap-px overflow-y-auto bg-line">

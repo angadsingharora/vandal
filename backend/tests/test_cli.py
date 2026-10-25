@@ -19,6 +19,7 @@ def test_help_lists_every_command(capsys) -> None:
         "synth",
         "verify",
         "inject",
+        "hunt",
         "rebuild",
         "intake",
     }

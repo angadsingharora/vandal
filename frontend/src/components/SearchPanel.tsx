@@ -140,7 +140,7 @@ export function SearchPanel() {
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Minimal counterexample</span>
-              <Badge tone="dim">{attack.source === "inject" ? "from your scenario" : `under ${attack.policy}`}</Badge>
+              <Badge tone="dim">{attack.source === "inject" ? "from your scenario" : attack.source === "hunt" ? `Claude's hunt · ${attack.policy}` : `under ${attack.policy}`}</Badge>
             </div>
             <MovesTimeline moves={attack.finding.moves} labels={attack.labels} judge={s.judge} />
             <div className="rounded border border-bad/40 bg-bad/10 p-2">
