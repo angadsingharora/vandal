@@ -191,4 +191,4 @@ Vandal Strike (twin, search, root cause, CEGIS, verification), fault injection, 
 
 ## Authors
 
-Angad Arora, Dhruv Kasarabada, and team.
+Angad Arora, Mohithram Narendrababu, and Kashish Venkayala.
