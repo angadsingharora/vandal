@@ -7,21 +7,24 @@
 import { cx, INVARIANTS, moveLine, usd } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
 import { EvidenceScan } from "./EvidenceScan";
+import { HuntPanel } from "./HuntPanel";
 import { MovesTimeline, SCENARIOS } from "./SearchPanel";
 import { StagePage } from "./Stage";
 import { Badge, Block, Button, LiveDot, Reveal, Stat } from "./ui";
 
 export function AttackPage({ onInject }: { onInject: () => void }) {
   const s = useWarRoom();
-  const { search, attack } = s;
+  const { search, attack, hunt } = s;
   const running = search.phase === "running";
+  const hunting = hunt.phase === "running";
+  const hunted = attack?.source === "hunt";
   const r = search.result;
   const policy = attack?.policy ?? s.tabs.find((t) => t.kind === "live")?.policy ?? "v0";
   const before = s.replays.before;
   const violations = before?.result.violations ?? [];
 
-  const broke = r ? r.findings.length : attack ? 1 : 0;
-  const explored = running ? search.explored : r ? r.explored : (s.inject.result?.explored ?? 0);
+  const broke = hunted ? (hunt.result?.hits ?? 1) : r ? r.findings.length : attack ? 1 : 0;
+  const explored = hunted ? hunt.attempts.length : running ? search.explored : r ? r.explored : (s.inject.result?.explored ?? 0);
   const safe = Math.max(explored - broke, 0);
   const sig = (f: { moves: { kind: string; params: Record<string, string | number> }[] }) => f.moves.map((m) => moveLine(m as never)).join("→");
 
@@ -107,10 +110,12 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
         </div>
       </Block>
 
+      <HuntPanel quiet={!!attack && !hunting} />
+
       {/* 2 · what the search found */}
       {(running || r || attack) && (
         <Block
-          label="2 · What the search found"
+          label={hunted ? "2 · What the hunt found" : "2 · What the search found"}
           aside={
             r && (
               <span className="num">
@@ -123,11 +128,11 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
             <Stat
               label={
                 <span className="flex items-center gap-1.5">
-                  Sequences tried {running && <LiveDot className="text-red" />}
+                  {hunted ? "Attempts" : "Sequences tried"} {running && <LiveDot className="text-red" />}
                 </span>
               }
               value={explored.toLocaleString()}
-              sub={running ? `exploring depth ${search.atDepth}…` : r ? `per depth [${r.levels.join(", ")}]` : attack?.source === "inject" ? "around your scenario" : undefined}
+              sub={hunted ? "Claude's hypotheses, each run on the twin" : running ? `exploring depth ${search.atDepth}…` : r ? `per depth [${r.levels.join(", ")}]` : attack?.source === "inject" ? "around your scenario" : undefined}
             />
             <Stat label="Safe" value={explored ? `${safe.toLocaleString()} / ${explored.toLocaleString()}` : "—"} tone="ok" sub="Guard held, or nothing broke" />
             <Stat
@@ -150,7 +155,7 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
         <Reveal k={attack.jobId}>
           <Block
             label="3 · The sequence that broke the books"
-            aside={<Badge tone="dim">{attack.source === "inject" ? "from your scenario" : "shortest one found"}</Badge>}
+            aside={<Badge tone="dim">{attack.source === "inject" ? "from your scenario" : attack.source === "hunt" ? "Claude's hunt" : "shortest one found"}</Badge>}
           >
             <div className="grid grid-cols-1 gap-px bg-line md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
               <div className="bg-panel p-3">

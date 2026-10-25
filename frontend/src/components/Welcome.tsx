@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cx } from "@/lib/format";
-import { loopSteps } from "@/lib/loop";
-import { useWarRoom, type View } from "@/lib/store";
-import type { OperatorKind } from "@/lib/types";
-import { SCENARIOS } from "./SearchPanel";
+import { useWarRoom } from "@/lib/store";
 import { Button } from "./ui";
 
 export const WELCOME_KEY = "vandal.welcomed";
@@ -21,85 +18,75 @@ export function wantsWelcome(): boolean {
   }
 }
 
-const SIDES: { id: View; name: string; product: string; blurb: string; first: string }[] = [
+type Side = "guard" | "strike";
+
+const PARTS: { side: Side | "operator"; name: string; blurb: string }[] = [
   {
-    id: "blue",
-    name: "BLUE",
-    product: "Vandal Guard",
-    blurb: "Watch the finance agent work the live books while Guard checks every action it takes.",
-    first: "Starts at step 1: run operations.",
+    side: "operator",
+    name: "The Operator",
+    blurb: "The AI finance agent, built on Claude. It reads invoices, asks for approvals, pays vendors, and keeps the books.",
   },
   {
-    id: "red",
-    name: "RED",
-    product: "Vandal Sandbox",
-    blurb: "Attack a clone of the company, find the gap, and build a fix Blue can approve.",
-    first: "Starts at step 2: unleash Vandal.",
+    side: "guard",
+    name: "Vandal Guard",
+    blurb: "Sits in front of the agent. Checks every payment, bank change, and refund against independent records, then allows, holds, or escalates it.",
+  },
+  {
+    side: "strike",
+    name: "Vandal Strike",
+    blurb: "Attacks a sandboxed copy of the books, finds what gets past Guard, then builds a fix and proves it works.",
   },
 ];
 
-const OPERATORS: { id: OperatorKind; label: string; hint: string }[] = [
-  { id: "reference", label: "reference Operator", hint: "Deterministic. The quickest way through the loop." },
-  { id: "llm", label: "LLM Operator", hint: "Reads messy documents. Needs a key or playback recordings." },
+// The same seven steps as the loop strip (lib/loop.ts), worded for a first-time viewer.
+const STEPS: { side: Side; label: string; what: string }[] = [
+  { side: "guard", label: "Operate", what: "The agent works a week of the company's books. Guard checks every action." },
+  { side: "strike", label: "Attack", what: "Strike searches a copy of the books for events that send money to the wrong place." },
+  { side: "strike", label: "Diagnose", what: "Finds the broken link between what was approved and what was paid." },
+  { side: "strike", label: "Fix", what: "Claude proposes rules for Guard; Strike attacks each one until one survives." },
+  { side: "strike", label: "Prove", what: "Six checks, including attacks it never saw and every legitimate payment still going through." },
+  { side: "guard", label: "Approve", what: "A human controller signs off. Neither the agent nor Strike can approve a rule." },
+  { side: "guard", label: "Enforce", what: "Guard applies the rule. The same attack is replayed and held: $0 moves." },
 ];
 
-const NOTHING_DONE = { operated: false, attacked: false, diagnosed: false, synthesized: false, submitted: false, applied: false, enforced: false };
+const tone = (side: Side | "operator") => (side === "strike" ? "text-red" : side === "guard" ? "text-blue" : "text-ink");
 
-function Choice({ on, red, onClick, title, children, className }: { on: boolean; red?: boolean; onClick: () => void; title?: string; children: React.ReactNode; className?: string }) {
-  return (
-    <button
-      role="radio"
-      aria-checked={on}
-      onClick={onClick}
-      title={title}
-      className={cx(
-        "rounded border text-left text-xs transition-colors",
-        on ? (red ? "border-red/70 bg-red/10 text-ink" : "border-blue/70 bg-blue/10 text-ink") : "border-line text-dim hover:border-dim hover:text-ink",
-        className,
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-/** First-visit landing: what Vandal is, the loop, and three choices that seed the war room. */
+/** First-visit landing: the business problem, the three parts, the loop, and one way in. Every visit starts the
+ * same demo: the LLM Operator, on Guard's side, at step 1. */
 export function Welcome({ onClose }: { onClose: () => void }) {
   const s = useWarRoom();
-  const [side, setSide] = useState<View>("blue");
-  const [scenario, setScenario] = useState(s.search.scenario);
-  const [operator, setOperator] = useState<OperatorKind>(s.operator);
   const [entering, setEntering] = useState(false);
   const [leaving, setLeaving] = useState(false);
-  const steps = loopSteps(NOTHING_DONE);
 
   // Fade out, then unmount. The card's leave animation is 200ms; the backdrop's 220ms.
-  const dismiss = () => setLeaving(true);
   useEffect(() => {
     if (!leaving) return;
     const t = setTimeout(onClose, 230);
     return () => clearTimeout(t);
   }, [leaving, onClose]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && dismiss();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  const enter = async () => {
+  const start = async () => {
+    if (entering || !s.ready) return;
     setEntering(true);
     try {
       window.localStorage.setItem(WELCOME_KEY, "1");
     } catch {
       /* private mode: show it again next time */
     }
-    s.setSearch({ scenario });
-    if (operator !== s.operator) await s.reset(s.summary?.policy ?? "v0", operator);
-    await s.setView(side);
-    setEntering(false);
-    dismiss();
+    try {
+      if (s.operator !== "llm" || s.summary?.operator !== "llm") await s.reset(s.summary?.policy ?? "v0", "llm");
+      await s.setView("blue");
+    } finally {
+      setEntering(false);
+      setLeaving(true);
+    }
   };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Enter" && start();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   return (
     <div className={cx("fixed inset-0 z-50 overflow-auto bg-bg", leaving ? "welcome-leave" : "welcome-enter")}>
@@ -114,107 +101,84 @@ export function Welcome({ onClose }: { onClose: () => void }) {
         aria-labelledby="welcome-title"
         className="welcome-card relative mx-auto grid min-h-full w-full max-w-7xl gap-10 px-6 py-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:items-center lg:px-12"
       >
-        {/* Left: what this is. */}
+        {/* Left: the business problem and what Vandal is. */}
         <section className="flex flex-col justify-center">
           <div className="text-xs uppercase tracking-[0.3em] text-faint">Welcome to</div>
           <h1 id="welcome-title" className="mt-2 text-6xl font-black leading-none tracking-[0.2em] text-ink sm:text-7xl lg:text-8xl">
             VANDAL
           </h1>
-          <p className="mt-3 text-sm tracking-wide text-faint">Break it. Fix it. Prove it.</p>
-          <p className="mt-6 max-w-xl text-sm leading-relaxed text-dim sm:text-[15px]">
-            A finance agent pays the bills. <span className="font-semibold text-blue">Guard</span> checks every action it takes
-            against the books. <span className="font-semibold text-red">Vandal</span> attacks a clone until the books break, names
-            the broken link, and builds a control that Guard then enforces. Nothing here moves real money.
+          <p className="mt-5 max-w-xl text-lg font-semibold leading-snug text-ink">
+            Your books can balance perfectly while the money goes to the wrong person.
+          </p>
+          <p className="mt-4 max-w-xl text-sm leading-relaxed text-dim sm:text-[15px]">
+            Companies are handing accounts payable to AI agents: paying vendors, changing bank details, issuing refunds. The
+            controls they rely on were built for human clerks. A single email from a lookalike domain, landing after an invoice is
+            approved and before the payment run, can send a vendor's payment to an attacker. Every step looks valid and the ledger
+            still balances.
+          </p>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-dim sm:text-[15px]">
+            Vandal is the security layer for those agents. It checks every action before money moves, and it keeps attacking its own
+            checks so they get stronger with every change.
           </p>
 
-          <div className="mt-8 text-[10px] uppercase tracking-[0.2em] text-faint">The loop</div>
-          <ol className="mt-3 max-w-md" aria-label="The loop">
-            {steps.map((st, i) => {
-              const red = st.side === "red";
-              const last = i === steps.length - 1;
-              return (
-                <li key={st.n} className="relative flex gap-4 pb-3 last:pb-0">
-                  {!last && <span aria-hidden className="absolute left-[11px] top-6 h-[calc(100%-0.75rem)] w-px bg-line" />}
-                  <span
-                    className={cx(
-                      "num relative mt-px flex size-6 shrink-0 items-center justify-center rounded-full border bg-bg text-[11px] font-bold",
-                      red ? "border-red/70 text-red" : "border-blue/70 text-blue",
-                    )}
-                  >
-                    {st.n}
-                  </span>
-                  <div className="min-w-0 pt-0.5">
-                    <span className="text-sm font-semibold text-ink">{st.label}</span>
-                    <span className="ml-2 text-xs text-faint">{red ? "Red" : "Blue"}</span>
-                    <div className="text-xs leading-snug text-dim">{st.next.split(". ")[0].replace(/\.$/, "")}</div>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
+          <div className="mt-8 grid max-w-2xl gap-3 sm:grid-cols-3">
+            {PARTS.map((p) => (
+              <div key={p.name} className="rounded border border-line bg-panel/70 p-3">
+                <div className={cx("text-sm font-semibold", tone(p.side))}>{p.name}</div>
+                <p className="mt-1 text-xs leading-snug text-dim">{p.blurb}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 max-w-2xl text-xs leading-relaxed text-faint">
+            Fixes go into Guard's rules, never into the agent: no retraining, no prompt edits. The protection holds whichever agent
+            does the work.
+          </p>
         </section>
 
-        {/* Right: the three choices and the way in. */}
+        {/* Right: the demo company, the loop, and the way in. */}
         <section className="flex flex-col gap-6 rounded-lg border border-line bg-panel/90 p-6 shadow-2xl backdrop-blur">
           <div>
-            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-faint">Start on</div>
-            <div role="radiogroup" aria-label="Side" className="grid gap-2">
-              {SIDES.map((x) => {
-                const red = x.id === "red";
+            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-faint">Today's company</div>
+            <p className="text-sm leading-relaxed text-dim">
+              <span className="font-semibold text-ink">Bayline Property Group</span>, a property manager with 12 buildings in the
+              Bay Area. Its AI agent handles 80 vendor invoices; anything over $25,000 needs a controller's approval. Everything here is
+              simulated. No real money moves.
+            </p>
+          </div>
+
+          <div>
+            <div className="mb-3 text-[10px] uppercase tracking-[0.2em] text-faint">The demo, in seven steps</div>
+            <ol aria-label="The demo loop">
+              {STEPS.map((st, i) => {
+                const strike = st.side === "strike";
+                const last = i === STEPS.length - 1;
                 return (
-                  <Choice key={x.id} on={side === x.id} red={red} onClick={() => setSide(x.id)} className={cx("border-l-4 p-3.5", red ? "border-l-red" : "border-l-blue")}>
-                    <div className="flex items-center gap-2">
-                      <span className={cx("text-xs font-black tracking-wider", red ? "text-red" : "text-blue")}>{x.name}</span>
-                      <span className="text-sm font-semibold text-ink">{x.product}</span>
-                      <span className="ml-auto text-[10px] text-faint">{x.first}</span>
+                  <li key={st.label} className="relative flex gap-4 pb-3 last:pb-0">
+                    {!last && <span aria-hidden className="absolute left-[11px] top-6 h-[calc(100%-0.75rem)] w-px bg-line" />}
+                    <span
+                      className={cx(
+                        "num relative mt-px flex size-6 shrink-0 items-center justify-center rounded-full border bg-bg text-[11px] font-bold",
+                        strike ? "border-red/70 text-red" : "border-blue/70 text-blue",
+                      )}
+                    >
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 pt-0.5">
+                      <span className="text-sm font-semibold text-ink">{st.label}</span>
+                      <span className={cx("ml-2 text-xs", tone(st.side))}>{strike ? "Vandal Strike" : "Vandal Guard"}</span>
+                      <div className="text-xs leading-snug text-dim">{st.what}</div>
                     </div>
-                    <p className="mt-1 text-xs leading-snug text-dim">{x.blurb}</p>
-                  </Choice>
+                  </li>
                 );
               })}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-faint">Threat for Red to search</div>
-            <div role="radiogroup" aria-label="Scenario" className="grid gap-1.5">
-              {SCENARIOS.map((x) => (
-                <Choice key={x.id} on={scenario === x.id} red onClick={() => setScenario(x.id)} title={x.hint} className="flex items-center gap-3 px-3 py-2">
-                  <span className={cx("num text-[11px] font-black uppercase", scenario === x.id ? "text-red" : "text-faint")}>{x.id}</span>
-                  <span className="text-ink">{x.label}</span>
-                </Choice>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-faint">Finance agent</div>
-            <div role="radiogroup" aria-label="Operator" className="grid grid-cols-2 gap-1.5">
-              {OPERATORS.map((x) => (
-                <Choice key={x.id} on={operator === x.id} onClick={() => setOperator(x.id)} title={x.hint} className="px-3 py-2">
-                  <div className="text-ink">{x.label}</div>
-                  <div className="mt-0.5 text-[11px] leading-snug text-faint">{x.hint}</div>
-                </Choice>
-              ))}
-            </div>
+            </ol>
           </div>
 
           <div className="flex items-center gap-3 border-t border-line pt-4">
-            <span className="text-[11px] text-faint">All of this can be changed later.</span>
-            <div className="ml-auto flex items-center gap-2">
-              <Button tone="ghost" onClick={dismiss}>
-                Skip
-              </Button>
-              <Button
-                tone={side === "red" ? "red" : "blue"}
-                onClick={enter}
-                busy={entering}
-                disabled={!s.ready}
-                className="h-9 px-5 text-sm font-semibold"
-              >
-                {s.ready ? "Enter the war room →" : "Connecting…"}
-              </Button>
-            </div>
+            <span className="text-[11px] text-faint">Starts at step 1 with Vandal Guard.</span>
+            <Button tone="blue" onClick={start} busy={entering} disabled={!s.ready} className="ml-auto h-9 px-5 text-sm font-semibold">
+              {s.ready ? "Start the demo →" : "Connecting…"}
+            </Button>
           </div>
         </section>
       </div>

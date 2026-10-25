@@ -447,6 +447,32 @@ export interface ThreatPlan {
   source: "llm" | "keywords" | "trace";
 }
 
+/** R13: one hypothesis from Red's threat hunter, and what the twin did with it. */
+export interface HuntAttempt {
+  n: number;
+  rationale: string;
+  weak_spot: string;
+  target_invariant: string;
+  moves: Move[];
+  outcome: {
+    violated: string[];
+    exposure: Cents;
+    violations: string[];
+    guard: string[];
+    money: string[];
+    dropped: string[];
+  };
+}
+
+export interface HuntResult {
+  policy: string;
+  attempts: HuntAttempt[];
+  best: (Finding & { attempt: number; outside_preset_search: boolean; novel_moves: Move[] }) | null;
+  hits: number;
+  reason: string;
+  scenario: string;
+}
+
 export interface InjectResult {
   plan: ThreatPlan;
   scenario: string;
