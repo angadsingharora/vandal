@@ -29,7 +29,14 @@ from pydantic import BaseModel, ConfigDict
 
 from vandal.contracts.entities import Cents, OracleLabel
 from vandal.contracts.moves import Move
-from vandal.search.alphabet import Scenario, build_alphabet, independent
+from vandal.search.alphabet import (
+    ALL,
+    SCENARIOS,
+    Scenario,
+    build_alphabet,
+    family_of,
+    independent,
+)
 from vandal.twin.state import State
 from vandal.twin.world import run_step, schedule
 from vandal.verify.invariants import Limits, check, exposure
@@ -60,6 +67,9 @@ class SearchResult(BaseModel):
     levels: list[int]  # sequences run per depth
     findings: list[Finding]  # first violating depth only, or every depth if exhaustive
     best: Finding | None
+    # The best finding per threat family (search/alphabet.family_of). The combined "all" window
+    # keeps searching past the first violating depth until every family has one, or depth runs out.
+    by_family: dict[str, Finding] = {}
     seconds: float
     workers: int
 
@@ -228,6 +238,33 @@ def rank(f: Finding) -> tuple:
     return (-f.exposure, -len(f.violated), len(f.moves), -sum(m.at for m in f.moves))
 
 
+def _contains(longer: Sequence[Move], shorter: Sequence[Move]) -> bool:
+    """Every move of `shorter` appears in `longer` (as a multiset)."""
+    pool = [m.model_dump_json() for m in longer]
+    for m in shorter:
+        key = m.model_dump_json()
+        if key not in pool:
+            return False
+        pool.remove(key)
+    return True
+
+
+def _best_by_family(findings: Sequence[Finding]) -> dict[str, Finding]:
+    """A mixed finding counts only when no other finding is a subset of it: a bank change with
+    an unrelated retry in front is still the bank change, not a new cross-family attack."""
+    out: dict[str, Finding] = {}
+    for f in findings:
+        fam = family_of(f.moves)
+        if fam == ALL.name and any(
+            g is not f and len(g.moves) < len(f.moves) and _contains(f.moves, g.moves)
+            for g in findings
+        ):
+            continue
+        if fam not in out or rank(f) < rank(out[fam]):
+            out[fam] = f
+    return dict(sorted(out.items()))
+
+
 def search(
     factory: SandboxFactory,
     scenario: Scenario,
@@ -241,7 +278,9 @@ def search(
     progress: Callable[[int, int], None] | None = None,
 ) -> SearchResult:
     """Explore every canonical sequence up to `depth`. Without `exhaustive`, stop after the
-    first depth that has violations: those are the minimal counterexamples.
+    first depth that has violations: those are the minimal counterexamples. The combined "all"
+    window stops only once every threat family has a violation, so a one-move identity attack
+    doesn't end the search before a two-move bank fault is found.
 
     `around` seeds the search (R9): every sequence includes those moves, and `depth` counts the
     alphabet moves added around them. Depth 0 is the seeded moves on their own."""
@@ -272,6 +311,11 @@ def search(
     levels: list[int] = []
     findings: list[Finding] = []
     seen: set[Key] = set()
+    wanted = set(SCENARIOS) if scenario.name == ALL.name else set()
+
+    def done() -> bool:
+        return bool(findings) and wanted <= {family_of(f.moves) for f in findings}
+
     try:
         root_key, root_violated, root_exposure = local.run([])
         seen.add(root_key)
@@ -281,7 +325,7 @@ def search(
             )
         frontier: list[Seq] = [()]
         for d in range(1, depth + 1):
-            if findings and not exhaustive:
+            if done() and not exhaustive:
                 break
             tasks: list[tuple[Seq, list[Seq]]] = []
             for seq in frontier:
@@ -329,6 +373,7 @@ def search(
         levels=levels,
         findings=findings,
         best=min(findings, key=rank) if findings else None,
+        by_family=_best_by_family(findings),
         seconds=time.perf_counter() - started,
         workers=workers,
     )

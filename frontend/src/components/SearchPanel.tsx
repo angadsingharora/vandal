@@ -6,10 +6,12 @@ import type { Move, OracleLabel } from "@/lib/types";
 import { Badge, Button, Empty, LiveDot, Panel, SideTag } from "./ui";
 
 const SCENARIOS = [
+  { id: "all", label: "All threats", hint: "Every attacker move and bank fault in one search, so Vandal isn't told where to look" },
   { id: "a", label: "Bank change after approval", hint: "A vendor's bank details change between approval and the payment run" },
   { id: "b", label: "Bank fault, retry", hint: "The bank drops an ack, the Operator retries, the vendor is paid twice" },
   { id: "f", label: "Refund redirection", hint: "An overpayment, then a refund request to a different account" },
 ];
+const FAMILIES = SCENARIOS.filter((x) => x.id !== "all");
 
 export function MovesTimeline({ moves, labels, judge }: { moves: Move[]; labels?: OracleLabel[]; judge?: boolean }) {
   return (
@@ -73,7 +75,11 @@ export function SearchPanel() {
                 key={x.id}
                 role="radio"
                 aria-checked={on}
-                onClick={() => s.setSearch({ scenario: x.id })}
+                onClick={() =>
+                  // The combined window is ~4x the moves: k=2 takes seconds, k=3 can take a minute
+                  // once a family is closed (search runs to full depth looking for it).
+                  s.setSearch(x.id === "all" && search.depth > 2 ? { scenario: x.id, depth: 2 } : { scenario: x.id })
+                }
                 title={x.hint}
                 className={cx(
                   "flex items-center gap-2 rounded border px-2 py-1 text-left text-xs transition-colors",
@@ -127,6 +133,37 @@ export function SearchPanel() {
         <div className="num border-b border-line px-3 py-1.5 text-[11px] text-dim">
           depth {r.depth} · alphabet {r.alphabet} · per depth [{r.levels.join(", ")}] · {r.deduped} deduped ·{" "}
           {r.pruned} pruned · {Math.round(r.runs_per_second)} runs/s
+        </div>
+      )}
+      {r?.scenario === "all" && (
+        <div className="space-y-1 border-b border-line px-3 py-2">
+          <div className="text-[10px] uppercase tracking-wider text-faint">Found per threat family</div>
+          {FAMILIES.map((fam) => {
+            const f = r.by_family?.[fam.id];
+            return (
+              <div key={fam.id} className="flex items-baseline justify-between gap-2 text-[11px]" title={fam.hint}>
+                <span className="flex items-baseline gap-1.5 text-dim">
+                  <span className={cx("num font-bold uppercase", f ? "text-red" : "text-faint")}>{fam.id}</span>
+                  {fam.label}
+                </span>
+                {f ? (
+                  <span className="num shrink-0 text-bad">
+                    {f.moves.length} move{f.moves.length === 1 ? "" : "s"} · {usd(f.exposure, { cents: false })}
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-faint">none within k={r.depth}</span>
+                )}
+              </div>
+            );
+          })}
+          {r.by_family?.all && (
+            <div className="flex items-baseline justify-between gap-2 text-[11px]">
+              <span className="text-dim">Mixed attack across families</span>
+              <span className="num shrink-0 text-bad">
+                {r.by_family.all.moves.length} moves · {usd(r.by_family.all.exposure, { cents: false })}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

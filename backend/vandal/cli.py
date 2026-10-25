@@ -231,13 +231,13 @@ def cmd_search(args: argparse.Namespace) -> int:
     from functools import partial
 
     from vandal.sandbox import new_sandbox
-    from vandal.search.alphabet import SCENARIOS
+    from vandal.search.alphabet import SEARCH_SCENARIOS
     from vandal.search.bfs import search
     from vandal.search.minimize import minimize_trace
     from vandal.twin.profile import load_profile
     from vandal.verify.replay import replay, replay_detailed
 
-    scenario = SCENARIOS[args.scenario]
+    scenario = SEARCH_SCENARIOS[args.scenario]
     policy = _policy(args)
     _print_policy(policy)
     findings = _lint_policy(policy, load_profile(args.profile))
@@ -274,6 +274,12 @@ def cmd_search(args: argparse.Namespace) -> int:
         return 0
     n, shortest = len(result.findings), len(result.best.moves)
     print(f"  violating         {n} sequences (shortest: {shortest} moves)")
+    if len(result.by_family) > 1 or scenario.name == "all":
+        for fam, f in result.by_family.items():
+            print(
+                f"  family {fam:<10} {len(f.moves)} moves, {', '.join(f.violated)}, "
+                f"exposure ${f.exposure / 100:,.2f}"
+            )
 
     def violated(moves):
         return set(replay(args.seed, moves, sandbox=factory, days=scenario.days).violated)
@@ -674,7 +680,9 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "rebuild":
             cmd.add_argument("run_id")
         if name == "search":
-            cmd.add_argument("--scenario", default="a", help="scenario name (search/alphabet.py)")
+            cmd.add_argument(
+                "--scenario", default="a", help="scenario name (search/alphabet.py), or all"
+            )
             cmd.add_argument(
                 "--depth", type=int, default=int(os.environ.get("SEARCH_DEPTH", DEFAULT_DEPTH))
             )

@@ -13,7 +13,7 @@ from vandal.api import deps
 from vandal.contracts.entities import OracleLabel
 from vandal.contracts.moves import Move
 from vandal.sandbox import intake_extractor, new_sandbox
-from vandal.search.alphabet import SCENARIOS
+from vandal.search.alphabet import ALL, SEARCH_SCENARIOS, family_of
 from vandal.search.bfs import search
 from vandal.synth.cegis import cegis
 from vandal.synth.coverage import diagnose
@@ -91,7 +91,7 @@ def job_events(request: Request, job_id: str, start: int | None = None, follow: 
 
 @router.post("/search")
 def start_search(request: Request, body: SearchRequest) -> dict[str, Any]:
-    if body.scenario not in SCENARIOS:
+    if body.scenario not in SEARCH_SCENARIOS:
         raise HTTPException(400, f"unknown scenario {body.scenario!r}")
     policy = deps.policy(body.policy, request)
     reg = deps.registry(request)
@@ -102,7 +102,7 @@ def start_search(request: Request, body: SearchRequest) -> dict[str, Any]:
 
         result = search(
             partial(new_sandbox, body.profile, policy=policy),
-            SCENARIOS[body.scenario],
+            SEARCH_SCENARIOS[body.scenario],
             seed=body.seed,
             depth=body.depth,
             workers=body.workers,
@@ -153,6 +153,9 @@ def start_synthesize(request: Request, body: SynthesizeRequest) -> dict[str, Any
         start = [Move.model_validate(m) for m in best["moves"]]
         labels = [OracleLabel.model_validate(lb) for lb in found.result.get("labels", [])]
         scenario = found.result.get("scenario") or found.meta.get("scenario") or "a"
+        if scenario == ALL.name:
+            # Repair the attack's own family; a mixed attack keeps the combined window.
+            scenario = family_of(start)
     profile = load_profile(body.profile)
 
     def work(job) -> dict[str, Any]:

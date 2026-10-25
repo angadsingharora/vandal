@@ -276,6 +276,8 @@ export interface SearchResult {
   levels: number[];
   findings: Finding[];
   best: Finding | null;
+  /** best finding per threat family (a, b, f, or "all" for a mixed attack) */
+  by_family?: Record<string, Finding>;
   seconds: number;
   workers: number;
   runs_per_second: number;

@@ -30,7 +30,7 @@ from pydantic import BaseModel, ConfigDict
 from vandal.contracts.controls import Control
 from vandal.contracts.entities import OracleLabel
 from vandal.contracts.moves import Move
-from vandal.search.alphabet import SCENARIOS
+from vandal.search.alphabet import SEARCH_SCENARIOS
 from vandal.search.bfs import search
 from vandal.search.minimize import minimize_trace
 from vandal.synth.coverage import diagnose
@@ -115,8 +115,9 @@ def cegis(
 ) -> CEGISResult:
     """`start` is a counterexample to repair (an injected threat, R9) instead of the one the
     parent's own search finds; `start_labels` is that trace's answer key. `scenario` picks the
-    search window (search/alphabet.SCENARIOS): the threat family being repaired."""
-    window = SCENARIOS[scenario]
+    search window (search/alphabet.SEARCH_SCENARIOS): the threat family being repaired, or
+    "all" for a mixed attack that crosses families."""
+    window = SEARCH_SCENARIOS[scenario]
     risk = profile.risk_appetite
     log: list[LogEntry] = []
 

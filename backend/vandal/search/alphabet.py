@@ -28,6 +28,7 @@ Nothing here knows which move wins. The search finds that.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from vandal.contracts.moves import Move, MoveKind
@@ -72,6 +73,29 @@ SCENARIOS: dict[str, Scenario] = {
         kinds=("deposit", "refund_request"),
     ),
 }
+
+# Every threat family in one window, so search isn't told where to look. Kept out of SCENARIOS:
+# Red's planner, held-out variants, and CEGIS pick a single family (see family_of).
+ALL = Scenario(
+    name="all",
+    description="Every threat family at once: identity attacks, bank faults, and money in",
+    days=max(s.days for s in SCENARIOS.values()),
+    window_days=max(s.window_days for s in SCENARIOS.values()),
+    kinds=tuple(dict.fromkeys(k for s in SCENARIOS.values() for k in s.kinds)),
+)
+
+SEARCH_SCENARIOS: dict[str, Scenario] = {**SCENARIOS, ALL.name: ALL}
+
+
+def family_of(moves: Sequence[Move]) -> str:
+    """The single threat family whose window covers every move, or "all" for a mixed attack
+    (one that crosses families, which only the combined search can find)."""
+    kinds = {m.kind for m in moves}
+    for name, s in SCENARIOS.items():
+        if kinds and kinds <= set(s.kinds):
+            return name
+    return ALL.name
+
 
 # One move per fault class (twin/bank.py). A one-day delay stands for every delay: longer
 # ones only push settlement further past the window.
