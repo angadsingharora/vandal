@@ -10,4 +10,3 @@ node_modules/
 .ruff_cache/
 backend/evidence/
 .vercel
-.env*
