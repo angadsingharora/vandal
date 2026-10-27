@@ -10,6 +10,12 @@ Every gap Strike finds becomes a control that Guard enforces. Fixes go into Guar
 
 > Your books can balance perfectly while the money goes to the wrong person.
 
+## Live demo
+
+The war room is live at **https://frontend-dusky-eight-92.vercel.app**, against the API at https://vandal-api.onrender.com. Playback is on there, so every model call is served from the recordings and the demo needs no API key.
+
+The API runs on Render's free tier: it sleeps after 15 idle minutes and takes about a minute to wake on the next request (the war room shows "can't reach the backend" until then), and a search runs at roughly a tenth of laptop speed. `.github/workflows/keepalive.yml` pings it every ten minutes to keep it awake.
+
 ## How the loop works
 
 1. **Operate.** The Operator does a 12-property real-estate manager's AP work (intake, approvals, payment runs, ledger, reconciliation), and Guard gates every tool call.
