@@ -9,3 +9,5 @@ node_modules/
 .pytest_cache/
 .ruff_cache/
 backend/evidence/
+.vercel
+.env*
