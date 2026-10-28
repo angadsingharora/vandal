@@ -72,6 +72,8 @@ interface State {
   api: VandalApi | null;
   ready: boolean;
   error: string | null;
+  /** Connecting, and the backend isn't answering yet: a free-tier host waking up. */
+  waking: boolean;
   settings: Settings | null;
   judge: boolean;
   view: View;
@@ -142,7 +144,8 @@ interface Actions {
   focus(runId: string): Promise<void>;
   refresh(): Promise<void>;
   setSearch(p: Partial<Pick<State["search"], "depth">>): void;
-  runSearch(): Promise<void>;
+  /** `fresh` computes even when playback would serve a recording. */
+  runSearch(fresh?: boolean): Promise<void>;
   replayAttack(policy: string): Promise<void>;
   diagnose(): Promise<void>;
   selectPayment(payment: string): Promise<void>;
@@ -169,6 +172,24 @@ const idle = { phase: "idle" as Phase };
 
 let stopRunStreams: (() => void) | null = null;
 let initializing: Promise<void> | null = null; // React StrictMode mounts twice in dev
+
+/** The first two calls, retried while the backend isn't answering at all: a free-tier host
+ * sleeps after fifteen idle minutes and takes about a minute to wake. Any other error throws
+ * at once. */
+const WAKE_FOR_MS = 150_000;
+async function connect(api: VandalApi, onWaking: () => void) {
+  const started = Date.now();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await Promise.all([api.settings(), api.policies()]);
+    } catch (err) {
+      const asleep = err instanceof ApiError && (err.status === 0 || err.status >= 502);
+      if (!asleep || Date.now() - started > WAKE_FOR_MS) throw err;
+      onWaking();
+      await new Promise((r) => setTimeout(r, Math.min(1500 * (attempt + 1), 6000)));
+    }
+  }
+}
 
 function follow(api: VandalApi, path: string, handlers: Handlers): Promise<void> {
   return new Promise((resolve) => {
@@ -261,6 +282,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     api: null,
     ready: false,
     error: null,
+    waking: false,
     settings: null,
     judge: false,
     view: "blue",
@@ -300,10 +322,18 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       initializing ??= (async () => {
         const a = await getApi();
         set({ api: a });
-        const [settings, policies] = await Promise.all([a.settings(), a.policies()]);
+        const [settings, policies] = await connect(a, () => set({ waking: true }));
         // Ask Claude when it can answer (a key, or recordings in playback); sweep otherwise.
         const noLlm = !(settings.api_key || settings.playback);
-        set((st) => ({ settings, policies, synth: { ...st.synth, noLlm } }));
+        // Offer only the depths the host allows.
+        const maxDepth = settings.limits?.max_depth ?? 6;
+        set((st) => ({
+          settings,
+          policies,
+          waking: false,
+          search: { ...st.search, depth: Math.min(st.search.depth, maxDepth) },
+          synth: { ...st.synth, noLlm, depth: Math.min(st.synth.depth, maxDepth) },
+        }));
         await get().reset("v0");
         set({ ready: true });
       })().finally(() => {
@@ -453,7 +483,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
 
     setSearch: (p) => set((s) => ({ search: { ...s.search, ...p } })),
 
-    runSearch: guard(async () => {
+    runSearch: guard(async (fresh = false) => {
       const a = api();
       const { scenario, depth } = get().search;
       const policy = get().summary?.policy ?? "v0";
@@ -462,7 +492,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         diagnosis: { ...idle, data: null, reason: null },
       });
       try {
-        const job = await a.search({ policy, scenario, depth });
+        const job = await a.search({ policy, scenario, depth, fresh });
         set((s) => ({ search: { ...s.search, jobId: job.id } }));
         const done = await finished<SearchResult>(a, job.id, {
           progress: (p: { depth: number; explored: number }) =>

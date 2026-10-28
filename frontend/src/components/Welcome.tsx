@@ -81,6 +81,17 @@ export function Welcome({ onClose }: { onClose: () => void }) {
     }
   };
 
+  // The whole loop from a recording of the real backend, replayed in the browser: no host to
+  // wait on. The top bar's RECORDED chip leads back to the live backend.
+  const watch = () => {
+    try {
+      window.localStorage.setItem(WELCOME_KEY, "1");
+    } catch {
+      /* private mode */
+    }
+    window.location.assign("/?mock=1");
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Enter" && start();
     window.addEventListener("keydown", onKey);
@@ -173,11 +184,23 @@ export function Welcome({ onClose }: { onClose: () => void }) {
             </ol>
           </div>
 
-          <div className="flex items-center gap-3 border-t border-line pt-4">
+          <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
             <span className="text-[11px] text-faint">Starts at step 1 with Vandal Guard.</span>
-            <Button tone="blue" onClick={start} busy={entering} disabled={!s.ready} className="ml-auto h-9 px-5 text-sm font-semibold">
-              {s.ready ? "Start the demo →" : "Connecting…"}
-            </Button>
+            <div className="ml-auto flex items-center gap-2">
+              {s.api?.mode !== "mock" && (
+                <Button
+                  tone="ghost"
+                  onClick={watch}
+                  title="The seven steps from a recording made against the real backend, replayed in the browser. No waiting on a host."
+                  className="h-9 px-4 text-sm"
+                >
+                  Watch the recorded loop
+                </Button>
+              )}
+              <Button tone="blue" onClick={start} busy={entering} disabled={!s.ready} className="h-9 px-5 text-sm font-semibold">
+                {s.ready ? "Start the demo →" : s.waking ? "Waking the demo host…" : "Connecting…"}
+              </Button>
+            </div>
           </div>
         </section>
       </div>

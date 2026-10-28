@@ -14,7 +14,7 @@ Every gap Strike finds becomes a control that Guard enforces. Fixes go into Guar
 
 The war room is live at **https://frontend-dusky-eight-92.vercel.app**, against the API at https://vandal-api.onrender.com. Playback is on there, so every model call is served from the recordings and the demo needs no API key.
 
-The API runs on Render's free tier: it sleeps after 15 idle minutes and takes about a minute to wake on the next request (the war room shows "can't reach the backend" until then), and a search runs at roughly a tenth of laptop speed. `.github/workflows/keepalive.yml` pings it every ten minutes to keep it awake.
+The API runs on Render's free tier: it sleeps after 15 idle minutes and takes about a minute to wake on the next request (the war room says "Waking the API" and retries until it answers), and a search runs at roughly a tenth of laptop speed. `.github/workflows/keepalive.yml` pings it every ten minutes to keep it awake. With playback on, search, synthesis, and verification results come from recordings of the same jobs (see below), so the loop is instant there; every page marks such a result **recorded** and offers to run it live. **Watch the recorded loop** on the welcome screen (or `?mock=1`) replays the whole seven-step loop in the browser from fixtures, with no backend at all.
 
 ## How the loop works
 
@@ -96,6 +96,10 @@ uv run uvicorn vandal.api.main:app --reload
 ```
 
 FastAPI app with SSE for live updates. It covers runs (`/demo/reset`, `/runs`, `/runs/{id}/operate`, `/state`, `/entities`, `/ledger`, `/chain/{payment}`, `/events`, `/inject`), jobs (`/search`, `/diagnose`, `/synthesize`, `/verify`, `/jobs/{id}/events`), Guard (`/runs/{id}/verdicts`, `/approvals`, `/policies/{version}/apply`, `/explain/{type}/{id}`), `/replay`, `/metrics`, `/policies`, and `/settings`. Runs live in memory. When `DATABASE_URL` is set (SQLite, or Postgres/Supabase through the `postgres` extra), runs, events, searches, syntheses, and evidence packs are also persisted. CORS origins come from `VANDAL_CORS_ORIGINS`, which defaults to `http://localhost:3000`.
+
+For a public host (`backend/vandal/api/limits.py`): `VANDAL_MAX_DEPTH` and `VANDAL_MAX_WORKERS` clamp what a request may ask for, `VANDAL_MAX_JOBS` bounds the jobs running at once (past it the API answers 429 with a Retry-After), and `SEARCH_WORKERS` is the default worker count. `/settings` reports the limits so the war room offers only what the host can do, and `/health` reports version, commit, uptime, and how busy the server is.
+
+Search, synthesis, and verification are deterministic given their inputs, so their results are recorded under `backend/job_cache/` (`backend/vandal/api/jobcache.py`, keyed by a hash of everything the result depends on). With playback on, a recorded job is served at once, its streamed messages replayed, and the result marked `cached`; `fresh: true` on the request computes anyway. Playback off always computes. `GET /jobs/{id}/evidence` downloads a finished verification's evidence pack as a file.
 
 ## War room
 

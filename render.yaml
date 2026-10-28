@@ -17,6 +17,11 @@ services:
         value: "true"
       - key: SEARCH_WORKERS
         value: "1"
+      # A fraction of a CPU: cap what one visitor can ask for, and how many jobs run at once.
+      - key: VANDAL_MAX_DEPTH
+        value: "3"
+      - key: VANDAL_MAX_JOBS
+        value: "3"
       # Optional: set it in the dashboard for live model calls, then turn playback off.
       - key: ANTHROPIC_API_KEY
         sync: false

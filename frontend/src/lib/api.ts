@@ -36,6 +36,8 @@ export interface SearchBody {
   policy: string;
   scenario: string;
   depth: number;
+  /** Compute even when playback would serve a recording. */
+  fresh?: boolean;
 }
 
 export interface SynthesizeBody {
@@ -78,6 +80,8 @@ export interface VandalApi {
   diagnose(searchId: string): Promise<DiagnoseOut>;
   synthesize(body: SynthesizeBody): Promise<Job<CEGISResult>>;
   verify(synthesisId: string, depth: number): Promise<Job<EvidencePack>>;
+  /** Where a finished verification's evidence pack downloads from; null when there is no file. */
+  evidenceUrl(verifyJobId: string): string | null;
   metrics(policies: string[], depth?: number): Promise<Metrics>;
   inject(runId: string, body: InjectBody & { dry_run: true }): Promise<{ plan: ThreatPlan }>;
   inject(runId: string, body: InjectBody): Promise<Job<InjectResult>>;
@@ -172,6 +176,7 @@ export class HttpApi implements VandalApi {
     this.call<Job<CEGISResult>>("POST", "/synthesize", body);
   verify = (synthesisId: string, depth: number) =>
     this.call<Job<EvidencePack>>("POST", "/verify", { synthesis_id: synthesisId, depth });
+  evidenceUrl = (verifyJobId: string) => `${this.base}/jobs/${verifyJobId}/evidence`;
   metrics = (policies: string[], depth = 1) =>
     this.call<Metrics>(
       "GET",
@@ -236,9 +241,17 @@ export class HttpApi implements VandalApi {
 
 let instance: VandalApi | null = null;
 
+/** The recorded loop (the in-browser mock) when the build asks for it, or the URL does
+ * (`?mock=1`, which the welcome screen's "Watch the recorded loop" opens). */
+export function wantsMock(): boolean {
+  if (process.env.NEXT_PUBLIC_VANDAL_MOCK === "1") return true;
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("mock") === "1";
+}
+
 export async function getApi(): Promise<VandalApi> {
   if (instance) return instance;
-  if (process.env.NEXT_PUBLIC_VANDAL_MOCK === "1") {
+  if (wantsMock()) {
     const { MockApi } = await import("@/mock/mockApi");
     instance = new MockApi();
   } else {

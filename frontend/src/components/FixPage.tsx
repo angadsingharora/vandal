@@ -17,6 +17,7 @@ export function FixPage() {
   const policy = result?.policy ?? null;
   const scored = [...synth.log].filter((e) => e.score != null).sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
   const best = policy ? result?.log.find((e) => e.outcome === "survived") : undefined;
+  const maxDepth = s.settings?.limits?.max_depth ?? 6;
   const canSynth = !!attack && s.diagnosis.phase === "done";
 
   const goProve = () => {
@@ -33,7 +34,9 @@ export function FixPage() {
           <label className="flex items-center gap-1 text-[11px] text-dim" title="Search depth for attacking each candidate, and for verifying the choice">
             k
             <select value={synth.depth} onChange={(e) => s.setSynthDepth(Number(e.target.value))} className="num h-7 rounded border border-line bg-raised px-1 text-[11px]">
-              {[1, 2, 3].map((d) => (
+              {[1, 2, 3]
+                .filter((d) => d <= maxDepth)
+                .map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
@@ -80,6 +83,7 @@ export function FixPage() {
             }
             aside={
               <>
+                {result.cached && <Badge tone="warn">recorded</Badge>}
                 <Badge tone="ok">{result.status.replaceAll("_", " ")}</Badge>
                 <span className="num">
                   {result.iterations} iterations{result.score != null && ` · score ${result.score.toLocaleString()}`}

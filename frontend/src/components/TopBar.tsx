@@ -178,12 +178,19 @@ export function TopBar({ onScorecard, onWelcome }: { onScorecard: () => void; on
           title="Serve LLM answers only from recorded calls (DEMO_PLAYBACK)"
         />
         <Toggle label="Judge view" on={s.judge} onChange={() => s.toggleJudge()} title="Reveal the oracle's answer key" />
-        <span
-          className={cx("rounded-sm px-1.5 py-0.5 text-[10px] font-semibold", s.api?.mode === "mock" ? "bg-warn/15 text-warn" : "bg-ok/10 text-ok")}
-          title={s.api?.mode === "mock" ? "In-browser mock API, recorded from the real backend" : "Connected to the backend"}
-        >
-          {s.api?.mode === "mock" ? "MOCK" : "LIVE"}
-        </span>
+        {s.api?.mode === "mock" ? (
+          <a
+            href="/"
+            className={cx("rounded-sm bg-warn/15 px-1.5 py-0.5 text-[10px] font-semibold text-warn hover:bg-warn/25")}
+            title="The loop from a recording of the real backend, replayed in the browser. Click for the live backend."
+          >
+            RECORDED
+          </a>
+        ) : (
+          <span className={cx("rounded-sm bg-ok/10 px-1.5 py-0.5 text-[10px] font-semibold text-ok")} title="Connected to the backend">
+            LIVE
+          </span>
+        )}
       </div>
     </header>
   );

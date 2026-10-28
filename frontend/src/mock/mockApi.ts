@@ -81,6 +81,7 @@ const nextId = (prefix: string) => `${prefix}-mock${(++counter).toString().padSt
 
 export class MockApi implements VandalApi {
   readonly mode = "mock" as const;
+  evidenceUrl = () => null; // the recording has no file to hand out
   private runs = new Map<string, MockRun>();
   private jobs = new Map<string, MockJob>();
   private patches = new Map<string, PatchRequest>();

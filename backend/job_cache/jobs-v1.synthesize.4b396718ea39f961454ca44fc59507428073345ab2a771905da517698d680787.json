@@ -1,0 +1,220 @@
+{
+ "cache_key": "jobs-v1.synthesize.4b396718ea39f961454ca44fc59507428073345ab2a771905da517698d680787",
+ "inputs": {
+  "depth": 2,
+  "labels": [],
+  "max_iterations": 4,
+  "no_llm": false,
+  "parent": {
+   "controls": [],
+   "diff": [],
+   "parent": null,
+   "version": "v0"
+  },
+  "profile": "bayline",
+  "scenario": "a",
+  "seed": 7,
+  "start": [
+   {
+    "at": 2,
+    "kind": "change_request",
+    "params": {
+     "channel": "email",
+     "fields": "bank",
+     "sender": "lookalike",
+     "vendor": "V-007"
+    }
+   }
+  ],
+  "version": "v1-synth"
+ },
+ "kind": "synthesize",
+ "recorded_at": "2026-10-28T08:20:21+00:00",
+ "result": {
+  "chosen": [
+   "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)",
+   "T1 VerifiedAccountChange(accepted_channels=['phone_outbound'], contact_as_of=before_request, window_days=30)"
+  ],
+  "iterations": 2,
+  "log": [
+   {
+    "base": [],
+    "candidate": "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)",
+    "counterexample": [
+     {
+      "at": 0,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "detail": "search beats it in 1 move(s): change_request@0 -> INV-4, INV-5 (gap: verification_channel)",
+    "gap": "approval_binding",
+    "iteration": 1,
+    "lint": [],
+    "measurement": {
+     "counterexamples": 4,
+     "holds": 2,
+     "legit_blocked": 0,
+     "legit_failed": 6,
+     "params": 3,
+     "residual_exposure": 11190684,
+     "templates": 1
+    },
+    "outcome": "counterexample",
+    "rationale": "Bind the approval to the payee_account it covered, plus the amount, so that execution with a different account (as in PAY-0057 vs APR-0024) is caught. On a mismatch the payment is held rather than blocked, which is the least restrictive response. due_date is left unbound so that legitimate rescheduling does not trigger false positives.",
+    "score": 11200684,
+    "source": "llm",
+    "violated": [
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "base": [],
+    "candidate": "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=reapprove)",
+    "counterexample": [
+     {
+      "at": 0,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "detail": "search beats it in 1 move(s): change_request@0 -> INV-4, INV-5 (gap: verification_channel)",
+    "gap": "approval_binding",
+    "iteration": 1,
+    "lint": [],
+    "measurement": {
+     "counterexamples": 4,
+     "holds": 2,
+     "legit_blocked": 0,
+     "legit_failed": 6,
+     "params": 3,
+     "residual_exposure": 11190684,
+     "templates": 1
+    },
+    "outcome": "counterexample",
+    "rationale": "Alternative to the hold option: a payee or amount change forces re-approval. This keeps the approval bound to the instruction while giving a clear path to resolve legitimate changes.",
+    "score": 11200684,
+    "source": "llm",
+    "violated": [
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "base": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)"
+    ],
+    "candidate": "T1 VerifiedAccountChange(accepted_channels=['phone_outbound'], contact_as_of=before_request, window_days=30)",
+    "counterexample": null,
+    "detail": "no violation within depth 2 (1,850 sequences); 9 holds, 0 blocks on legitimate operations",
+    "gap": "verification_channel",
+    "iteration": 2,
+    "lint": [],
+    "measurement": {
+     "counterexamples": 0,
+     "holds": 9,
+     "legit_blocked": 0,
+     "legit_failed": 0,
+     "params": 6,
+     "residual_exposure": 0,
+     "templates": 2
+    },
+    "outcome": "survived",
+    "rationale": "Closes the verification_channel gap: a bank account change like BA-0032 must be confirmed by an outbound callback to contact details on file before the request, before payment can execute. Inbound email, agent messages and inbound calls are excluded because an attacker can spoof them. Using contact_as_of=before_request stops an attacker from changing the contact details first. The T2 refutations show that binding fields alone cannot stop a forged change request.",
+    "score": 45000,
+    "source": "llm",
+    "violated": []
+   },
+   {
+    "base": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)"
+    ],
+    "candidate": "T1 VerifiedAccountChange(accepted_channels=['phone_outbound', 'portal'], contact_as_of=before_request, window_days=30)",
+    "counterexample": null,
+    "detail": "no violation within depth 2 (1,850 sequences); 9 holds, 0 blocks on legitimate operations",
+    "gap": "verification_channel",
+    "iteration": 2,
+    "lint": [],
+    "measurement": {
+     "counterexamples": 0,
+     "holds": 9,
+     "legit_blocked": 0,
+     "legit_failed": 0,
+     "params": 7,
+     "residual_exposure": 0,
+     "templates": 2
+    },
+    "outcome": "survived",
+    "rationale": "Less restrictive option: also accepts confirmation through the authenticated vendor portal. This avoids false positives for vendors who legitimately self-serve their account changes. Both channels are authenticated and independent of the request, and pre-request contact anchoring is kept.",
+    "score": 45000,
+    "source": "llm",
+    "violated": []
+   },
+   {
+    "base": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)"
+    ],
+    "candidate": "T1 VerifiedAccountChange(accepted_channels=['phone_outbound', 'portal', 'video'], contact_as_of=before_request, window_days=30)",
+    "counterexample": null,
+    "detail": "spoofable: T1 accepts video, which this attacker can forge (spoof_caller_id=True, clone_voice=True)",
+    "gap": "verification_channel",
+    "iteration": 2,
+    "lint": [
+     "spoofable: T1 accepts video, which this attacker can forge (spoof_caller_id=True, clone_voice=True)"
+    ],
+    "measurement": null,
+    "outcome": "lint",
+    "rationale": "Broadest of the three: adds video verification for vendors without portal access. All channels still require proactive or authenticated confirmation against contacts on file before the request, so a 1-move change_request attack is still blocked.",
+    "score": null,
+    "source": "llm",
+    "violated": []
+   }
+  ],
+  "notes": [],
+  "policy": {
+   "controls": [
+    {
+     "params": {
+      "bound_fields": [
+       "amount",
+       "payee_account"
+      ],
+      "on_mismatch": "hold"
+     },
+     "template": "T2"
+    },
+    {
+     "params": {
+      "accepted_channels": [
+       "phone_outbound"
+      ],
+      "contact_as_of": "before_request",
+      "window_days": 30
+     },
+     "template": "T1"
+    }
+   ],
+   "diff": [
+    "+ T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)",
+    "+ T1 VerifiedAccountChange(accepted_channels=['phone_outbound'], contact_as_of=before_request, window_days=30)"
+   ],
+   "parent": "v0",
+   "version": "v1-synth"
+  },
+  "reason": "T1 VerifiedAccountChange(accepted_channels=['phone_outbound'], contact_as_of=before_request, window_days=30) survived search and the regression suite",
+  "score": 45000,
+  "status": "repaired",
+  "stored_as": "synth-3ed8b8e98f20"
+ }
+}

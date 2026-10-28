@@ -18,6 +18,7 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
   const { search, attack, hunt } = s;
   const running = search.phase === "running";
   const hunting = hunt.phase === "running";
+  const maxDepth = s.settings?.limits?.max_depth ?? 6;
   const hunted = attack?.source === "hunt";
   const r = search.result;
   const policy = attack?.policy ?? s.tabs.find((t) => t.kind === "live")?.policy ?? "v0";
@@ -78,14 +79,16 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
               onChange={(e) => s.setSearch({ depth: Number(e.target.value) })}
               className="num h-8 rounded border border-line bg-raised px-1.5 text-xs"
             >
-              {[1, 2, 3, 4].map((d) => (
+              {[1, 2, 3, 4]
+                .filter((d) => d <= maxDepth)
+                .map((d) => (
                 <option key={d} value={d}>
                   k={d}
                 </option>
               ))}
             </select>
           </label>
-          <Button tone="red" onClick={s.runSearch} busy={running} disabled={!s.ready} nudge={!attack} className="h-8 px-4 text-[13px] font-semibold">
+          <Button tone="red" onClick={() => s.runSearch()} busy={running} disabled={!s.ready} nudge={!attack} className="h-8 px-4 text-[13px] font-semibold">
             Release Vandal Strike
           </Button>
         </div>
@@ -99,8 +102,21 @@ export function AttackPage({ onInject }: { onInject: () => void }) {
           label={hunted ? "2 · What the hunt found" : "2 · What the search found"}
           aside={
             r && (
-              <span className="num">
-                depth {r.depth} · alphabet {r.alphabet} · {r.deduped} deduped · {r.pruned} pruned · {Math.round(r.runs_per_second)} runs/s
+              <span className="flex items-center gap-2">
+                {r.cached && <Badge tone="warn">recorded</Badge>}
+                <span className="num">
+                  depth {r.depth} · alphabet {r.alphabet} · {r.deduped} deduped · {r.pruned} pruned · {Math.round(r.runs_per_second)} runs/s
+                </span>
+                {r.cached && !running && (
+                  <button
+                    type="button"
+                    onClick={() => s.runSearch(true)}
+                    className="whitespace-nowrap normal-case tracking-normal text-red underline"
+                    title="Playback is on, so this came from a recording of the same search. Run it on the host now instead."
+                  >
+                    run it live
+                  </button>
+                )}
               </span>
             )
           }

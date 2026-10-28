@@ -7,7 +7,7 @@ import { cx } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
 import { StagePage } from "./Stage";
 import { CHECK_HELP, ControlList, ScoreCompare } from "./synth";
-import { Block, Button, Empty, LiveDot, Reveal } from "./ui";
+import { Badge, Block, Button, Empty, LiveDot, Reveal } from "./ui";
 
 export function ProvePage() {
   const s = useWarRoom();
@@ -16,6 +16,7 @@ export function ProvePage() {
   const running = verify.phase === "running";
   const policy = synth.result?.policy ?? null;
   const passed = verify.checks.filter((c) => c.passed).length;
+  const evidence = pack && verify.jobId ? s.api?.evidenceUrl(verify.jobId) : null;
 
   return (
     <StagePage
@@ -64,6 +65,12 @@ export function ProvePage() {
               {passed}/{verify.checks.length} checks passed
             </span>
             <span className="text-xs text-dim">{pack.approvable ? "The evidence pack travels with the rule." : "A failed check keeps it out of Guard's inbox."}</span>
+            {pack.cached && <Badge tone="warn">recorded</Badge>}
+            {evidence && (
+              <a href={evidence} download className="ml-auto text-xs text-ink underline" title="The pack as JSON: every check, the scorecard before and after, and the rule itself">
+                Download evidence pack
+              </a>
+            )}
           </div>
         </Reveal>
       )}

@@ -1,0 +1,697 @@
+{
+ "cache_key": "jobs-v1.search.359cc3a86c7f45697b43e162a194d3a55bc1d6cc3185aeef115e7046d4df2b44",
+ "inputs": {
+  "depth": 3,
+  "exhaustive": false,
+  "policy": {
+   "controls": [],
+   "diff": [],
+   "parent": null,
+   "version": "v0"
+  },
+  "profile": "bayline",
+  "scenario": "all",
+  "seed": 7
+ },
+ "kind": "search",
+ "recorded_at": "2026-10-28T08:18:01+00:00",
+ "result": {
+  "alphabet": 120,
+  "best": {
+   "exposure": 4000000,
+   "moves": [
+    {
+     "at": 2,
+     "kind": "change_request",
+     "params": {
+      "channel": "email",
+      "fields": "bank",
+      "sender": "lookalike",
+      "vendor": "V-007"
+     }
+    }
+   ],
+   "violated": [
+    "INV-2",
+    "INV-4",
+    "INV-5"
+   ]
+  },
+  "deduped": 117,
+  "depth": 3,
+  "explored": 495,
+  "families": [
+   "a",
+   "b",
+   "f"
+  ],
+  "findings": [
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "violated": [
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "compromised_mailbox",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "violated": [
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 1595342,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-021"
+      }
+     }
+    ],
+    "violated": [
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 1595342,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "compromised_mailbox",
+       "vendor": "V-021"
+      }
+     }
+    ],
+    "violated": [
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 1,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 1,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "compromised_mailbox",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 1595342,
+    "moves": [
+     {
+      "at": 1,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-021"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 1595342,
+    "moves": [
+     {
+      "at": 1,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "compromised_mailbox",
+       "vendor": "V-021"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 2,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 2,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "compromised_mailbox",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 1595342,
+    "moves": [
+     {
+      "at": 2,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-021"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 1595342,
+    "moves": [
+     {
+      "at": 2,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "compromised_mailbox",
+       "vendor": "V-021"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "fault",
+      "params": {
+       "kind": "drop_ack"
+      }
+     }
+    ],
+    "violated": [
+     "INV-3"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 1,
+      "kind": "fault",
+      "params": {
+       "kind": "drop_ack"
+      }
+     }
+    ],
+    "violated": [
+     "INV-3"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 2,
+      "kind": "fault",
+      "params": {
+       "kind": "drop_ack"
+      }
+     }
+    ],
+    "violated": [
+     "INV-3"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "cleared": 0,
+       "customer": "C-004",
+       "party": "attacker"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "new",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11",
+     "INV-4"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "cleared": 0,
+       "customer": "C-004",
+       "party": "attacker"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "source",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11",
+     "INV-4"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "customer": "C-004",
+       "party": "attacker"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "new",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "customer": "C-004"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "new",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11",
+     "INV-4"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 1,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "cleared": 0,
+       "customer": "C-004",
+       "party": "attacker"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "new",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11",
+     "INV-4"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 1,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "cleared": 0,
+       "customer": "C-004",
+       "party": "attacker"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "source",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11",
+     "INV-4"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 1,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "customer": "C-004",
+       "party": "attacker"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "new",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 2,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "cleared": 0,
+       "customer": "C-004",
+       "party": "attacker"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "new",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11",
+     "INV-4"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 2,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "cleared": 0,
+       "customer": "C-004",
+       "party": "attacker"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "source",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11",
+     "INV-4"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 2,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "customer": "C-004",
+       "party": "attacker"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "new",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 3,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "cleared": 0,
+       "customer": "C-004",
+       "party": "attacker"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "new",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11",
+     "INV-4"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 3,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "cleared": 0,
+       "customer": "C-004",
+       "party": "attacker"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "source",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11",
+     "INV-4"
+    ]
+   },
+   {
+    "exposure": 500000,
+    "moves": [
+     {
+      "at": 3,
+      "kind": "deposit",
+      "params": {
+       "amount": "overpay",
+       "customer": "C-004",
+       "party": "attacker"
+      }
+     },
+     {
+      "at": 4,
+      "kind": "refund_request",
+      "params": {
+       "customer": "C-004",
+       "dest": "new",
+       "party": "attacker"
+      }
+     }
+    ],
+    "violated": [
+     "INV-11"
+    ]
+   }
+  ],
+  "levels": [
+   120,
+   375
+  ],
+  "ms_per_run": 7.555340606051337,
+  "pruned": 0,
+  "runs_per_second": 132.3567066187678,
+  "scenario": "a",
+  "seconds": 3.739893599995412,
+  "stored_as": "search-4552cf841bca",
+  "workers": 8
+ }
+}

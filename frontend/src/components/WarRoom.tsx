@@ -23,6 +23,7 @@ export function WarRoom() {
   const error = useWarRoom((s) => s.error);
   const clearError = useWarRoom((s) => s.clearError);
   const ready = useWarRoom((s) => s.ready);
+  const waking = useWarRoom((s) => s.waking);
   const stage = useWarRoom((s) => s.stage);
   const [dialog, setDialog] = useState<"inject" | "scorecard" | null>(null);
   const [welcome, setWelcome] = useState(false);
@@ -58,6 +59,14 @@ export function WarRoom() {
           <button onClick={clearError} aria-label="Dismiss" className="text-bad/70 hover:text-bad">
             ✕
           </button>
+        </div>
+      )}
+      {waking && !ready && !error && (
+        <div role="status" className="flex items-center gap-3 border-b border-warn/40 bg-warn/10 px-4 py-1.5 text-xs text-warn">
+          <span className="font-semibold">Waking the API</span>
+          <span className="min-w-0 flex-1 truncate">
+            The demo host sleeps after fifteen idle minutes and takes about a minute to wake. Nothing is wrong.
+          </span>
         </div>
       )}
       {page}

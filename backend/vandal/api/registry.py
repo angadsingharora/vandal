@@ -5,7 +5,10 @@ A run is one live sandbox (a company under a policy). Every event it emits goes 
 writers (operate) with readers (state, chain), since operate runs on a worker thread.
 
 A job is long work (operate, search, synthesis, verification) on a thread pool. It publishes
-progress to its own Channel and ends with a `done` or `error` message.
+progress to its own Channel and ends with a `done` or `error` message. A host can bound how
+many run at once (`max_jobs`; past it `submit` raises JobsBusy, which the API answers with a
+429), and finished jobs are kept to the newest `keep_finished` so a long-lived server stays
+small.
 """
 
 from __future__ import annotations
@@ -52,6 +55,10 @@ def _id(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex[:10]}"
 
 
+class JobsBusy(RuntimeError):
+    """The host's job limit is reached; try again shortly."""
+
+
 @dataclass
 class RunHandle:
     id: str
@@ -92,8 +99,16 @@ class Job:
 
 
 class Registry:
-    def __init__(self, store: Store | None = None, threads: int = 4) -> None:
+    def __init__(
+        self,
+        store: Store | None = None,
+        threads: int = 4,
+        max_jobs: int = 0,
+        keep_finished: int = 200,
+    ) -> None:
         self.store = store
+        self.max_jobs = max_jobs  # 0: unlimited
+        self.keep_finished = keep_finished
         self.runs: dict[str, RunHandle] = {}
         self.jobs: dict[str, Job] = {}
         self.inbox = PolicyInbox()  # B3: policy patches wait here for a human
@@ -155,7 +170,21 @@ class Registry:
 
     # --- jobs -------------------------------------------------------------------------------
 
+    def active(self) -> int:
+        return sum(1 for j in self.jobs.values() if j.status in ("queued", "running"))
+
+    def _evict_finished(self) -> None:
+        finished = [j.id for j in self.jobs.values() if j.status in ("done", "failed")]
+        for job_id in finished[: max(0, len(finished) - self.keep_finished)]:
+            del self.jobs[job_id]
+
     def submit(self, kind: str, work: Callable[[Job], Any], **meta: Any) -> Job:
+        if self.max_jobs and self.active() >= self.max_jobs:
+            raise JobsBusy(
+                f"the demo is busy: {self.active()} of {self.max_jobs} jobs running; "
+                "try again in a minute"
+            )
+        self._evict_finished()
         job = Job(id=_id(kind), kind=kind, meta=meta)
         self.jobs[job.id] = job
 
