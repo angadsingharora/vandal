@@ -5,17 +5,13 @@ import { cx } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
 import { Button } from "./ui";
 
-export const WELCOME_KEY = "vandal.welcomed";
-
-/** True on a first visit (not dismissed in this browser yet), or when the URL asks for it with `?welcome`. */
+/** Every page load lands on the welcome screen, so a visitor always starts from the story.
+ * The one exception is the recorded loop (`?mock=1`), which the welcome screen itself opens:
+ * landing there again would send them in a circle. `?welcome` forces it even then. */
 export function wantsWelcome(): boolean {
   if (typeof window === "undefined") return false;
-  if (new URLSearchParams(window.location.search).has("welcome")) return true;
-  try {
-    return !window.localStorage.getItem(WELCOME_KEY);
-  } catch {
-    return false;
-  }
+  const params = new URLSearchParams(window.location.search);
+  return params.has("welcome") || params.get("mock") !== "1";
 }
 
 type Side = "guard" | "strike";
@@ -69,11 +65,6 @@ export function Welcome({ onClose }: { onClose: () => void }) {
     if (entering || !s.ready) return;
     setEntering(true);
     try {
-      window.localStorage.setItem(WELCOME_KEY, "1");
-    } catch {
-      /* private mode: show it again next time */
-    }
-    try {
       await s.reset("v0");
     } finally {
       setEntering(false);
@@ -83,14 +74,7 @@ export function Welcome({ onClose }: { onClose: () => void }) {
 
   // The whole loop from a recording of the real backend, replayed in the browser: no host to
   // wait on. The top bar's RECORDED chip leads back to the live backend.
-  const watch = () => {
-    try {
-      window.localStorage.setItem(WELCOME_KEY, "1");
-    } catch {
-      /* private mode */
-    }
-    window.location.assign("/?mock=1");
-  };
+  const watch = () => window.location.assign("/?mock=1");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Enter" && start();
