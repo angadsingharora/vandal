@@ -264,6 +264,9 @@ export interface Finding {
 }
 
 export interface SearchResult {
+  /** Served from a recording of the same job (playback on): backend/vandal/api/jobcache.py. */
+  cached?: boolean;
+  recorded_at?: string | null;
   /** The family the best finding came from (every family is searched). */
   scenario: string;
   families?: string[];
@@ -355,6 +358,8 @@ export interface Policy {
 }
 
 export interface CEGISResult {
+  cached?: boolean;
+  recorded_at?: string | null;
   status: "repaired" | "cannot_auto_repair" | "nothing_to_repair";
   reason: string;
   policy: Policy | null;
@@ -400,6 +405,8 @@ export interface CheckResult {
 }
 
 export interface EvidencePack {
+  cached?: boolean;
+  recorded_at?: string | null;
   version: string;
   parent: string | null;
   profile: string;
@@ -558,7 +565,16 @@ export interface PolicyInfo {
   diff: string[];
 }
 
+/** What the host allows (backend/vandal/api/limits.py); unset on a laptop. */
+export interface HostLimits {
+  max_depth: number;
+  max_workers: number;
+  max_jobs: number;
+  default_workers: number;
+}
+
 export interface Settings {
   playback: boolean;
   api_key: boolean;
+  limits?: HostLimits;
 }

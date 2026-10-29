@@ -1,0 +1,689 @@
+{
+ "cache_key": "jobs-v1.verify.efde1f561ee94401b13e1553ffec3989e6352c2490910eaf516c360a132deb5c",
+ "inputs": {
+  "candidates": [
+   {
+    "controls": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)"
+    ],
+    "lint": [],
+    "result": "counterexample: search beats it in 1 move(s): change_request@0 -> INV-4, INV-5 (gap: verification_channel)",
+    "source": "cegis it1 (llm)"
+   },
+   {
+    "controls": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=reapprove)"
+    ],
+    "lint": [],
+    "result": "counterexample: search beats it in 1 move(s): change_request@0 -> INV-4, INV-5 (gap: verification_channel)",
+    "source": "cegis it1 (llm)"
+   },
+   {
+    "controls": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)",
+     "T1 VerifiedAccountChange(accepted_channels=['phone_outbound'], contact_as_of=before_request, window_days=30)"
+    ],
+    "lint": [],
+    "result": "survived: no violation within depth 2 (1,850 sequences); 9 holds, 0 blocks on legitimate operations",
+    "source": "cegis it2 (llm)"
+   },
+   {
+    "controls": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)",
+     "T1 VerifiedAccountChange(accepted_channels=['phone_outbound', 'portal'], contact_as_of=before_request, window_days=30)"
+    ],
+    "lint": [],
+    "result": "survived: no violation within depth 2 (1,850 sequences); 9 holds, 0 blocks on legitimate operations",
+    "source": "cegis it2 (llm)"
+   },
+   {
+    "controls": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)",
+     "T1 VerifiedAccountChange(accepted_channels=['phone_outbound', 'portal', 'video'], contact_as_of=before_request, window_days=30)"
+    ],
+    "lint": [
+     "spoofable: T1 accepts video, which this attacker can forge (spoof_caller_id=True, clone_voice=True)"
+    ],
+    "result": "lint: spoofable: T1 accepts video, which this attacker can forge (spoof_caller_id=True, clone_voice=True)",
+    "source": "cegis it2 (llm)"
+   }
+  ],
+  "depth": 2,
+  "parent": {
+   "controls": [],
+   "diff": [],
+   "parent": null,
+   "version": "v0"
+  },
+  "policy": {
+   "controls": [
+    {
+     "params": {
+      "bound_fields": [
+       "amount",
+       "payee_account"
+      ],
+      "on_mismatch": "hold"
+     },
+     "template": "T2"
+    },
+    {
+     "params": {
+      "accepted_channels": [
+       "phone_outbound"
+      ],
+      "contact_as_of": "before_request",
+      "window_days": 30
+     },
+     "template": "T1"
+    }
+   ],
+   "diff": [
+    "+ T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)",
+    "+ T1 VerifiedAccountChange(accepted_channels=['phone_outbound'], contact_as_of=before_request, window_days=30)"
+   ],
+   "parent": "v0",
+   "version": "v1-synth"
+  },
+  "profile": "bayline",
+  "seed": 7
+ },
+ "kind": "verify",
+ "recorded_at": "2026-10-28T08:21:31+00:00",
+ "result": {
+  "approvable": true,
+  "candidates": [
+   {
+    "controls": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)"
+    ],
+    "lint": [],
+    "result": "counterexample: search beats it in 1 move(s): change_request@0 -> INV-4, INV-5 (gap: verification_channel)",
+    "source": "cegis it1 (llm)"
+   },
+   {
+    "controls": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=reapprove)"
+    ],
+    "lint": [],
+    "result": "counterexample: search beats it in 1 move(s): change_request@0 -> INV-4, INV-5 (gap: verification_channel)",
+    "source": "cegis it1 (llm)"
+   },
+   {
+    "controls": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)",
+     "T1 VerifiedAccountChange(accepted_channels=['phone_outbound'], contact_as_of=before_request, window_days=30)"
+    ],
+    "lint": [],
+    "result": "survived: no violation within depth 2 (1,850 sequences); 9 holds, 0 blocks on legitimate operations",
+    "source": "cegis it2 (llm)"
+   },
+   {
+    "controls": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)",
+     "T1 VerifiedAccountChange(accepted_channels=['phone_outbound', 'portal'], contact_as_of=before_request, window_days=30)"
+    ],
+    "lint": [],
+    "result": "survived: no violation within depth 2 (1,850 sequences); 9 holds, 0 blocks on legitimate operations",
+    "source": "cegis it2 (llm)"
+   },
+   {
+    "controls": [
+     "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)",
+     "T1 VerifiedAccountChange(accepted_channels=['phone_outbound', 'portal', 'video'], contact_as_of=before_request, window_days=30)"
+    ],
+    "lint": [
+     "spoofable: T1 accepts video, which this attacker can forge (spoof_caller_id=True, clone_voice=True)"
+    ],
+    "result": "lint: spoofable: T1 accepts video, which this attacker can forge (spoof_caller_id=True, clone_voice=True)",
+    "source": "cegis it2 (llm)"
+   }
+  ],
+  "checks": [
+   {
+    "data": {
+     "exposure": 0,
+     "violated": []
+    },
+    "detail": "counterexample held",
+    "name": "replay",
+    "number": 1,
+    "passed": true
+   },
+   {
+    "data": {
+     "depth": 2,
+     "explored": 1850,
+     "scenarios": {
+      "a": {
+       "best": null,
+       "explored": 1850,
+       "levels": [
+        65,
+        1785
+       ],
+       "seconds": 3.11
+      }
+     }
+    },
+    "detail": "no violation within depth 2 (1,850 sequences, scenario a)",
+    "name": "re-search",
+    "number": 2,
+    "passed": true
+   },
+   {
+    "data": {
+     "succeeded": []
+    },
+    "detail": "0 of 40 held-out variants succeeded",
+    "name": "variants",
+    "number": 3,
+    "passed": true
+   },
+   {
+    "data": {
+     "cases": [
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "baseline",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "inbox_over_threshold",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 1,
+       "name": "bank_change_email_callback",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 1,
+       "name": "bank_change_portal",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 1,
+       "name": "bank_change_with_inbound_call",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 1,
+       "name": "contact_then_bank_change",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 3,
+       "name": "bank_change_after_approval",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 1,
+       "name": "bank_change_quiet_vendor",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 1,
+       "name": "bank_change_portal_fixture",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "contact_change",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "credit_memo_corrected_invoice",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "recurring_same_amount",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "two_invoices_one_week",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "late_invoice",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "over_threshold_new_invoice",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "small_invoice_quiet_vendor",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "agent_conversation",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "vendor_email_inquiry",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "retry_after_real_failure",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "rent_paid_exactly",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "partial_rent",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "one_deposit_two_invoices",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "unidentified_deposit",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "overpayment_refund_to_source",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      },
+      {
+       "blocks": 0,
+       "holds": 0,
+       "name": "duplicate_ack",
+       "problems": [],
+       "status": "passed",
+       "violations": []
+      }
+     ]
+    },
+    "detail": "25 of 25 legitimate cases passed",
+    "name": "regression",
+    "number": 4,
+    "passed": true
+   },
+   {
+    "data": {
+     "stuck": []
+    },
+    "detail": "all 80 seeded invoices paid, 0 holds, 0 blocks",
+    "name": "legit ops",
+    "number": 5,
+    "passed": true
+   },
+   {
+    "data": {
+     "broken": []
+    },
+    "detail": "no legitimate run broke an invariant",
+    "name": "invariants",
+    "number": 6,
+    "passed": true
+   }
+  ],
+  "chosen": [
+   "T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)",
+   "T1 VerifiedAccountChange(accepted_channels=['phone_outbound'], contact_as_of=before_request, window_days=30)"
+  ],
+  "counterexample": {
+   "exposure": 4000000,
+   "found_under": "v0",
+   "moves": [
+    {
+     "at": 2,
+     "kind": "change_request",
+     "params": {
+      "channel": "email",
+      "fields": "bank",
+      "sender": "lookalike",
+      "vendor": "V-007"
+     }
+    }
+   ],
+   "violated": [
+    "INV-2",
+    "INV-4",
+    "INV-5"
+   ]
+  },
+  "diagnosis": {
+   "also": [
+    "verification_channel"
+   ],
+   "chain": {
+    "invoice": "INV-1042",
+    "links": [
+     {
+      "entities": [
+       "INV-1042",
+       "PO-0063"
+      ],
+      "events": [
+       "EV-000000",
+       "EV-000001"
+      ],
+      "facts": {},
+      "gap": null,
+      "name": "obligation",
+      "reason": "validated (3-way match) and unique",
+      "status": "covered"
+     },
+     {
+      "entities": [
+       "APR-0024"
+      ],
+      "events": [
+       "EV-000048",
+       "EV-000049",
+       "EV-000165",
+       "EV-000166"
+      ],
+      "facts": {
+       "approved_amount": 4000000,
+       "approver": "U-CTRL",
+       "via": "approvals_inbox"
+      },
+      "gap": null,
+      "name": "approval",
+      "reason": "approved via approvals_inbox by U-CTRL",
+      "status": "covered"
+     },
+     {
+      "entities": [
+       "PAY-0057",
+       "PI-0057",
+       "BA-0032",
+       "APR-0024",
+       "CR-0001",
+       "MSG-0001"
+      ],
+      "events": [
+       "EV-000165",
+       "EV-000166",
+       "EV-000168",
+       "EV-000169",
+       "EV-000170",
+       "EV-000171",
+       "EV-000174",
+       "EV-000175",
+       "EV-000222",
+       "EV-000223",
+       "EV-000225"
+      ],
+      "facts": {
+       "approved_amount": 4000000,
+       "approved_payee": "BA-0007",
+       "executed_amount": 4000000,
+       "executed_payee": "BA-0032",
+       "other_gaps": [
+        "verification_channel"
+       ],
+       "payee_status": "unverified",
+       "verified_by": null
+      },
+      "gap": "approval_binding",
+      "name": "execution",
+      "reason": "PAY-0057 executed payee_account different from what APR-0024 approved: the approval doesn't bind the instruction",
+      "status": "uncovered"
+     },
+     {
+      "entities": [
+       "BT-0001"
+      ],
+      "events": [
+       "EV-000343"
+      ],
+      "facts": {},
+      "gap": null,
+      "name": "settlement",
+      "reason": "bank confirmed BT-0001",
+      "status": "covered"
+     },
+     {
+      "entities": [
+       "JE-0025",
+       "JE-0026"
+      ],
+      "events": [
+       "EV-000368",
+       "EV-000167",
+       "EV-000226"
+      ],
+      "facts": {},
+      "gap": null,
+      "name": "books",
+      "reason": "posted and reconciled",
+      "status": "covered"
+     }
+    ],
+    "payment": "PAY-0057"
+   },
+   "cites": [
+    "APR-0024",
+    "BA-0032",
+    "CR-0001",
+    "MSG-0001",
+    "PAY-0057",
+    "PI-0057",
+    "EV-000165",
+    "EV-000166",
+    "EV-000168",
+    "EV-000169",
+    "EV-000170",
+    "EV-000171",
+    "EV-000174",
+    "EV-000175",
+    "EV-000222",
+    "EV-000223",
+    "EV-000225"
+   ],
+   "exposure": 4000000,
+   "gap": "approval_binding",
+   "link": "execution",
+   "payment": "PAY-0057",
+   "reason": "PAY-0057 executed payee_account different from what APR-0024 approved: the approval doesn't bind the instruction",
+   "violated": [
+    "INV-2",
+    "INV-4",
+    "INV-5"
+   ]
+  },
+  "diff": [
+   "+ T2 ApprovalBinding(bound_fields=['amount', 'payee_account'], on_mismatch=hold)",
+   "+ T1 VerifiedAccountChange(accepted_channels=['phone_outbound'], contact_as_of=before_request, window_days=30)"
+  ],
+  "metrics": {
+   "after": {
+    "attack_success": {
+     "agent_pressure": {
+      "attempts": 8,
+      "exposure": 0,
+      "succeeded": 0
+     },
+     "contact_swap": {
+      "attempts": 8,
+      "exposure": 0,
+      "succeeded": 0
+     },
+     "deepfake_phone": {
+      "attempts": 8,
+      "exposure": 0,
+      "succeeded": 0
+     },
+     "deepfake_video": {
+      "attempts": 8,
+      "exposure": 0,
+      "succeeded": 0
+     },
+     "redirect": {
+      "attempts": 8,
+      "exposure": 0,
+      "succeeded": 0
+     }
+    },
+    "attack_success_rate": 0.0,
+    "broken_invariants": [],
+    "exposure": 0,
+    "extraction_accuracy": 1.0,
+    "false_positive_rate": 0.0,
+    "gl_coding_accuracy": 1.0,
+    "holds": 9,
+    "legit_blocked": 0,
+    "legit_failed": 0,
+    "legit_operations": 105,
+    "notes": [
+     "extraction and GL-coding accuracy: 24 messy-document items (DESIGN 5.6) through the LLM Operator's intake (24 llm)",
+     "planted discrepancies: n/a; the messy-document items (DESIGN 5.6) plant formats and GL twists, not conflicting sources"
+    ],
+    "planted_discrepancies_caught": null,
+    "policy": "v1-synth",
+    "search_depth": 2,
+    "sequences_explored": 1850,
+    "violations_found": 0
+   },
+   "before": {
+    "attack_success": {
+     "agent_pressure": {
+      "attempts": 8,
+      "exposure": 2652105,
+      "succeeded": 8
+     },
+     "contact_swap": {
+      "attempts": 8,
+      "exposure": 4635532,
+      "succeeded": 8
+     },
+     "deepfake_phone": {
+      "attempts": 8,
+      "exposure": 9015935,
+      "succeeded": 8
+     },
+     "deepfake_video": {
+      "attempts": 8,
+      "exposure": 2935138,
+      "succeeded": 8
+     },
+     "redirect": {
+      "attempts": 8,
+      "exposure": 6840062,
+      "succeeded": 8
+     }
+    },
+    "attack_success_rate": 1.0,
+    "broken_invariants": [
+     "INV-2",
+     "INV-5"
+    ],
+    "exposure": 30078772,
+    "extraction_accuracy": 1.0,
+    "false_positive_rate": 0.06666666666666667,
+    "gl_coding_accuracy": 1.0,
+    "holds": 0,
+    "legit_blocked": 0,
+    "legit_failed": 7,
+    "legit_operations": 105,
+    "notes": [
+     "extraction and GL-coding accuracy: 24 messy-document items (DESIGN 5.6) through the LLM Operator's intake (24 llm)",
+     "planted discrepancies: n/a; the messy-document items (DESIGN 5.6) plant formats and GL twists, not conflicting sources"
+    ],
+    "planted_discrepancies_caught": null,
+    "policy": "v0",
+    "search_depth": 2,
+    "sequences_explored": 65,
+    "violations_found": 12
+   }
+  },
+  "parent": "v0",
+  "profile": "bayline",
+  "seed": 7,
+  "version": "v1-synth"
+ }
+}

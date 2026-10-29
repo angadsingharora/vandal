@@ -2,7 +2,8 @@
 suite stays fast. Run everything with `uv run pytest --slow` (or VANDAL_SLOW=1).
 
 The suite never calls Claude: backend/.env isn't loaded, the API key is cleared, and each test
-gets an empty LLM cache, so every caller takes its deterministic path. The one live check in
+gets an empty LLM cache and an empty job cache, so every caller takes its deterministic path
+and no test leaves a recording in the repo. The one live check in
 test_llm.py runs only with VANDAL_LIVE_LLM=1."""
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ def _offline_llm(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     from vandal import llm
 
     monkeypatch.setenv("LLM_CACHE_DIR", str(tmp_path / "llm_cache"))
+    monkeypatch.setenv("JOB_CACHE_DIR", str(tmp_path / "job_cache"))
     monkeypatch.setattr(llm, "_client_cache", None)
 
 
