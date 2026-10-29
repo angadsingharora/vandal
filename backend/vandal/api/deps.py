@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from vandal.api.registry import Job, Registry, RunHandle
 from vandal.api.sse import Channel, stream
 from vandal.synth.templates import Policy, available_policies, load_policy
+from vandal.twin.profile import builtin_profiles, custom_profiles
 
 
 def registry(request: Request) -> Registry:
@@ -39,6 +40,15 @@ def policy(name: str | None, request: Request | None = None) -> Policy:
         return load_policy(name)
     except (FileNotFoundError, ValueError) as err:
         raise HTTPException(400, f"unknown policy {name!r}: {err}") from None
+
+
+def profile_name(name: str) -> str:
+    """A profile the API may seed from: a built-in, or a custom company made in this process.
+    A custom one is gone after a restart, so a stale name is a 400 the client can act on, not
+    a 500. The API never loads an arbitrary path."""
+    if name in custom_profiles() or name in builtin_profiles():
+        return name
+    raise HTTPException(400, f"unknown profile {name!r}")
 
 
 def sse(request: Request, channel: Channel, start: int | None, follow: bool) -> StreamingResponse:

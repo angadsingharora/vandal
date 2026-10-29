@@ -95,11 +95,13 @@ cd backend
 uv run uvicorn vandal.api.main:app --reload
 ```
 
-FastAPI app with SSE for live updates. It covers runs (`/demo/reset`, `/runs`, `/runs/{id}/operate`, `/state`, `/entities`, `/ledger`, `/chain/{payment}`, `/events`, `/inject`), jobs (`/search`, `/diagnose`, `/synthesize`, `/verify`, `/jobs/{id}/events`), Guard (`/runs/{id}/verdicts`, `/approvals`, `/policies/{version}/apply`, `/explain/{type}/{id}`), `/replay`, `/metrics`, `/policies`, and `/settings`. Runs live in memory. When `DATABASE_URL` is set (SQLite, or Postgres/Supabase through the `postgres` extra), runs, events, searches, syntheses, and evidence packs are also persisted. CORS origins come from `VANDAL_CORS_ORIGINS`, which defaults to `http://localhost:3000`.
+FastAPI app with SSE for live updates. It covers runs (`/demo/reset`, `/runs`, `/runs/{id}/operate`, `/state`, `/entities`, `/ledger`, `/chain/{payment}`, `/events`, `/inject`), jobs (`/search`, `/diagnose`, `/synthesize`, `/verify`, `/jobs/{id}/events`), Guard (`/runs/{id}/verdicts`, `/approvals`, `/policies/{version}/apply`, `/explain/{type}/{id}`), `/replay`, `/metrics`, `/policies`, `/profiles`, and `/settings`. Runs live in memory. When `DATABASE_URL` is set (SQLite, or Postgres/Supabase through the `postgres` extra), runs, events, searches, syntheses, and evidence packs are also persisted. CORS origins come from `VANDAL_CORS_ORIGINS`, which defaults to `http://localhost:3000`.
 
 For a public host (`backend/vandal/api/limits.py`): `VANDAL_MAX_DEPTH` and `VANDAL_MAX_WORKERS` clamp what a request may ask for, `VANDAL_MAX_JOBS` bounds the jobs running at once (past it the API answers 429 with a Retry-After), and `SEARCH_WORKERS` is the default worker count. `/settings` reports the limits so the war room offers only what the host can do, and `/health` reports version, commit, uptime, and how busy the server is.
 
 Search, synthesis, and verification are deterministic given their inputs, so their results are recorded under `backend/job_cache/` (`backend/vandal/api/jobcache.py`, keyed by a hash of everything the result depends on). With playback on, a recorded job is served at once, its streamed messages replayed, and the result marked `cached`; `fresh: true` on the request computes anyway. Playback off always computes. `GET /jobs/{id}/evidence` downloads a finished verification's evidence pack as a file.
+
+A run, a search, a synthesis, a verification, and `/metrics` all take a `profile` (a company, `backend/profiles/*.yaml`) and a `seed`. `GET /profiles` lists the companies with their knobs; `POST /profiles` derives a new one from a base (`backend/vandal/api/routes_profiles.py`): the company's name, the approval matrix (threshold, match tolerance, prior payments to trust a vendor, aggregate window), how many invoices to generate, what the attacker may do, the risk appetite, and the payment horizon. A custom company is seeded once to check the generator can satisfy it, then lives in the API's process like a run does, and every job accepts its name.
 
 ## War room
 
@@ -109,6 +111,8 @@ npm install
 npm run dev        # against the API on :8000
 npm run dev:mock   # no backend: a mock API recorded from the real one
 ```
+
+The landing page has two ways in. **Start the demo** is the guided seven-step loop on Bayline: a stepper, a "next" on every page, and a reset. **Open the workspace** (`?workspace=1`) is the same war room with nothing scripted: the pages sit behind plain Guard and Strike tabs, and its settings hold every knob. Pick a built-in company or describe your own (`POST /profiles`), set the seed and starting policy, point the search at one threat family or all of them, choose the depth and workers for search, synthesis and verification, and ask Claude for candidates or sweep the templates. Settings persist in the browser; a new run seeds a fresh company from them.
 
 See [frontend/README.md](frontend/README.md) for the demo loop.
 

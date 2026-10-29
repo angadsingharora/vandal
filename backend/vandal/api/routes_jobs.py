@@ -77,6 +77,8 @@ def _bounded(body: BaseModel) -> dict[str, Any]:
     """The job's meta: the request, with depth and workers as the host allows them."""
     lim = limits()
     meta = body.model_dump()
+    if "profile" in meta:
+        deps.profile_name(meta["profile"])
     meta["depth"] = lim.depth(meta["depth"])
     meta["workers"] = lim.workers(meta.get("workers"))
     meta["clamped"] = meta["depth"] != body.depth  # type: ignore[attr-defined]
@@ -84,7 +86,11 @@ def _bounded(body: BaseModel) -> dict[str, Any]:
 
 
 def _factory_for(profile: str):
-    return lambda p: partial(new_sandbox, profile, policy=p)
+    """Sandbox factories carry the Profile object, not its name: a search's worker processes
+    resolve a name against profiles/*.yaml and would never see a custom company (api/
+    routes_profiles.py), which lives only in this process."""
+    loaded = load_profile(profile)
+    return lambda p: partial(new_sandbox, loaded, policy=p)
 
 
 def _done(request: Request, job_id: str, *kinds: str):
@@ -139,7 +145,7 @@ def start_search(request: Request, body: SearchRequest) -> dict[str, Any]:
             job.channel.publish("progress", {"depth": depth, "explored": explored})
 
         def compute() -> dict[str, Any]:
-            factory = partial(new_sandbox, body.profile, policy=policy)
+            factory = partial(new_sandbox, load_profile(body.profile), policy=policy)
             options = dict(
                 seed=body.seed,
                 depth=meta["depth"],
@@ -177,7 +183,9 @@ def start_diagnose(request: Request, body: DiagnoseRequest) -> dict[str, Any]:
             "reason": "the search found no violation",
         }
     meta = job.meta
-    factory = partial(new_sandbox, meta["profile"], policy=deps.policy(meta["policy"], request))
+    factory = partial(
+        new_sandbox, load_profile(meta["profile"]), policy=deps.policy(meta["policy"], request)
+    )
     moves = [Move.model_validate(m) for m in best["moves"]]
     labels = [OracleLabel.model_validate(lb) for lb in job.result.get("labels", [])]
     result, sb, _ = replay_detailed(meta["seed"], moves, sandbox=factory, labels=labels)
@@ -323,13 +331,14 @@ def metrics(
 ) -> dict[str, Any]:
     """Scorecards side by side (R7). Depth 1 by default so the call stays interactive; the
     evidence pack from /verify has the full-depth numbers."""
+    deps.profile_name(profile)
     depth = limits().depth(depth)
     out = {}
     for name in [p.strip() for p in policies.split(",") if p.strip()]:
         policy = deps.policy(name, request)
         runs = collect(
             policy,
-            partial(new_sandbox, profile, policy=policy),
+            partial(new_sandbox, load_profile(profile), policy=policy),
             seed=seed,
             depth=depth,
             workers=1,

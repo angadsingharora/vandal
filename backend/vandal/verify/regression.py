@@ -65,10 +65,21 @@ def _pending_vendor(s: State, nth: int, po: bool | None = None) -> str:
     return vendors[nth]
 
 
+class Unmet(LookupError):
+    """The seeded company has nothing a case needs (a small custom company, say): the case is
+    skipped, not failed."""
+
+
+def _first(candidates, what: str) -> str:
+    for c in candidates:
+        return c
+    raise Unmet(what)
+
+
 def _quiet_vendor(s: State) -> str:
     """A vendor with nothing open."""
     busy = {s.invoices[i].vendor for i in _pending(s)}
-    return next(v for v in sorted(s.vendors) if v not in busy)
+    return _first((v for v in sorted(s.vendors) if v not in busy), "a vendor with nothing open")
 
 
 def _established_non_po(s: State) -> str:
@@ -80,7 +91,10 @@ def _established_non_po(s: State) -> str:
             and s.invoices[s.payment_instructions[p.instruction].invoice].vendor == v
         )
 
-    return next(v for v in sorted(s.vendors) if not s.vendors[v].po_required and prior(v) >= 3)
+    return _first(
+        (v for v in sorted(s.vendors) if not s.vendors[v].po_required and prior(v) >= 3),
+        "a non-PO vendor with three settled payments",
+    )
 
 
 def _next_invoice_id(s: State, offset: int = 0) -> str:
@@ -162,7 +176,10 @@ def paid_to_new_verified(final: State, vendor: str, invoice_id: str | None) -> l
 
 
 def _vendor_invoice(seed: State, vendor: str) -> str:
-    return next(i for i in _pending(seed) if seed.invoices[i].vendor == vendor)
+    return _first(
+        (i for i in _pending(seed) if seed.invoices[i].vendor == vendor),
+        f"an open invoice from {vendor}",
+    )
 
 
 # --- the cases ------------------------------------------------------------------------------
@@ -556,7 +573,11 @@ def run_case(case: Case, factory: SandboxFactory, seed: int = 7) -> CaseResult:
     if case.requires:
         return CaseResult(name=case.name, status="skipped", problems=[f"needs {case.requires}"])
     base = factory(seed).run.state
-    moves = case.moves(base)
+    try:
+        moves = case.moves(base)
+    except (Unmet, IndexError) as err:  # IndexError: an nth vendor the company doesn't have
+        what = str(err) if isinstance(err, Unmet) else "enough vendors"
+        return CaseResult(name=case.name, status="skipped", problems=[f"company has no {what}"])
     result, sb, _ = replay_detailed(seed, moves, sandbox=factory, days=case.days)
     final = sb.run.state
     problems = case.expect(base, final)

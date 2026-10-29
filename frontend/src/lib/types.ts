@@ -577,4 +577,61 @@ export interface Settings {
   playback: boolean;
   api_key: boolean;
   limits?: HostLimits;
+  /** The threat families a search can be pointed at, by name (backend/vandal/search/alphabet.py). */
+  scenarios?: Record<string, string>;
+}
+
+/** How the war room is being used: the guided seven-step demo, or the workspace, where nothing is
+ * scripted and every knob is in the open. */
+export type Mode = "demo" | "workspace";
+
+/** A company a run can be seeded from (GET /profiles): a built-in, or one derived at runtime. */
+export interface ProfileInfo {
+  name: string;
+  custom: boolean;
+  company: string;
+  currency: string;
+  properties: number;
+  vendors: number;
+  customers: number;
+  approval: {
+    threshold: Cents;
+    match_tolerance_pct: number;
+    min_prior_payments: number;
+    aggregate_window_days: number;
+    approvers: { id: string; name: string; max_amount: Cents | null }[];
+  };
+  generation: {
+    invoices: number;
+    pending_invoices: number;
+    history_days: number;
+    prior_contact_rate: number;
+    prior_account_rate: number;
+  };
+  attacker: AttackerCapabilities;
+  risk: { lambda_per_blocked: Cents; mu_per_hold: Cents };
+  operator: { payment_horizon_days: number };
+  fixtures: number;
+}
+
+export interface AttackerCapabilities {
+  change_request_channels: string[];
+  senders: string[];
+  spoof_caller_id: boolean;
+  clone_voice: boolean;
+  portal_takeover: boolean;
+  submit_invoices: boolean;
+  deposits: boolean;
+}
+
+/** POST /profiles: a base profile with any subset of its knobs turned. */
+export interface NewProfile {
+  name?: string;
+  base?: string;
+  company_name?: string;
+  approval?: Partial<Omit<ProfileInfo["approval"], "approvers">>;
+  generation?: Partial<ProfileInfo["generation"]>;
+  attacker?: Partial<AttackerCapabilities>;
+  risk?: Partial<ProfileInfo["risk"]>;
+  operator?: Partial<ProfileInfo["operator"]>;
 }

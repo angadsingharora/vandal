@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useWarRoom } from "@/lib/store";
 import { cx, DECISION_STYLE } from "@/lib/format";
 import type { Decision } from "@/lib/types";
 
@@ -62,9 +63,10 @@ export function Button({
   title?: string;
   className?: string;
   type?: "button" | "submit";
-  /** The one thing to click next: a soft ring breathes around it. */
+  /** The one thing to click next: a soft ring breathes around it. Only the guided demo nudges. */
   nudge?: boolean;
 }) {
+  const demo = useWarRoom((s) => s.mode === "demo");
   const tones: Record<Tone, string> = {
     default: "border-line bg-raised text-ink hover:border-dim",
     red: "border-red/60 bg-red/15 text-red hover:bg-red/25",
@@ -82,8 +84,8 @@ export function Button({
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue",
         "disabled:cursor-not-allowed disabled:opacity-40",
         tones[tone],
-        nudge && !disabled && !busy && "nudge",
-        nudge && tone === "red" && "nudge-red",
+        demo && nudge && !disabled && !busy && "nudge",
+        demo && nudge && tone === "red" && "nudge-red",
         className,
       )}
     >

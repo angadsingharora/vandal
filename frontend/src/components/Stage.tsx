@@ -47,10 +47,15 @@ export function StagePage({
   children: ReactNode;
 }) {
   const { steps, now } = useLoop();
+  const demo = useWarRoom((s) => s.mode === "demo");
   const step = stepOf(steps, stage);
   const following = steps[step.n] as (typeof steps)[number] | undefined;
   const red = step.side === "red";
-  const nudge = next ? (next.nudge ?? (next.ready && step.done && !(following?.done ?? true))) : false;
+  const nudge = demo && next ? (next.nudge ?? (next.ready && step.done && !(following?.done ?? true))) : false;
+  // The workspace keeps a footer's state ("Not approvable: a check failed") and drops the tour's
+  // narration ("Next: …", "Loop closed…").
+  const narration = (h: ReactNode) => typeof h === "string" && /^(Next:|Loop closed)/.test(h);
+  const hint = demo ? (next?.hint ?? (next?.ready && following ? `Next: ${following.next}` : "")) : narration(next?.hint) ? "" : next?.hint;
 
   return (
     <div className={cx("flex min-h-0 flex-1 flex-col", !fill && "overflow-y-auto")}>
@@ -63,9 +68,10 @@ export function StagePage({
         <div className="min-w-0 flex-1 basis-80">
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className={cx("num text-[10px] font-bold uppercase tracking-[0.18em]", red ? "text-red" : "text-blue")}>
-              Step {step.n} of {steps.length} · {red ? "Vandal Strike" : "Vandal Guard"}
+              {demo && `Step ${step.n} of ${steps.length} · `}
+              {red ? "Vandal Strike" : "Vandal Guard"}
             </span>
-            {step.done ? (
+            {!demo ? null : step.done ? (
               <span className="text-[10px] uppercase tracking-wider text-ok">done</span>
             ) : now?.id === stage ? (
               <span className="text-[10px] uppercase tracking-wider text-warn">up next</span>
@@ -83,9 +89,7 @@ export function StagePage({
 
       {next && (
         <footer className="sticky bottom-0 z-20 flex shrink-0 items-center gap-3 border-t border-line bg-panel/95 px-5 py-2 backdrop-blur">
-          <span className="min-w-0 flex-1 truncate text-xs text-dim">
-            {next.hint ?? (next.ready && following ? `Next: ${following.next}` : "")}
-          </span>
+          <span className="min-w-0 flex-1 truncate text-xs text-dim">{hint}</span>
           <Button
             tone={next.tone ?? following?.side ?? "default"}
             onClick={next.onClick}

@@ -40,7 +40,7 @@ class Inject(BaseModel):
 def inject(request: Request, run_id: str, body: Inject) -> dict[str, Any]:
     handle = deps.get_run(request, run_id)
     profile, seed, policy = handle.profile, handle.seed, handle.policy
-    factory = partial(new_sandbox, profile, policy=policy)
+    factory = partial(new_sandbox, handle.sandbox.profile, policy=policy)  # the object: see jobs
     if body.scenario is not None and body.scenario not in SCENARIOS:
         raise HTTPException(400, f"unknown scenario {body.scenario!r}")
     if body.moves:

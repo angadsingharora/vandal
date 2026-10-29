@@ -28,7 +28,7 @@ class Hunt(BaseModel):
 def start_hunt(request: Request, run_id: str, body: Hunt) -> dict[str, Any]:
     handle = deps.get_run(request, run_id)
     profile, seed, policy = handle.profile, handle.seed, handle.policy
-    factory = partial(new_sandbox, profile, policy=policy)
+    factory = partial(new_sandbox, handle.sandbox.profile, policy=policy)  # the object: see jobs
 
     def work(job) -> dict[str, Any]:
         result = hunt(

@@ -12,12 +12,14 @@ import { InjectDialog } from "./InjectDialog";
 import { OperatePage } from "./OperatePage";
 import { ProvePage } from "./ProvePage";
 import { ScorecardDialog } from "./ScorecardDialog";
-import { LoopStrip, TopBar } from "./TopBar";
-import { wantsWelcome, Welcome } from "./Welcome";
+import { LoopStrip, PageNav, TopBar } from "./TopBar";
+import { wantsWelcome, wantsWorkspace, Welcome } from "./Welcome";
+import { WorkspaceDialog } from "./WorkspaceDialog";
 
 /** DESIGN §14 as seven pages, one per step of the loop. Blue (Guard) operates, approves and
- * enforces; Red (Strike) attacks a clone, diagnoses, fixes and proves. The stepper under the
- * top bar moves between them, and each page's footer carries the loop forward. */
+ * enforces; Red (Strike) attacks a clone, diagnoses, fixes and proves. In the demo, the stepper
+ * under the top bar moves between them and each page's footer carries the loop forward; in the
+ * workspace the same pages sit behind plain tabs, with nothing scripted. */
 export function WarRoom() {
   const init = useWarRoom((s) => s.init);
   const error = useWarRoom((s) => s.error);
@@ -25,13 +27,16 @@ export function WarRoom() {
   const ready = useWarRoom((s) => s.ready);
   const waking = useWarRoom((s) => s.waking);
   const stage = useWarRoom((s) => s.stage);
-  const [dialog, setDialog] = useState<"inject" | "scorecard" | null>(null);
+  const mode = useWarRoom((s) => s.mode);
+  const setMode = useWarRoom((s) => s.setMode);
+  const [dialog, setDialog] = useState<"inject" | "scorecard" | "workspace" | null>(null);
   const [welcome, setWelcome] = useState(false);
 
   useEffect(() => {
+    if (wantsWorkspace()) setMode("workspace");
     void init();
     setWelcome(wantsWelcome()); // after mount, so the server and first client render agree
-  }, [init]);
+  }, [init, setMode]);
 
   const page = {
     operate: <OperatePage />,
@@ -45,8 +50,8 @@ export function WarRoom() {
 
   return (
     <div className="flex min-h-screen flex-col lg:h-screen lg:overflow-hidden">
-      <TopBar onScorecard={() => setDialog("scorecard")} onWelcome={() => setWelcome(true)} />
-      <LoopStrip />
+      <TopBar onScorecard={() => setDialog("scorecard")} onWelcome={() => setWelcome(true)} onWorkspace={() => setDialog("workspace")} />
+      {mode === "demo" ? <LoopStrip /> : <PageNav />}
       {error && (
         <div role="alert" className="flex items-center gap-3 border-b border-bad/40 bg-bad/10 px-4 py-1.5 text-xs text-bad">
           <span className="font-semibold">Error</span>
@@ -65,14 +70,15 @@ export function WarRoom() {
         <div role="status" className="flex items-center gap-3 border-b border-warn/40 bg-warn/10 px-4 py-1.5 text-xs text-warn">
           <span className="font-semibold">Waking the API</span>
           <span className="min-w-0 flex-1 truncate">
-            The demo host sleeps after fifteen idle minutes and takes about a minute to wake. Nothing is wrong.
+            The host sleeps after fifteen idle minutes and takes about a minute to wake. Nothing is wrong.
           </span>
         </div>
       )}
       {page}
       {dialog === "inject" && <InjectDialog onClose={() => setDialog(null)} />}
       {dialog === "scorecard" && <ScorecardDialog onClose={() => setDialog(null)} />}
-      {welcome && <Welcome onClose={() => setWelcome(false)} />}
+      {dialog === "workspace" && <WorkspaceDialog onClose={() => setDialog(null)} />}
+      {welcome && <Welcome onClose={() => setWelcome(false)} onWorkspace={() => setDialog("workspace")} />}
       <ExplainDrawer />
     </div>
   );

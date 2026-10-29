@@ -25,6 +25,11 @@ def _offline_llm(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     monkeypatch.setenv("LLM_CACHE_DIR", str(tmp_path / "llm_cache"))
     monkeypatch.setenv("JOB_CACHE_DIR", str(tmp_path / "job_cache"))
     monkeypatch.setattr(llm, "_client_cache", None)
+    yield
+    # custom companies (POST /profiles) live in the process; no test sees another's
+    from vandal.twin.profile import clear_custom_profiles
+
+    clear_custom_profiles()
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
