@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cx, usd } from "@/lib/format";
 import { CFO, CONTROLLER, OPERATOR, useWarRoom } from "@/lib/store";
 import type { Decision, VerdictItem } from "@/lib/types";
@@ -18,7 +18,8 @@ function argsLine(args: Record<string, unknown>): string {
 /** Blue's banner controls: how many days the Operator works. */
 export function RunOperations() {
   const s = useWarRoom();
-  const [days, setDays] = useState(5);
+  const [days, setDays] = useState(s.ws.operateDays);
+  useEffect(() => setDays(s.ws.operateDays), [s.ws.operateDays]);
   const operating = s.operate.phase === "running";
   return (
     <>

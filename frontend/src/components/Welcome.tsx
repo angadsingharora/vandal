@@ -6,12 +6,29 @@ import { useWarRoom } from "@/lib/store";
 import { Button } from "./ui";
 
 /** Every page load lands on the welcome screen, so a visitor always starts from the story.
- * The one exception is the recorded loop (`?mock=1`), which the welcome screen itself opens:
- * landing there again would send them in a circle. `?welcome` forces it even then. */
+ * The exceptions are the two places the welcome screen itself opens: the recorded loop
+ * (`?mock=1`) and the workspace (`?workspace=1`); landing on the welcome again from either
+ * would send them in a circle. `?welcome` forces it even then. */
 export function wantsWelcome(): boolean {
   if (typeof window === "undefined") return false;
   const params = new URLSearchParams(window.location.search);
-  return params.has("welcome") || params.get("mock") !== "1";
+  return params.has("welcome") || (params.get("mock") !== "1" && params.get("workspace") !== "1");
+}
+
+/** `?workspace=1`: the war room as a product, with nothing scripted. */
+export function wantsWorkspace(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("workspace") === "1";
+}
+
+/** Keep (or drop) `?workspace=1` in the address bar without a reload, so a reload or a shared
+ * link lands where the visitor chose. */
+function markUrl(workspace: boolean) {
+  const url = new URL(window.location.href);
+  if (workspace) url.searchParams.set("workspace", "1");
+  else url.searchParams.delete("workspace");
+  url.searchParams.delete("welcome");
+  window.history.replaceState(null, "", url.pathname + (url.search || ""));
 }
 
 type Side = "guard" | "strike";
@@ -47,9 +64,10 @@ const STEPS: { side: Side; label: string; what: string }[] = [
 
 const tone = (side: Side | "operator") => (side === "strike" ? "text-red" : side === "guard" ? "text-blue" : "text-ink");
 
-/** First-visit landing: the business problem, the three parts, the loop, and one way in. Every visit starts the
- * same demo: the LLM Operator, on Guard's side, at step 1. */
-export function Welcome({ onClose }: { onClose: () => void }) {
+/** The landing: the business problem, the three parts, and two ways in. The guided demo starts
+ * the same tour every time (the LLM Operator, on Guard's side, at step 1); the workspace is the
+ * same war room with nothing scripted and every knob in its settings. */
+export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorkspace: () => void }) {
   const s = useWarRoom();
   const [entering, setEntering] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -64,12 +82,24 @@ export function Welcome({ onClose }: { onClose: () => void }) {
   const start = async () => {
     if (entering || !s.ready) return;
     setEntering(true);
+    s.setMode("demo");
+    markUrl(false);
     try {
       await s.reset("v0");
     } finally {
       setEntering(false);
       setLeaving(true);
     }
+  };
+
+  // The workspace: same backend, same pages, no tour. Its settings open right away so the
+  // first thing seen is what can be changed.
+  const workspace = () => {
+    if (entering) return;
+    s.setMode("workspace");
+    markUrl(true);
+    setLeaving(true);
+    onWorkspace();
   };
 
   // The whole loop from a recording of the real backend, replayed in the browser: no host to
@@ -83,7 +113,7 @@ export function Welcome({ onClose }: { onClose: () => void }) {
   });
 
   return (
-    <div className={cx("fixed inset-0 z-50 overflow-auto bg-bg", leaving ? "welcome-leave" : "welcome-enter")}>
+    <div className={cx("fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-bg", leaving ? "welcome-leave" : "welcome-enter")}>
       {/* Backdrop: a faint grid with one glow per side. */}
       <div aria-hidden className="welcome-grid pointer-events-none absolute inset-0" />
       <div aria-hidden className="pointer-events-none absolute -left-40 -top-40 size-[34rem] rounded-full bg-blue/15 blur-3xl" />
@@ -93,12 +123,12 @@ export function Welcome({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal
         aria-labelledby="welcome-title"
-        className="welcome-card relative mx-auto grid min-h-full w-full max-w-7xl gap-10 px-6 py-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:items-center lg:px-12"
+        className="welcome-card relative mx-auto grid min-h-full w-full max-w-7xl grid-cols-[minmax(0,1fr)] gap-10 px-6 py-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:items-center lg:px-12"
       >
         {/* Left: the business problem and what Vandal is. */}
         <section className="flex flex-col justify-center">
           <div className="text-xs uppercase tracking-[0.3em] text-faint">Welcome to</div>
-          <h1 id="welcome-title" className="mt-2 text-6xl font-black leading-none tracking-[0.2em] text-ink sm:text-7xl lg:text-8xl">
+          <h1 id="welcome-title" className="mt-2 text-5xl font-black leading-none tracking-[0.2em] text-ink sm:text-7xl lg:text-8xl">
             VANDAL
           </h1>
           <p className="mt-5 max-w-xl text-lg font-semibold leading-snug text-ink">
@@ -169,7 +199,7 @@ export function Welcome({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
-            <span className="text-[11px] text-faint">Starts at step 1 with Vandal Guard.</span>
+            <span className="text-[11px] text-faint">Guided. Starts at step 1 with Vandal Guard.</span>
             <div className="ml-auto flex items-center gap-2">
               {s.api?.mode !== "mock" && (
                 <Button
@@ -182,10 +212,25 @@ export function Welcome({ onClose }: { onClose: () => void }) {
                 </Button>
               )}
               <Button tone="blue" onClick={start} busy={entering} disabled={!s.ready} className="h-9 px-5 text-sm font-semibold">
-                {s.ready ? "Start the demo →" : s.waking ? "Waking the demo host…" : "Connecting…"}
+                {s.ready ? "Start the demo →" : s.waking ? "Waking the host…" : "Connecting…"}
               </Button>
             </div>
           </div>
+
+          {s.api?.mode !== "mock" && (
+            <div className="flex flex-wrap items-center gap-3 rounded border border-line bg-bg/60 p-4">
+              <div className="min-w-0 flex-1 basis-60">
+                <div className="text-sm font-semibold text-ink">Or use it on your own terms</div>
+                <p className="mt-1 text-xs leading-snug text-dim">
+                  The same war room with nothing scripted: your company and approval rules, what the attacker may do, which threat
+                  family to search and how deep, and the pages in any order.
+                </p>
+              </div>
+              <Button onClick={workspace} disabled={!s.ready} className="h-9 px-4 text-sm font-semibold" title="No tour. Every knob is in the settings.">
+                Open the workspace →
+              </Button>
+            </div>
+          )}
         </section>
       </div>
     </div>

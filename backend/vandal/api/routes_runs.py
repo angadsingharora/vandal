@@ -80,7 +80,7 @@ def summary(handle: RunHandle) -> dict[str, Any]:
 
 def _create(request: Request, body: NewRun) -> dict[str, Any]:
     handle = deps.registry(request).create_run(
-        body.profile, body.seed, deps.policy(body.policy, request)
+        deps.profile_name(body.profile), body.seed, deps.policy(body.policy, request)
     )
     return summary(handle)
 
@@ -305,7 +305,7 @@ def replay(request: Request, body: Replay) -> dict[str, Any]:
     """Replay a trace on a fresh company as a new run; its events stream like any run's."""
     reg = deps.registry(request)
     policy = deps.policy(body.policy, request)
-    handle = reg.create_run(body.profile, body.seed, policy, kind="replay")
+    handle = reg.create_run(deps.profile_name(body.profile), body.seed, policy, kind="replay")
     with handle.lock:
         result, _, oracle = replay_detailed(
             body.seed,

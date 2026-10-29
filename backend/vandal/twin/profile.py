@@ -145,8 +145,50 @@ class Profile(_Spec):
     fixtures: Fixtures = Field(default_factory=Fixtures)
 
 
+# Profiles made at runtime (the workspace's custom companies, api/routes_profiles.py). They live
+# as long as the process, like runs do, and resolve by name wherever a profile name is accepted.
+_CUSTOM: dict[str, Profile] = {}
+
+
 def load_profile(name_or_path: str | Path = "bayline") -> Profile:
+    if isinstance(name_or_path, str) and name_or_path in _CUSTOM:
+        return _CUSTOM[name_or_path]
     path = Path(name_or_path)
     if not path.suffix:
         path = PROFILES_DIR / f"{name_or_path}.yaml"
     return Profile.model_validate(yaml.safe_load(path.read_text()))
+
+
+def builtin_profiles() -> list[str]:
+    """The profiles shipped as profiles/*.yaml, by name."""
+    return sorted(p.stem for p in PROFILES_DIR.glob("*.yaml"))
+
+
+def custom_profiles() -> dict[str, Profile]:
+    return dict(_CUSTOM)
+
+
+def register_profile(name: str, profile: Profile) -> None:
+    if name in builtin_profiles():
+        raise ValueError(f"{name!r} is a built-in profile")
+    _CUSTOM[name] = profile
+
+
+def clear_custom_profiles() -> None:
+    _CUSTOM.clear()
+
+
+def _merge(base: dict, over: dict) -> dict:
+    out = dict(base)
+    for k, v in over.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def derive_profile(base: Profile, overrides: dict) -> Profile:
+    """A new profile from `base` with nested `overrides` applied (a dict shaped like the YAML,
+    any subset of its keys). Validation is the same as for a file."""
+    return Profile.model_validate(_merge(base.model_dump(mode="python"), overrides))

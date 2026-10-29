@@ -28,9 +28,12 @@ import type {
   LogEntry,
   MessyDocument,
   Metrics,
+  Mode,
+  NewProfile,
   OracleLabel,
   PatchRequest,
   PolicyInfo,
+  ProfileInfo,
   ReplayOut,
   RunSummary,
   SearchResult,
@@ -59,6 +62,55 @@ export interface RunTab {
   kind: "live" | "replay";
 }
 
+/** The workspace's knobs: which company a run is seeded from and how each job is asked for. In
+ * the demo they stay at the defaults, which are the backend's. */
+export interface Workspace {
+  profile: string;
+  seed: number;
+  /** Guard's controls for a new run. */
+  policy: string;
+  /** Business days one "Run operations" works. */
+  operateDays: number;
+  /** Parallel runs for search, synthesis and verification; null: the host's default. */
+  workers: number | null;
+  exhaustive: boolean;
+  /** CEGIS rounds before synthesis gives up. */
+  maxIterations: number;
+  /** Depth verification proves the fix at; null: the depth synthesis used. */
+  verifyDepth: number | null;
+}
+
+const WORKSPACE_KEY = "vandal.workspace";
+
+/** The workspace's knobs survive a reload in this browser (the demo never reads them). */
+function savedWorkspace(): Partial<Workspace> {
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_KEY);
+    return raw ? (JSON.parse(raw) as Partial<Workspace>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveWorkspace(ws: Workspace) {
+  try {
+    window.localStorage.setItem(WORKSPACE_KEY, JSON.stringify(ws));
+  } catch {
+    /* private mode */
+  }
+}
+
+export const DEFAULT_WORKSPACE: Workspace = {
+  profile: "bayline",
+  seed: 7,
+  policy: "v0",
+  operateDays: 5,
+  workers: null,
+  exhaustive: false,
+  maxIterations: 4,
+  verifyDepth: null,
+};
+
 /** The counterexample the loop is working on: from a search, or from an injected threat. */
 export interface Attack {
   jobId: string;
@@ -75,6 +127,11 @@ interface State {
   /** Connecting, and the backend isn't answering yet: a free-tier host waking up. */
   waking: boolean;
   settings: Settings | null;
+  /** The guided demo, or the workspace (no script, every knob in the open). */
+  mode: Mode;
+  ws: Workspace;
+  /** The companies a run can be seeded from (loaded when the workspace settings open). */
+  profiles: ProfileInfo[];
   judge: boolean;
   view: View;
   /** The page of the loop being looked at. Its side is `view`. */
@@ -131,6 +188,13 @@ interface State {
 interface Actions {
   init(): Promise<void>;
   clearError(): void;
+  setMode(mode: Mode): void;
+  setWorkspace(p: Partial<Workspace>): void;
+  loadProfiles(): Promise<void>;
+  /** Derive a company on the backend; it is selected for the next run. Null when it failed. */
+  createProfile(body: NewProfile): Promise<ProfileInfo | null>;
+  /** Start over on a run seeded from the workspace's company, under its starting policy. */
+  startRun(): Promise<void>;
   toggleJudge(): void;
   setView(view: View): Promise<void>;
   setStage(stage: Stage): Promise<void>;
@@ -143,7 +207,7 @@ interface Actions {
   operateDays(days: number): Promise<void>;
   focus(runId: string): Promise<void>;
   refresh(): Promise<void>;
-  setSearch(p: Partial<Pick<State["search"], "depth">>): void;
+  setSearch(p: Partial<Pick<State["search"], "depth" | "scenario">>): void;
   /** `fresh` computes even when playback would serve a recording. */
   runSearch(fresh?: boolean): Promise<void>;
   replayAttack(policy: string): Promise<void>;
@@ -284,6 +348,9 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     error: null,
     waking: false,
     settings: null,
+    mode: "demo",
+    ws: DEFAULT_WORKSPACE,
+    profiles: [],
     judge: false,
     view: "blue",
     stage: "operate",
@@ -343,6 +410,40 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     }),
 
     clearError: () => set({ error: null }),
+    setMode: (mode) =>
+      set((s) => ({
+        mode,
+        judge: mode === "demo" ? s.judge : false,
+        // the demo always runs on the defaults; the workspace picks up what this browser saved
+        ws: mode === "demo" ? DEFAULT_WORKSPACE : { ...DEFAULT_WORKSPACE, ...savedWorkspace() },
+      })),
+    setWorkspace: (p) =>
+      set((s) => {
+        const ws = { ...s.ws, ...p };
+        saveWorkspace(ws);
+        return { ws };
+      }),
+
+    loadProfiles: guard(async () => {
+      set({ profiles: await api().profiles() });
+    }),
+
+    createProfile: async (body) => {
+      try {
+        const made = await api().createProfile(body);
+        set((s) => ({ profiles: [...s.profiles.filter((p) => p.name !== made.name), made] }));
+        get().setWorkspace({ profile: made.name });
+        return made;
+      } catch (err) {
+        set({ error: err instanceof Error ? err.message : String(err) });
+        return null;
+      }
+    },
+
+    startRun: async () => {
+      await get().reset(get().ws.policy);
+    },
+
     toggleJudge: () => set((s) => ({ judge: !s.judge })),
 
     progress: () => {
@@ -413,7 +514,20 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     // The demo has one path: a reset starts over on Blue at step 1.
     reset: guard(async (policy: string) => {
       const a = api();
-      const run = await a.reset(policy);
+      const { profile, seed } = get().ws;
+      let run: RunSummary;
+      try {
+        run = await a.reset({ policy, profile, seed });
+      } catch (err) {
+        // A custom company lives in the backend's process: after a restart it is gone. Fall
+        // back to the default company rather than leaving every button failing.
+        if (!(err instanceof ApiError && err.status === 400 && /unknown profile/.test(err.message))) throw err;
+        if (profile === DEFAULT_WORKSPACE.profile) throw err;
+        set((s) => ({ profiles: s.profiles.filter((p) => p.name !== profile) }));
+        get().setWorkspace({ profile: DEFAULT_WORKSPACE.profile });
+        run = await a.reset({ policy, profile: DEFAULT_WORKSPACE.profile, seed });
+        setTimeout(() => set({ error: `The company "${profile}" is gone (the backend restarted). This run is on ${run.company}; make the company again in Settings.` }), 0);
+      }
       set({
         view: "blue",
         tabs: [{ id: run.run_id, label: "Live", policy: run.policy, kind: "live" }],
@@ -486,13 +600,14 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     runSearch: guard(async (fresh = false) => {
       const a = api();
       const { scenario, depth } = get().search;
+      const { profile, seed, workers, exhaustive } = get().ws;
       const policy = get().summary?.policy ?? "v0";
       set({
         search: { ...get().search, phase: "running", explored: 0, atDepth: 0, result: null, jobId: null },
         diagnosis: { ...idle, data: null, reason: null },
       });
       try {
-        const job = await a.search({ policy, scenario, depth, fresh });
+        const job = await a.search({ policy, scenario, depth, fresh, profile, seed, workers: workers ?? undefined, exhaustive });
         set((s) => ({ search: { ...s.search, jobId: job.id } }));
         const done = await finished<SearchResult>(a, job.id, {
           progress: (p: { depth: number; explored: number }) =>
@@ -516,7 +631,8 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     replayAttack: guard(async (policy: string) => {
       const attack = get().attack;
       if (!attack) return;
-      const out = await api().replay(attack.finding.moves, policy, attack.labels);
+      const { profile, seed } = get().ws;
+      const out = await api().replay(attack.finding.moves, policy, attack.labels, { profile, seed });
       const before = policy === attack.policy;
       set((s) => ({ replays: { ...s.replays, [before ? "before" : "after"]: out } }));
       addTab({
@@ -569,8 +685,17 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         patch: null,
       }));
       const { noLlm, depth } = get().synth;
+      const { profile, seed, workers, maxIterations } = get().ws;
       try {
-        const job = await a.synthesize({ search_id: attack.jobId, no_llm: noLlm, depth });
+        const job = await a.synthesize({
+          search_id: attack.jobId,
+          no_llm: noLlm,
+          depth,
+          max_iterations: maxIterations,
+          workers: workers ?? undefined,
+          profile,
+          seed,
+        });
         set((s) => ({ synth: { ...s.synth, jobId: job.id } }));
         const done = await finished<CEGISResult>(a, job.id, {
           log: (e: LogEntry) => set((s) => ({ synth: { ...s.synth, log: [...s.synth.log, e] } })),
@@ -588,7 +713,15 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       if (!synthId) return;
       set({ verify: { phase: "running", jobId: null, checks: [], pack: null }, patch: null });
       try {
-        const job = await a.verify(synthId, get().synth.depth); // prove it at the depth CEGIS used
+        const { profile, seed, workers, verifyDepth } = get().ws;
+        // prove it at the depth CEGIS used, unless the workspace says otherwise
+        const job = await a.verify({
+          synthesis_id: synthId,
+          depth: verifyDepth ?? get().synth.depth,
+          workers: workers ?? undefined,
+          profile,
+          seed,
+        });
         set((s) => ({ verify: { ...s.verify, jobId: job.id } }));
         const done = await finished<EvidencePack>(a, job.id, {
           check: (c: CheckResult) => set((s) => ({ verify: { ...s.verify, checks: [...s.verify.checks, c] } })),
@@ -716,7 +849,8 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     loadMetrics: guard(async (policies: string[]) => {
       set((s) => ({ metrics: { ...s.metrics, phase: "running" } }));
       try {
-        set({ metrics: { phase: "done", data: await api().metrics(policies) } });
+        const { profile, seed } = get().ws;
+        set({ metrics: { phase: "done", data: await api().metrics(policies, 1, { profile, seed }) } });
       } catch (err) {
         set((s) => ({ metrics: { ...s.metrics, phase: "failed" } }));
         throw err;

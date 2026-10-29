@@ -8,8 +8,9 @@ reads state over JSON and follows runs and jobs over SSE.
 
 `/settings` holds the demo switches the war room flips: LLM playback (DEMO_PLAYBACK, read by
 vandal/llm.py and vandal/api/jobcache.py) for this server process, and reports the host's
-limits (api/limits.py). `/health` is what a monitor or a reviewer reads: version, commit,
-uptime, persistence, and how busy the server is.
+limits (api/limits.py) and the threat families. `/profiles` lists the companies a run can be
+seeded from and makes new ones (api/routes_profiles.py). `/health` is what a monitor or a
+reviewer reads: version, commit, uptime, persistence, and how busy the server is.
 """
 
 from __future__ import annotations
@@ -32,12 +33,14 @@ from vandal.api import (
     routes_inject,
     routes_jobs,
     routes_policies,
+    routes_profiles,
     routes_runs,
 )
 from vandal.api.db import Store
 from vandal.api.limits import limits
 from vandal.api.registry import JobsBusy, Registry
 from vandal.llm import load_env, playback
+from vandal.search.alphabet import SCENARIOS
 
 
 def _version() -> str:
@@ -107,6 +110,8 @@ def create_app(store: Store | None = None, persist: bool | None = None) -> FastA
             "playback": playback(),
             "api_key": bool(os.environ.get("ANTHROPIC_API_KEY")),
             "limits": limits().as_dict(),
+            # The threat families a search can be pointed at (search/alphabet.py), for a picker.
+            "scenarios": {name: sc.description for name, sc in SCENARIOS.items()},
         }
 
     @app.get("/settings")
@@ -123,6 +128,7 @@ def create_app(store: Store | None = None, persist: bool | None = None) -> FastA
     app.include_router(routes_hunt.router)
     app.include_router(routes_jobs.router)
     app.include_router(routes_policies.router)
+    app.include_router(routes_profiles.router)
     app.include_router(routes_blue.router)
     return app
 

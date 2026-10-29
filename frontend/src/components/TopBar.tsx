@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cx } from "@/lib/format";
-import { currentStep, loopSteps } from "@/lib/loop";
+import { currentStep, loopSteps, STAGES, sideOf } from "@/lib/loop";
 import { useWarRoom, type View } from "@/lib/store";
 import { Button } from "./ui";
 
@@ -130,14 +130,78 @@ export function LoopStrip() {
   );
 }
 
-export function TopBar({ onScorecard, onWelcome }: { onScorecard: () => void; onWelcome: () => void }) {
+const PAGE_LABEL: Record<string, string> = {
+  operate: "Operate",
+  attack: "Attack",
+  diagnose: "Diagnose",
+  fix: "Fix",
+  prove: "Prove",
+  approve: "Approve",
+  enforce: "Enforce",
+};
+
+/** The workspace's navigation: the same seven pages as the loop, as plain tabs grouped by the
+ * side that owns them. No numbers, no done marks, no "next": nothing is scripted here. */
+export function PageNav() {
+  const stage = useWarRoom((s) => s.stage);
+  const setStage = useWarRoom((s) => s.setStage);
+  const summary = useWarRoom((s) => s.summary);
+  const ws = useWarRoom((s) => s.ws);
+  return (
+    <nav aria-label="Pages" className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-line bg-bg px-4 py-1.5">
+      {(["blue", "red"] as const).map((side) => (
+        <div key={side} className="flex items-center gap-1" role="tablist" aria-label={side === "red" ? "Vandal Strike" : "Vandal Guard"}>
+          <span className={cx("mr-1 text-[10px] font-semibold uppercase tracking-wider", side === "red" ? "text-red" : "text-blue")}>
+            {side === "red" ? "Strike" : "Guard"}
+          </span>
+          {STAGES.filter((st) => sideOf(st) === side).map((st) => {
+            const on = stage === st;
+            return (
+              <button
+                key={st}
+                role="tab"
+                aria-selected={on}
+                aria-current={on ? "page" : undefined}
+                onClick={() => void setStage(st)}
+                className={cx(
+                  "h-7 rounded-full border px-2.5 text-[11px] transition-colors",
+                  on ? (side === "red" ? "border-red bg-red/15 text-ink" : "border-blue bg-blue/15 text-ink") : "border-line text-dim hover:text-ink",
+                )}
+              >
+                {PAGE_LABEL[st]}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+      {summary && (
+        <p className="ml-auto min-w-0 truncate text-[11px] text-dim" title="The run being worked on: company, policy, seed">
+          <span className="font-semibold text-ink">{summary.company}</span> · <span className="num">{summary.policy}</span> · seed{" "}
+          <span className="num">{summary.seed}</span>
+          {ws.profile !== summary.profile && <span className="text-warn"> · settings changed: start a new run to apply</span>}
+        </p>
+      )}
+    </nav>
+  );
+}
+
+export function TopBar({
+  onScorecard,
+  onWelcome,
+  onWorkspace,
+}: {
+  onScorecard: () => void;
+  onWelcome: () => void;
+  onWorkspace: () => void;
+}) {
   const s = useWarRoom();
+  const demo = s.mode === "demo";
   const [policy, setPolicy] = useState("v0");
   const [resetting, setResetting] = useState(false);
 
   const reset = async () => {
     setResetting(true);
-    await s.reset(policy);
+    await (demo ? s.reset(policy) : s.startRun());
     setResetting(false);
   };
 
@@ -150,23 +214,36 @@ export function TopBar({ onScorecard, onWelcome }: { onScorecard: () => void; on
       <SideSwitch />
 
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
-        <label className="sr-only" htmlFor="policy">Starting policy</label>
-        <select
-          id="policy"
-          value={policy}
-          onChange={(e) => setPolicy(e.target.value)}
-          className="h-7 rounded border border-line bg-raised px-1.5 text-xs"
-          title="Guard's controls for the new run"
-        >
-          {s.policies.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <Button onClick={reset} busy={resetting} title="Drop every run and seed the company again">
-          Reset demo
-        </Button>
+        {demo ? (
+          <>
+            <label className="sr-only" htmlFor="policy">Starting policy</label>
+            <select
+              id="policy"
+              value={policy}
+              onChange={(e) => setPolicy(e.target.value)}
+              className="h-7 rounded border border-line bg-raised px-1.5 text-xs"
+              title="Guard's controls for the new run"
+            >
+              {s.policies.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <Button onClick={reset} busy={resetting} title="Drop every run and seed the company again">
+              Reset demo
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button onClick={onWorkspace} title="Company, run, and how each job is asked for">
+              Settings
+            </Button>
+            <Button onClick={reset} busy={resetting} disabled={!s.ready} title="Start over on a run seeded from the workspace's company and policy">
+              New run
+            </Button>
+          </>
+        )}
         <span aria-hidden className="mx-1 h-4 w-px bg-line" />
         <Button onClick={onScorecard} disabled={!s.ready}>
           Scorecard
@@ -175,9 +252,9 @@ export function TopBar({ onScorecard, onWelcome }: { onScorecard: () => void; on
           label="Playback"
           on={!!s.settings?.playback}
           onChange={(v) => s.setPlayback(v)}
-          title="Serve LLM answers only from recorded calls (DEMO_PLAYBACK)"
+          title={demo ? "Serve LLM answers only from recorded calls (DEMO_PLAYBACK)" : "Serve model calls and recorded jobs from the cache instead of computing"}
         />
-        <Toggle label="Judge view" on={s.judge} onChange={() => s.toggleJudge()} title="Reveal the oracle's answer key" />
+        {demo && <Toggle label="Judge view" on={s.judge} onChange={() => s.toggleJudge()} title="Reveal the oracle's answer key" />}
         {s.api?.mode === "mock" ? (
           <a
             href="/"

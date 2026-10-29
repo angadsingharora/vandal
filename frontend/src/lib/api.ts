@@ -24,6 +24,8 @@ import type {
   DeliverOut,
   IntakeRead,
   MessyDocument,
+  NewProfile,
+  ProfileInfo,
   RunSummary,
   SearchResult,
   Settings,
@@ -32,18 +34,42 @@ import type {
 
 export type Handlers = Record<string, (data: any) => void>;
 
+/** Which company a run (or a job's clones) is seeded from. Omitted: the backend's default. */
+export interface RunOptions {
+  policy: string;
+  profile?: string;
+  seed?: number;
+}
+
 export interface SearchBody {
   policy: string;
   scenario: string;
   depth: number;
   /** Compute even when playback would serve a recording. */
   fresh?: boolean;
+  profile?: string;
+  seed?: number;
+  /** Parallel runs; omitted: the host's default. */
+  workers?: number;
+  exhaustive?: boolean;
 }
 
 export interface SynthesizeBody {
   search_id: string;
   no_llm: boolean;
   depth?: number;
+  max_iterations?: number;
+  workers?: number;
+  profile?: string;
+  seed?: number;
+}
+
+export interface VerifyBody {
+  synthesis_id: string;
+  depth: number;
+  workers?: number;
+  profile?: string;
+  seed?: number;
 }
 
 export interface InjectBody {
@@ -61,9 +87,12 @@ export interface VandalApi {
   settings(): Promise<Settings>;
   setSettings(s: { playback: boolean }): Promise<Settings>;
   policies(): Promise<PolicyInfo[]>;
+  /** The companies a run can be seeded from, and deriving a new one (the workspace's custom company). */
+  profiles(): Promise<ProfileInfo[]>;
+  createProfile(body: NewProfile): Promise<ProfileInfo>;
 
-  reset(policy: string): Promise<RunSummary>;
-  createRun(policy: string): Promise<RunSummary>;
+  reset(opts: RunOptions): Promise<RunSummary>;
+  createRun(opts: RunOptions): Promise<RunSummary>;
   state(runId: string): Promise<RunSummary>;
   /** O1: the planted messy documents, what intake read, and delivering one to the LLM Operator. */
   documents(runId: string): Promise<MessyDocument[]>;
@@ -73,16 +102,16 @@ export interface VandalApi {
   ledger(runId: string): Promise<JournalEntry[]>;
   chain(runId: string, payment: string): Promise<Chain>;
   operate(runId: string, days: number): Promise<Job>;
-  replay(moves: Move[], policy: string, labels?: OracleLabel[]): Promise<ReplayOut>;
+  replay(moves: Move[], policy: string, labels?: OracleLabel[], run?: Omit<RunOptions, "policy">): Promise<ReplayOut>;
 
   job<R>(id: string): Promise<Job<R>>;
   search(body: SearchBody): Promise<Job<SearchResult>>;
   diagnose(searchId: string): Promise<DiagnoseOut>;
   synthesize(body: SynthesizeBody): Promise<Job<CEGISResult>>;
-  verify(synthesisId: string, depth: number): Promise<Job<EvidencePack>>;
+  verify(body: VerifyBody): Promise<Job<EvidencePack>>;
   /** Where a finished verification's evidence pack downloads from; null when there is no file. */
   evidenceUrl(verifyJobId: string): string | null;
-  metrics(policies: string[], depth?: number): Promise<Metrics>;
+  metrics(policies: string[], depth?: number, run?: Omit<RunOptions, "policy">): Promise<Metrics>;
   inject(runId: string, body: InjectBody & { dry_run: true }): Promise<{ plan: ThreatPlan }>;
   inject(runId: string, body: InjectBody): Promise<Job<InjectResult>>;
   /** R13: Claude studies the run's company and reasons out attacks; each attempt streams as a log. */
@@ -151,9 +180,11 @@ export class HttpApi implements VandalApi {
   settings = () => this.call<Settings>("GET", "/settings");
   setSettings = (s: { playback: boolean }) => this.call<Settings>("POST", "/settings", s);
   policies = () => this.call<PolicyInfo[]>("GET", "/policies");
+  profiles = () => this.call<ProfileInfo[]>("GET", "/profiles");
+  createProfile = (body: NewProfile) => this.call<ProfileInfo>("POST", "/profiles", body);
 
-  reset = (policy: string) => this.call<RunSummary>("POST", "/demo/reset", { policy });
-  createRun = (policy: string) => this.call<RunSummary>("POST", "/runs", { policy });
+  reset = (opts: RunOptions) => this.call<RunSummary>("POST", "/demo/reset", opts);
+  createRun = (opts: RunOptions) => this.call<RunSummary>("POST", "/runs", opts);
   state = (runId: string) => this.call<RunSummary>("GET", `/runs/${runId}/state`);
   documents = (runId: string) => this.call<MessyDocument[]>("GET", `/runs/${runId}/documents`);
   deliver = (runId: string, documentId: string) =>
@@ -165,8 +196,8 @@ export class HttpApi implements VandalApi {
     this.call<Chain>("GET", `/runs/${runId}/chain/${payment}`);
   operate = (runId: string, days: number) =>
     this.call<Job>("POST", `/runs/${runId}/operate`, { days });
-  replay = (moves: Move[], policy: string, labels: OracleLabel[] = []) =>
-    this.call<ReplayOut>("POST", "/replay", { moves, policy, labels });
+  replay = (moves: Move[], policy: string, labels: OracleLabel[] = [], run: Omit<RunOptions, "policy"> = {}) =>
+    this.call<ReplayOut>("POST", "/replay", { moves, policy, labels, ...run });
 
   job = <R>(id: string) => this.call<Job<R>>("GET", `/jobs/${id}`);
   search = (body: SearchBody) => this.call<Job<SearchResult>>("POST", "/search", body);
@@ -174,14 +205,14 @@ export class HttpApi implements VandalApi {
     this.call<DiagnoseOut>("POST", "/diagnose", { search_id: searchId });
   synthesize = (body: SynthesizeBody) =>
     this.call<Job<CEGISResult>>("POST", "/synthesize", body);
-  verify = (synthesisId: string, depth: number) =>
-    this.call<Job<EvidencePack>>("POST", "/verify", { synthesis_id: synthesisId, depth });
+  verify = (body: VerifyBody) => this.call<Job<EvidencePack>>("POST", "/verify", body);
   evidenceUrl = (verifyJobId: string) => `${this.base}/jobs/${verifyJobId}/evidence`;
-  metrics = (policies: string[], depth = 1) =>
-    this.call<Metrics>(
-      "GET",
-      `/metrics?policies=${encodeURIComponent(policies.join(","))}&depth=${depth}`,
-    );
+  metrics = (policies: string[], depth = 1, run: Omit<RunOptions, "policy"> = {}) => {
+    const q = new URLSearchParams({ policies: policies.join(","), depth: String(depth) });
+    if (run.profile) q.set("profile", run.profile);
+    if (run.seed != null) q.set("seed", String(run.seed));
+    return this.call<Metrics>("GET", `/metrics?${q}`);
+  };
   inject = ((runId: string, body: InjectBody) =>
     this.call("POST", `/runs/${runId}/inject`, body)) as VandalApi["inject"];
   hunt = (runId: string, body: { attempts: number; keep_going?: boolean }) =>
