@@ -1,6 +1,6 @@
 # Vandal
 
-Vandal is a security layer for AI that runs a company's money: Vandal Strike attacks it, and Vandal Guard defends it. It was built for Cal Hacks 13.0 (Hyphenate track: *The Hyphenated Enterprise: Autonomous Systems for Finance*).
+Vandal is a security layer for AI that runs a company's money: Vandal Strike attacks it, and Vandal Guard defends it.
 
 - **Vandal Strike** clones the company's financial system into a deterministic *financial twin*. It then searches for sequences of events that break financial invariants, finds the root cause, and synthesizes a control that closes the gap. Before anyone sees that control, Strike has already verified it.
 - **Vandal Guard** sits in the live path. Before any money moves, it checks each action the finance agent takes (pay, change vendor bank details, refund, post an entry) against an independent source of truth. It allows, holds, or escalates the action and records the evidence.
@@ -201,4 +201,4 @@ Vandal Strike (twin, search, root cause, CEGIS, verification), fault injection, 
 
 ## Authors
 
-Angad Arora, Mohith Ram Narendra Babu, and Kashish Vankayala.
+Angad Arora and Mohith Ram Narendra Babu.
