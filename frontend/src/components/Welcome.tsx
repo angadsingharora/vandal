@@ -228,7 +228,9 @@ function useSeen<T extends Element>(): [React.RefObject<T | null>, boolean] {
           io.disconnect();
         }
       },
-      { threshold: 0.3 },
+      // Well into view, not just peeking over the bottom edge: the reveal should be what
+      // scrolling down earns, not something that starts while the hero is still on screen.
+      { threshold: 0.6, rootMargin: "0px 0px -12% 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -463,7 +465,7 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
         </section>
 
         {/* The proof. */}
-        <Rise as="section" when={proofSeen} className="mt-16 lg:mt-20" aria-label="From a real run">
+        <Rise as="section" when={proofSeen} className="mt-28 lg:mt-40" aria-label="From a real run">
           <div ref={proofRef} className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line lg:grid-cols-4">
             {PROOF.map((p, i) => (
               <Figure key={p.label} {...p} go={proofSeen} delay={i * 120} />
