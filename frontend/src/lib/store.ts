@@ -7,6 +7,7 @@
 import { create } from "zustand";
 import { ApiError, getApi, type Handlers, type InjectBody, type VandalApi } from "./api";
 import { landingStage, loopSteps, sideOf, type LoopInput, type Stage } from "./loop";
+import { BAYLINE } from "./profiles";
 import type {
   Actor,
   AlertItem,
@@ -132,6 +133,9 @@ interface State {
   ws: Workspace;
   /** The companies a run can be seeded from (loaded when the workspace settings open). */
   profiles: ProfileInfo[];
+  /** The API predates /profiles (an older build on the host): only the built-in company, no
+   * custom ones. */
+  profilesStale: boolean;
   judge: boolean;
   view: View;
   /** The page of the loop being looked at. Its side is `view`. */
@@ -351,6 +355,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     mode: "demo",
     ws: DEFAULT_WORKSPACE,
     profiles: [],
+    profilesStale: false,
     judge: false,
     view: "blue",
     stage: "operate",
@@ -425,10 +430,19 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       }),
 
     loadProfiles: guard(async () => {
-      set({ profiles: await api().profiles() });
+      try {
+        set({ profiles: await api().profiles(), profilesStale: false });
+      } catch (err) {
+        if (!(err instanceof ApiError && err.status === 404)) throw err;
+        set({ profiles: [BAYLINE], profilesStale: true });
+      }
     }),
 
     createProfile: async (body) => {
+      if (get().profilesStale) {
+        set({ error: "This API is an older build without custom companies. Redeploy it from main, then try again." });
+        return null;
+      }
       try {
         const made = await api().createProfile(body);
         set((s) => ({ profiles: [...s.profiles.filter((p) => p.name !== made.name), made] }));
