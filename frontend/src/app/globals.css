@@ -94,6 +94,18 @@ body {
   .reveal { animation-duration: 1ms; }
 }
 
+/* Landing page: each block rises in, staggered by an inline animation-delay. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.rise {
+  animation: rise-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise { animation: none; }
+}
+
 /* The landing page fades in, and fades out before it unmounts. */
 @keyframes welcome-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes welcome-out { from { opacity: 1; } to { opacity: 0; } }
