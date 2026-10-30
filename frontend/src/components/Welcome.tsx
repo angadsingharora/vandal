@@ -79,11 +79,111 @@ const tone = (side: Side | "operator") => (side === "strike" ? "text-red" : side
 const sideName = (side: Side) => (side === "strike" ? "Strike" : "Guard");
 
 /** A block that rises in after `delay` ms (globals.css `.rise`). */
-function Rise({ delay = 0, className, children, as: Tag = "div", ...rest }: { delay?: number; className?: string; children: ReactNode; as?: "div" | "section" | "header" | "footer" | "li" } & Record<string, unknown>) {
+function Rise({
+  delay = 0,
+  when = true,
+  className,
+  children,
+  as: Tag = "div",
+  ...rest
+}: {
+  delay?: number;
+  /** Rise once this is true (a section scrolled into view); invisible until then. */
+  when?: boolean;
+  className?: string;
+  children: ReactNode;
+  as?: "div" | "section" | "header" | "footer" | "li";
+} & Record<string, unknown>) {
   return (
-    <Tag className={cx("rise", className)} style={{ animationDelay: `${delay}ms` } as CSSProperties} {...rest}>
+    <Tag className={cx(when ? "rise" : "waiting", className)} style={{ animationDelay: `${delay}ms` } as CSSProperties} {...rest}>
       {children}
     </Tag>
+  );
+}
+
+/** Types `text` one character at a time once `go` is true. */
+function Typed({ text, go, cps = 40, className }: { text: string; go: boolean; cps?: number; className?: string }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!go) return;
+    if (reducedMotion()) {
+      setN(text.length);
+      return;
+    }
+    const id = setInterval(() => setN((k) => (k >= text.length ? (clearInterval(id), k) : k + 1)), 1000 / cps);
+    return () => clearInterval(id);
+  }, [go, text, cps]);
+  return (
+    <span className={className}>
+      {text.slice(0, n)}
+      {n < text.length && <span className="live-dot">▍</span>}
+    </span>
+  );
+}
+
+// Each part shows a few seconds of its own work when its section scrolls into view. The
+// lines are from the demo company's recorded runs.
+const OPERATOR_LINES = ["read INV-1057 · Northbay Masonry · $2,496.70", "match PO-0311 · 3-way ok", "pay PAY-0056 → BA-0031"];
+const GUARD_LINES: { what: string; verdict: "allow" | "hold" | "escalate" }[] = [
+  { what: "PAY-0055 · Harbor Point Construction · $6,332.00", verdict: "allow" },
+  { what: "bank change · V-007 · by email", verdict: "hold" },
+  { what: "INV-1042 · $40,000 · over threshold", verdict: "escalate" },
+];
+const VERDICT_TONE = { allow: "bg-ok/10 text-ok", hold: "bg-warn/10 text-warn", escalate: "bg-esc/10 text-esc" };
+
+function OperatorTrace({ go }: { go: boolean }) {
+  const [line, setLine] = useState(0);
+  useEffect(() => {
+    if (!go) return;
+    const timers = OPERATOR_LINES.map((_, i) => setTimeout(() => setLine(i + 1), reducedMotion() ? 0 : 900 * i));
+    return () => timers.forEach(clearTimeout);
+  }, [go]);
+  return (
+    <ol className="num mt-3 space-y-1 text-[11px] text-dim" aria-hidden>
+      {OPERATOR_LINES.slice(0, line).map((l) => (
+        <li key={l} className="es-finding on">
+          <Typed text={l} go={go} cps={45} />
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function GuardTrace({ go }: { go: boolean }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    if (!go) return;
+    const timers = GUARD_LINES.map((_, i) => setTimeout(() => setShown(i + 1), reducedMotion() ? 0 : 500 + 800 * i));
+    return () => timers.forEach(clearTimeout);
+  }, [go]);
+  return (
+    <ol className="mt-3 space-y-1 text-[11px]" aria-hidden>
+      {GUARD_LINES.map((g, i) => (
+        <li key={g.what} className={cx("es-finding flex items-center gap-2", i < shown ? "on" : "off")}>
+          <span className={cx("num rounded-sm px-1.5 py-px text-[10px] font-semibold uppercase", VERDICT_TONE[g.verdict])}>{g.verdict}</span>
+          <span className="num truncate text-dim">{g.what}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function StrikeTrace({ go }: { go: boolean }) {
+  // The demo's recorded depth-3 search: 495 sequences tried, 28 broke the books.
+  const tried = useCountUp(495, go, 1800);
+  const broke = useCountUp(28, go, 1800);
+  return (
+    <div className="mt-3 text-[11px]" aria-hidden>
+      <div className="flex items-baseline justify-between">
+        <span className="num text-dim">
+          sequences tried <span className="text-ink">{tried}</span>
+        </span>
+        <span className="num text-red">{broke} broke the books</span>
+      </div>
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-line">
+        <div className="h-full bg-red transition-[width] duration-200" style={{ width: `${(tried / 495) * 100}%` }} />
+      </div>
+    </div>
   );
 }
 
@@ -246,6 +346,9 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
   const [leaving, setLeaving] = useState(false);
   const mock = s.api?.mode === "mock";
   const [proofRef, proofSeen] = useSeen<HTMLDivElement>();
+  const [partsRef, partsSeen] = useSeen<HTMLElement>();
+  const [loopRef, loopSeen] = useSeen<HTMLElement>();
+  const [footRef, footSeen] = useSeen<HTMLElement>();
 
   // Fade out, then unmount (200ms).
   useEffect(() => {
@@ -360,7 +463,7 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
         </section>
 
         {/* The proof. */}
-        <Rise as="section" delay={560} className="mt-16 lg:mt-20" aria-label="From a real run">
+        <Rise as="section" when={proofSeen} className="mt-16 lg:mt-20" aria-label="From a real run">
           <div ref={proofRef} className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line lg:grid-cols-4">
             {PROOF.map((p, i) => (
               <Figure key={p.label} {...p} go={proofSeen} delay={i * 120} />
@@ -372,26 +475,32 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
         </Rise>
 
         {/* The three parts. */}
-        <section className="mt-16 grid gap-8 border-t border-line pt-8 sm:grid-cols-3 lg:mt-20" aria-label="The three parts">
+        <section ref={partsRef} className="mt-16 grid gap-8 border-t border-line pt-8 sm:grid-cols-3 lg:mt-20" aria-label="The three parts">
           {PARTS.map((p, i) => (
-            <Rise key={p.name} delay={640 + i * 90}>
+            <Rise key={p.name} when={partsSeen} delay={i * 140}>
               <h2 className={cx("text-sm font-semibold", tone(p.side))}>{p.name}</h2>
               <p className="mt-1.5 text-[13px] leading-relaxed text-dim">{p.blurb}</p>
+              {p.side === "operator" && <OperatorTrace go={partsSeen} />}
+              {p.side === "guard" && <GuardTrace go={partsSeen} />}
+              {p.side === "strike" && <StrikeTrace go={partsSeen} />}
             </Rise>
           ))}
         </section>
 
         {/* The loop. */}
-        <section className="mt-16 border-t border-line pt-8" aria-label="The loop">
-          <Rise delay={900} className="flex flex-wrap items-baseline justify-between gap-2">
+        <section ref={loopRef} className="mt-16 border-t border-line pt-8" aria-label="The loop">
+          <Rise when={loopSeen} className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-faint">The loop, in seven steps</h2>
             <span className="text-[11px] text-faint">
               <span className="text-blue">Guard</span> runs the books and enforces. <span className="text-red">Strike</span> attacks, fixes, proves.
             </span>
           </Rise>
-          <ol className="mt-5 grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-7">
+          <div className="relative mt-5">
+            {loopSeen && <div aria-hidden className="draw absolute inset-x-0 top-0 hidden h-px bg-ink/40 lg:block" />}
+          </div>
+          <ol className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-7">
             {STEPS.map((st, i) => (
-              <Rise as="li" key={st.label} delay={960 + i * 70} className={cx("border-t-2 pt-3", st.side === "strike" ? "border-red" : "border-blue")}>
+              <Rise as="li" key={st.label} when={loopSeen} delay={120 + i * 200} className={cx("border-t-2 pt-3", st.side === "strike" ? "border-red" : "border-blue")}>
                 <div className="flex items-baseline gap-2">
                   <span className="num text-[11px] text-faint">{i + 1}</span>
                   <span className="text-[13px] font-semibold text-ink">{st.label}</span>
@@ -403,7 +512,7 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
           </ol>
         </section>
 
-        <Rise as="footer" delay={1200} className="mt-16 flex flex-wrap items-baseline justify-between gap-3 border-t border-line pt-6 text-xs leading-relaxed text-faint">
+        <Rise as="footer" when={footSeen} ref={footRef} className="mt-16 flex flex-wrap items-baseline justify-between gap-3 border-t border-line pt-6 text-xs leading-relaxed text-faint">
           <span>Fixes go into Guard&apos;s rules, never into the agent: no retraining, no prompt edits. The protection holds whichever agent does the work.</span>
           <a href="https://github.com/angadsingharora/vandal" className="underline-offset-4 hover:text-ink hover:underline" target="_blank" rel="noreferrer">
             Source on GitHub
