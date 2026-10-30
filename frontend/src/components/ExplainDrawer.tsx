@@ -26,7 +26,7 @@ export function ExplainDrawer() {
   return (
     <aside
       aria-label="Explanation"
-      className="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-line bg-panel shadow-2xl"
+      className="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-line bg-panel shadow-lg"
     >
       <header className="flex items-center gap-2 border-b border-line px-4 py-2.5">
         <span className="rounded-sm bg-blue/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-blue">GUARD</span>
