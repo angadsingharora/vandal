@@ -102,8 +102,22 @@ body {
 .rise {
   animation: rise-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
+/* Below the fold, a block waits (invisible) until it scrolls into view, then rises. */
+.waiting {
+  opacity: 0;
+}
+/* The loop rail: a line draws across under the steps as they light up in order. */
+@keyframes draw-x {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.draw {
+  transform-origin: left;
+  animation: draw-x 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
 @media (prefers-reduced-motion: reduce) {
-  .rise { animation: none; }
+  .rise, .draw { animation: none; }
+  .waiting { opacity: 1; }
 }
 
 /* The landing page is the first paint (no fade-in); it fades out before it unmounts. */
