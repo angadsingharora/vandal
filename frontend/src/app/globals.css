@@ -106,13 +106,11 @@ body {
   .rise { animation: none; }
 }
 
-/* The landing page fades in, and fades out before it unmounts. */
-@keyframes welcome-in { from { opacity: 0; } to { opacity: 1; } }
+/* The landing page is the first paint (no fade-in); it fades out before it unmounts. */
 @keyframes welcome-out { from { opacity: 1; } to { opacity: 0; } }
-.welcome-enter { animation: welcome-in 200ms ease-out both; }
 .welcome-leave { animation: welcome-out 200ms ease-in both; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
-  .welcome-enter, .welcome-leave { animation-duration: 1ms; }
+  .welcome-leave { animation-duration: 1ms; }
 }
 
 /* Evidence: a scanline sweeps the intercepted message while its tells are pulled out. */

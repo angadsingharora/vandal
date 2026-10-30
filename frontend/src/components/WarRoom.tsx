@@ -30,12 +30,15 @@ export function WarRoom() {
   const mode = useWarRoom((s) => s.mode);
   const setMode = useWarRoom((s) => s.setMode);
   const [dialog, setDialog] = useState<"inject" | "scorecard" | "workspace" | null>(null);
-  const [welcome, setWelcome] = useState(false);
+  // The landing page is the first paint: the server and the first client render both show it,
+  // and only the two routes that skip it (?mock=1, ?workspace=1) take it down after mount.
+  // Deciding after mount the other way round flashed the war room before the landing page.
+  const [welcome, setWelcome] = useState(true);
 
   useEffect(() => {
     if (wantsWorkspace()) setMode("workspace");
     void init();
-    setWelcome(wantsWelcome()); // after mount, so the server and first client render agree
+    if (!wantsWelcome()) setWelcome(false);
   }, [init, setMode]);
 
   const page = {
