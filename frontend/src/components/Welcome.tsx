@@ -299,7 +299,7 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
           : { dot: "bg-faint live-dot", text: "Connecting…" };
 
   return (
-    <div className={cx("fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-bg", leaving ? "welcome-leave" : "welcome-enter")}>
+    <div className={cx("fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-bg", leaving && "welcome-leave")}>
       <div role="dialog" aria-modal aria-labelledby="welcome-title" className="mx-auto w-full max-w-6xl px-6 py-8 sm:px-10 lg:py-12">
         <Rise as="header" delay={0} className="flex items-baseline justify-between gap-4">
           <span className="text-base font-semibold tracking-tight text-ink">Vandal</span>
