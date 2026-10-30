@@ -224,10 +224,16 @@ export function WorkspaceDialog({ onClose }: { onClose: () => void }) {
             </p>
           )}
           <div className="sm:col-span-2 lg:col-span-4">
-            <Check checked={custom} onChange={setCustom}>
-              Describe a custom company{picked ? ` based on ${picked.company}` : ""}
-            </Check>
-            {custom && picked && (
+            {s.profilesStale ? (
+              <p className="text-[11px] leading-snug text-warn">
+                This API is an older build without custom companies: only the built-in one is available until the host redeploys from main.
+              </p>
+            ) : (
+              <Check checked={custom} onChange={setCustom}>
+                Describe a custom company{picked ? ` based on ${picked.company}` : ""}
+              </Check>
+            )}
+            {custom && !s.profilesStale && picked && (
               <CustomCompany
                 key={picked.name}
                 base={picked}

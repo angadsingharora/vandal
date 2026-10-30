@@ -2,6 +2,7 @@
 // (scripts/capture_fixtures.py writes fixtures.json), so shapes match; the mock only replays them
 // with delays and keeps the little state the demo loop needs (runs, jobs, the inbox).
 
+import { BAYLINE } from "@/lib/profiles";
 import { ApiError, toPatch, type Handlers, type InjectBody, type SearchBody, type SynthesizeBody, type VandalApi, RunOptions, VerifyBody } from "@/lib/api";
 import type {
   Actor,
@@ -79,40 +80,6 @@ interface MockJob {
 
 let counter = 0;
 const nextId = (prefix: string) => `${prefix}-mock${(++counter).toString().padStart(4, "0")}`;
-
-/** Bayline, as GET /profiles describes it (backend/profiles/bayline.yaml). */
-const BAYLINE: ProfileInfo = {
-  name: "bayline",
-  custom: false,
-  company: "Bayline Property Group",
-  currency: "USD",
-  properties: 12,
-  vendors: 25,
-  customers: 6,
-  approval: {
-    threshold: 2_500_000,
-    match_tolerance_pct: 2,
-    min_prior_payments: 3,
-    aggregate_window_days: 5,
-    approvers: [
-      { id: "U-CTRL", name: "Controller", max_amount: 10_000_000 },
-      { id: "U-CFO", name: "CFO", max_amount: null },
-    ],
-  },
-  generation: { invoices: 80, pending_invoices: 24, history_days: 60, prior_contact_rate: 0.3, prior_account_rate: 0.25 },
-  attacker: {
-    change_request_channels: ["email", "agent_msg"],
-    senders: ["lookalike", "compromised_mailbox"],
-    spoof_caller_id: true,
-    clone_voice: true,
-    portal_takeover: false,
-    submit_invoices: true,
-    deposits: true,
-  },
-  risk: { lambda_per_blocked: 500_000, mu_per_hold: 5_000 },
-  operator: { payment_horizon_days: 10 },
-  fixtures: 1,
-};
 
 export class MockApi implements VandalApi {
   readonly mode = "mock" as const;
