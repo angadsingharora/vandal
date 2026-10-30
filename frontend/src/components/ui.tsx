@@ -190,11 +190,11 @@ export function Modal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/60 p-4 pt-[8vh]" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-ink/25 p-4 pt-[8vh]" onClick={onClose}>
       <div
         role="dialog"
         aria-modal
-        className={cx("w-full border border-line bg-panel shadow-2xl", wide ? "max-w-5xl" : "max-w-2xl")}
+        className={cx("w-full rounded-md border border-line bg-panel shadow-lg", wide ? "max-w-5xl" : "max-w-2xl")}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-center border-b border-line px-4 py-2.5">

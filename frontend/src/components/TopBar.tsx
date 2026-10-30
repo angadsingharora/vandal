@@ -208,7 +208,7 @@ export function TopBar({
   return (
     <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-panel px-4 py-2">
       <button onClick={onWelcome} title="Back to the welcome screen" className="flex items-baseline gap-2.5 rounded px-1 -mx-1 hover:bg-raised">
-        <span className="text-[15px] font-black tracking-[0.25em] text-ink">VANDAL</span>
+        <span className="text-sm font-semibold tracking-tight text-ink">Vandal</span>
       </button>
 
       <SideSwitch />
