@@ -490,7 +490,7 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
             onClick={toProof}
             aria-label="Scroll down to the proof"
             className={cx(
-              "bob flex size-10 items-center justify-center rounded-full bg-ink text-panel shadow-md transition-opacity duration-500 hover:bg-ink/85",
+              "bob flex size-10 items-center justify-center rounded-full border-[1.5px] border-blue bg-panel text-blue transition-[opacity,background-color,color] duration-300 hover:bg-blue hover:text-panel",
               scrolled ? "pointer-events-none opacity-0" : "opacity-100",
             )}
           >
