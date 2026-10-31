@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cx } from "@/lib/format";
 import { NAV, SITE } from "@/lib/site";
 
-/** The header the landing page and the company pages share: wordmark, three links, source. */
+/** The header the landing page and the company pages share: wordmark and three links. */
 export function SiteHeader({ current, className }: { current: "/" | "/about" | "/contact"; className?: string }) {
   return (
     <header className={cx("flex items-baseline justify-between gap-6", className)}>
@@ -21,9 +21,6 @@ export function SiteHeader({ current, className }: { current: "/" | "/about" | "
             {n.label}
           </Link>
         ))}
-        <a href={SITE.github} target="_blank" rel="noreferrer" className="text-dim underline-offset-4 hover:text-ink hover:underline">
-          GitHub
-        </a>
       </nav>
     </header>
   );
@@ -42,9 +39,6 @@ export function SiteFooter({ className }: { className?: string }) {
         <Link href="/contact" className="underline-offset-4 hover:text-ink hover:underline">
           Contact
         </Link>
-        <a href={SITE.github} target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-ink hover:underline">
-          Source
-        </a>
       </span>
     </footer>
   );
