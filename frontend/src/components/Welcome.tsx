@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cx } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
+import { SITE } from "@/lib/site";
+import { SiteFooter, SiteHeader } from "./site/SiteShell";
 import { Button } from "./ui";
 
 /** Every page load lands on the welcome screen, so a visitor always starts from the story.
@@ -424,9 +426,8 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
   return (
     <div ref={pageRef} className={cx("fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-bg", leaving && "welcome-leave")}>
       <div role="dialog" aria-modal aria-labelledby="welcome-title" className="mx-auto w-full max-w-6xl px-6 py-8 sm:px-10 lg:py-12">
-        <Rise as="header" delay={0} className="flex items-baseline justify-between gap-4">
-          <span className="text-base font-semibold tracking-tight text-ink">Vandal</span>
-          <span className="num text-[11px] uppercase tracking-wider text-faint">Security for AI finance agents</span>
+        <Rise delay={0}>
+          <SiteHeader current="/" />
         </Rise>
 
         {/* The problem and the way in, beside the proof. */}
@@ -441,8 +442,12 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
             <Rise delay={200}>
               <p className="mt-6 max-w-xl text-[15px] leading-relaxed text-dim">
                 Companies are handing accounts payable to AI agents. The controls those agents rely on were built for human clerks,
-                and one forged email can walk straight through them. Vandal checks every action before money moves, then keeps
-                attacking its own checks so they get stronger with every change.
+                and one forged email can walk straight through them.
+              </p>
+              <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ink">{SITE.what}</p>
+              <p className="mt-3 max-w-xl text-xs leading-relaxed text-faint">
+                For finance teams running an AP agent, or about to. Fixes go into Guard&apos;s rules, never into the agent, so the
+                protection holds whichever agent does the work.
               </p>
             </Rise>
 
@@ -551,11 +556,41 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
           </ol>
         </section>
 
-        <Rise as="footer" when={footSeen} ref={footRef} className="mt-16 flex flex-wrap items-baseline justify-between gap-3 border-t border-line pt-6 text-xs leading-relaxed text-faint">
-          <span>Fixes go into Guard&apos;s rules, never into the agent: no retraining, no prompt edits. The protection holds whichever agent does the work.</span>
-          <a href="https://github.com/angadsingharora/vandal" className="underline-offset-4 hover:text-ink hover:underline" target="_blank" rel="noreferrer">
-            Source on GitHub
-          </a>
+        {/* What is real. The honest version is the credible one. */}
+        <Rise as="section" when={footSeen} ref={footRef} className="mt-16 border-t border-line pt-8" aria-label="What is real">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-faint">What is real, and what is not</h2>
+            <a href="/about" className="text-[11px] text-dim underline-offset-4 hover:text-ink hover:underline">
+              The full tables, and what we will not claim
+            </a>
+          </div>
+          <div className="mt-5 grid gap-8 sm:grid-cols-3">
+            <div>
+              <h3 className="text-sm font-semibold text-ink">Real</h3>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-dim">
+                The ledger, the invariants, the policy gate, the search, the synthesizer, and the verification. Claude reads every
+                document and proposes every control. All of it is code with tests.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-ink">Simulated</h3>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-dim">
+                The company, its vendors, its bank, and the money. Attacks are modelled as channel events with forgeable
+                attributes; there is no synthetic media. No real money moves, anywhere.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-ink">How we know</h3>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-dim">
+                A hidden answer key no agent can read, held-out variants the synthesizer never saw, a re-search under the new
+                policy, and a scorecard from actual runs. We say &quot;exposure&quot;, never &quot;losses prevented&quot;.
+              </p>
+            </div>
+          </div>
+        </Rise>
+
+        <Rise when={footSeen} delay={200}>
+          <SiteFooter className="mt-16" />
         </Rise>
       </div>
     </div>
