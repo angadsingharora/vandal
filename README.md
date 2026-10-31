@@ -112,6 +112,8 @@ npm run dev        # against the API on :8000
 npm run dev:mock   # no backend: a mock API recorded from the real one
 ```
 
+The site has three pages: the landing (the war room, behind a landing page), `/about` (why now, how it works, what is real and what is simulated, what we can and cannot claim, the design docs, who is building it), and `/contact` (pilot, demo, issues, email). What the site says about itself lives in `frontend/src/lib/site.ts`; a share card is generated at `/opengraph-image`.
+
 The landing page has two ways in. **Start the demo** is the guided seven-step loop on Bayline: a stepper, a "next" on every page, and a reset. **Open the workspace** (`?workspace=1`) is the same war room with nothing scripted: the pages sit behind plain Guard and Strike tabs, and its settings hold every knob. Pick a built-in company or describe your own (`POST /profiles`), set the seed and starting policy, point the search at one threat family or all of them, choose the depth and workers for search, synthesis and verification, and ask Claude for candidates or sweep the templates. Settings persist in the browser; a new run seeds a fresh company from them.
 
 See [frontend/README.md](frontend/README.md) for the demo loop.
