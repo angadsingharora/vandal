@@ -489,9 +489,12 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
             type="button"
             onClick={toProof}
             aria-label="Scroll down to the proof"
-            className={cx("bob rounded-full p-2 text-faint transition-opacity duration-500 hover:text-ink", scrolled ? "pointer-events-none opacity-0" : "opacity-100")}
+            className={cx(
+              "bob flex size-10 items-center justify-center rounded-full bg-ink text-panel shadow-md transition-opacity duration-500 hover:bg-ink/85",
+              scrolled ? "pointer-events-none opacity-0" : "opacity-100",
+            )}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden>
               <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
