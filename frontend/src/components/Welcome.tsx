@@ -348,6 +348,16 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
   const [leaving, setLeaving] = useState(false);
   const mock = s.api?.mode === "mock";
   const [proofRef, proofSeen] = useSeen<HTMLDivElement>();
+  // The landing is a fixed overlay that scrolls itself, so scroll it by measured offset rather
+  // than relying on scrollIntoView to find the right scroller.
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const toProof = () => {
+    const page = pageRef.current;
+    const strip = proofRef.current;
+    if (!page || !strip) return;
+    const top = strip.getBoundingClientRect().top - page.getBoundingClientRect().top + page.scrollTop - 40;
+    page.scrollTo({ top, behavior: reducedMotion() ? "auto" : "smooth" });
+  };
   const [partsRef, partsSeen] = useSeen<HTMLElement>();
   const [loopRef, loopSeen] = useSeen<HTMLElement>();
   const [footRef, footSeen] = useSeen<HTMLElement>();
@@ -404,7 +414,7 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
           : { dot: "bg-faint live-dot", text: "Connecting…" };
 
   return (
-    <div className={cx("fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-bg", leaving && "welcome-leave")}>
+    <div ref={pageRef} className={cx("fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-bg", leaving && "welcome-leave")}>
       <div role="dialog" aria-modal aria-labelledby="welcome-title" className="mx-auto w-full max-w-6xl px-6 py-8 sm:px-10 lg:py-12">
         <Rise as="header" delay={0} className="flex items-baseline justify-between gap-4">
           <span className="text-base font-semibold tracking-tight text-ink">Vandal</span>
@@ -457,6 +467,17 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
                 war room with nothing scripted: your company, your rules, your attacker. No real money moves in either.
               </p>
             </Rise>
+            <Rise delay={900}>
+              <button
+                type="button"
+                onClick={toProof}
+                className="mt-10 flex items-center gap-2 text-xs text-dim hover:text-ink"
+                title="The numbers from a real verification run, the three parts, and the loop"
+              >
+                <span className="num">The proof, from a real run</span>
+                <span aria-hidden className="bob inline-block">↓</span>
+              </button>
+            </Rise>
           </div>
 
           <Rise delay={420}>
@@ -465,8 +486,8 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
         </section>
 
         {/* The proof. */}
-        <Rise as="section" when={proofSeen} className="mt-28 lg:mt-40" aria-label="From a real run">
-          <div ref={proofRef} className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line lg:grid-cols-4">
+        <Rise as="section" when={proofSeen} className="mt-24 lg:mt-32" aria-label="From a real run">
+          <div ref={proofRef} className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line scroll-mt-10 lg:grid-cols-4">
             {PROOF.map((p, i) => (
               <Figure key={p.label} {...p} go={proofSeen} delay={i * 120} />
             ))}

@@ -106,6 +106,18 @@ body {
 .waiting {
   opacity: 0;
 }
+/* The scroll cue under the hero: a small arrow that bobs until the visitor moves. */
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+.bob {
+  animation: bob 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bob { animation: none; }
+}
+
 /* The loop rail: a line draws across under the steps as they light up in order. */
 @keyframes draw-x {
   from { transform: scaleX(0); }
