@@ -351,6 +351,14 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
   // The landing is a fixed overlay that scrolls itself, so scroll it by measured offset rather
   // than relying on scrollIntoView to find the right scroller.
   const pageRef = useRef<HTMLDivElement | null>(null);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const page = pageRef.current;
+    if (!page) return;
+    const onScroll = () => setScrolled(page.scrollTop > 60);
+    page.addEventListener("scroll", onScroll, { passive: true });
+    return () => page.removeEventListener("scroll", onScroll);
+  }, []);
   const toProof = () => {
     const page = pageRef.current;
     const strip = proofRef.current;
@@ -422,7 +430,8 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
         </Rise>
 
         {/* The problem and the way in, beside the proof. */}
-        <section className="mt-16 grid items-center gap-12 lg:mt-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:gap-16">
+        <div className="lg:flex lg:min-h-[calc(100svh-7.5rem)] lg:flex-col">
+        <section className="mt-16 grid items-center gap-12 lg:my-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:gap-16">
           <div>
             <Rise delay={80}>
               <h1 id="welcome-title" className="max-w-xl text-[2.6rem] font-bold leading-[1.02] tracking-tight text-ink sm:text-6xl">
@@ -467,26 +476,30 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
                 war room with nothing scripted: your company, your rules, your attacker. No real money moves in either.
               </p>
             </Rise>
-            <Rise delay={900}>
-              <button
-                type="button"
-                onClick={toProof}
-                className="mt-10 flex items-center gap-2 text-xs text-dim hover:text-ink"
-                title="The numbers from a real verification run, the three parts, and the loop"
-              >
-                <span className="num">The proof, from a real run</span>
-                <span aria-hidden className="bob inline-block">↓</span>
-              </button>
-            </Rise>
           </div>
 
           <Rise delay={420}>
             <Specimen />
           </Rise>
         </section>
+        {/* The one hint that there is more: a chevron at the bottom of the first screen, gone once
+            the visitor has scrolled. */}
+        <Rise delay={1400} className="mt-12 hidden justify-center lg:mt-auto lg:flex lg:pt-8">
+          <button
+            type="button"
+            onClick={toProof}
+            aria-label="Scroll down to the proof"
+            className={cx("bob rounded-full p-2 text-faint transition-opacity duration-500 hover:text-ink", scrolled ? "pointer-events-none opacity-0" : "opacity-100")}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </Rise>
+        </div>
 
         {/* The proof. */}
-        <Rise as="section" when={proofSeen} className="mt-24 lg:mt-32" aria-label="From a real run">
+        <Rise as="section" when={proofSeen} className="mt-20 lg:mt-24" aria-label="From a real run">
           <div ref={proofRef} className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line scroll-mt-10 lg:grid-cols-4">
             {PROOF.map((p, i) => (
               <Figure key={p.label} {...p} go={proofSeen} delay={i * 120} />
