@@ -1,0 +1,35 @@
+# Deploy the API on Render whenever main changes it. Render's own "auto-deploy on commit" never
+# fired for this service (the dashboard showed no deploy for merges to main), so the repo
+# triggers the deploy itself through the service's deploy hook.
+#
+# One-time setup: Render → vandal-api → Settings → Deploy Hook → copy the URL, then add it to
+# this repository as the secret RENDER_DEPLOY_HOOK (Settings → Secrets and variables → Actions).
+name: deploy-api
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "render.yaml"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger the Render deploy hook
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK is not set. Copy the deploy hook from Render (Settings → Deploy Hook) into this repository's Actions secrets."
+            exit 1
+          fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "Render deploy requested for ${GITHUB_SHA::7}."
