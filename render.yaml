@@ -22,6 +22,12 @@ services:
         value: "3"
       - key: VANDAL_MAX_JOBS
         value: "3"
+      # One visitor gets one job at a time, and the runs kept in memory are bounded: the least
+      # recently touched go first.
+      - key: VANDAL_JOBS_PER_CLIENT
+        value: "1"
+      - key: VANDAL_MAX_RUNS
+        value: "40"
       # Optional: set it in the dashboard for live model calls, then turn playback off.
       - key: ANTHROPIC_API_KEY
         sync: false

@@ -47,7 +47,7 @@ def approvals(request: Request) -> dict[str, Any]:
     """The inbox: payment approvals waiting in any run, and policy patches."""
     reg = deps.registry(request)
     payments = []
-    for handle in reg.runs.values():
+    for handle in reg.runs_of(deps.client(request)):
         with handle.lock:
             for r in handle.state.approval_requests.values():
                 if r.status == "pending":

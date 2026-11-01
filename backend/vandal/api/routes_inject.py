@@ -109,4 +109,8 @@ def inject(request: Request, run_id: str, body: Inject) -> dict[str, Any]:
         }
 
     meta = {"run": run_id, "profile": profile, "seed": seed, "policy": policy.version}
-    return deps.registry(request).submit("inject", work, **meta, depth=body.depth).summary()
+    return (
+        deps.registry(request)
+        .submit("inject", work, owner=deps.client(request), **meta, depth=body.depth)
+        .summary()
+    )

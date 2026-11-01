@@ -36,6 +36,7 @@ import type {
   PolicyInfo,
   ProfileInfo,
   ReplayOut,
+  RunListItem,
   RunSummary,
   SearchResult,
   Settings,
@@ -192,7 +193,10 @@ interface State {
 interface Actions {
   init(): Promise<void>;
   clearError(): void;
+  setError(message: string): void;
   setMode(mode: Mode): void;
+  /** A company the backend now knows (imported, or made elsewhere), selected for the next run. */
+  addProfile(p: ProfileInfo): void;
   setWorkspace(p: Partial<Workspace>): void;
   loadProfiles(): Promise<void>;
   /** Derive a company on the backend; it is selected for the next run. Null when it failed. */
@@ -346,6 +350,23 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
 
   const addTab = (tab: RunTab) => set((s) => ({ tabs: [...s.tabs.filter((t) => t.id !== tab.id), tab] }));
 
+  /** Pick up a live run that is already on the server (a reload, or a second tab) as this
+   * tab's run, instead of starting over. */
+  const adopt = async (run: RunListItem) => {
+    const a = api();
+    set({
+      view: "blue",
+      tabs: [{ id: run.run_id, label: "Live", policy: run.policy, kind: "live" }],
+      liveRunId: run.run_id,
+      // days already worked count as step 1 done
+      operate: { phase: run.day > 0 ? "done" : "idle", day: run.day > 0 ? run.day : null, events: run.events },
+      policies: await a.policies(),
+      stage: "operate",
+    });
+    await get().focus(run.run_id);
+    await get().loadApprovals();
+  };
+
   return {
     api: null,
     ready: false,
@@ -406,7 +427,14 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
           search: { ...st.search, depth: Math.min(st.search.depth, maxDepth) },
           synth: { ...st.synth, noLlm, depth: Math.min(st.synth.depth, maxDepth) },
         }));
-        await get().reset("v0");
+        // A reload keeps the run this browser already has on the server, when it is on the company
+        // this mode wants (the demo's default, or the workspace's pick); only a browser with none
+        // starts one. The loop's results live in this tab and are gone; the books are not.
+        const { profile, seed } = get().ws;
+        const mine = await a.listRuns().catch(() => []);
+        const live = mine.filter((r) => r.kind === "operate" && r.profile === profile && r.seed === seed).at(-1);
+        if (live) await adopt(live);
+        else await get().reset("v0");
         set({ ready: true });
       })().finally(() => {
         initializing = null;
@@ -415,6 +443,11 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     }),
 
     clearError: () => set({ error: null }),
+    setError: (message) => set({ error: message }),
+    addProfile: (p) => {
+      set((s) => ({ profiles: [...s.profiles.filter((x) => x.name !== p.name), p] }));
+      get().setWorkspace({ profile: p.name });
+    },
     setMode: (mode) =>
       set((s) => ({
         mode,

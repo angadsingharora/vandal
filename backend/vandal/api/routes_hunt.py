@@ -48,4 +48,8 @@ def start_hunt(request: Request, run_id: str, body: Hunt) -> dict[str, Any]:
         }
 
     meta = {"run": run_id, "profile": profile, "seed": seed, "policy": policy.version}
-    return deps.registry(request).submit("hunt", work, **meta, **body.model_dump()).summary()
+    return (
+        deps.registry(request)
+        .submit("hunt", work, owner=deps.client(request), **meta, **body.model_dump())
+        .summary()
+    )

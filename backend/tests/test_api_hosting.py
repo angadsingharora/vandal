@@ -29,6 +29,8 @@ def test_health_and_settings_report_the_host(monkeypatch) -> None:
             "max_depth": 2,
             "max_workers": 32,
             "max_jobs": 3,
+            "jobs_per_client": 0,
+            "max_runs": 0,
             "default_workers": 2,
         }
         assert c.get("/settings").json()["limits"]["max_depth"] == 2

@@ -104,3 +104,63 @@ def test_custom_companies_are_bounded_and_validated() -> None:
         # can't shadow a built-in
         shadow = c.post("/profiles", json={"name": "bayline"}).json()
         assert shadow["name"] == "bayline-2"
+
+
+def test_your_own_vendors_take_the_place_of_the_base_companys() -> None:
+    with client() as c:
+        made = c.post(
+            "/profiles",
+            json={
+                "company_name": "Harbor Dental Group",
+                "vendors": [
+                    {"name": "Acme Dental Supply", "domain": "acmedental.com"},
+                    {"name": "Bright Smiles Lab"},
+                ],
+            },
+        ).json()
+        assert made["company"] == "Harbor Dental Group"
+        assert made["vendors"] == 25  # the base's count: renamed in place, not added
+        assert made["vendor_names"][:2] == ["Acme Dental Supply", "Bright Smiles Lab"]
+        assert made["vendor_names"][2] == "Coastal HVAC Services"
+        exported = c.get(f"/profiles/{made['name']}/export").json()["profile"]
+        assert exported["vendors"][0]["domain"] == "acmedental.com"
+        assert exported["vendors"][1]["domain"] == "brightsmileslab.com"
+        assert exported["vendors"][0]["id"] == "V-001"  # structure kept
+        # the renamed company seeds and runs
+        run = c.post("/runs", json={"profile": made["name"]}).json()
+        vendors = {v["name"] for v in c.get(f"/runs/{run['run_id']}/entities").json()["vendors"]}
+        assert "Acme Dental Supply" in vendors and "Bayside Plumbing" not in vendors
+        # bounds
+        assert c.post("/profiles", json={"vendors": [{"name": "x"}] * 26}).status_code == 400
+        twice = c.post("/profiles", json={"vendors": [{"name": "Same"}, {"name": "same"}]})
+        assert twice.status_code == 400 and "twice" in twice.json()["detail"]
+        bad = c.post("/profiles", json={"vendors": [{"name": "A", "domain": "not a domain"}]})
+        assert bad.status_code == 400 and "domain" in bad.json()["detail"]
+
+
+def test_a_company_survives_as_a_file() -> None:
+    with client() as c:
+        made = c.post(
+            "/profiles",
+            json={"company_name": "Keep Me Inc", "approval": {"threshold": 1_000_000}},
+        ).json()
+        exported = c.get(f"/profiles/{made['name']}/export").json()
+        assert exported["company"] == "Keep Me Inc"
+        assert exported["profile"]["approval_matrix"]["threshold"] == 1_000_000
+        assert c.get("/profiles/nope/export").status_code == 404
+        # bring it back under another name, as a new process would
+        back = c.post("/profiles/import", json={"name": "restored", "profile": exported["profile"]})
+        assert back.status_code == 200, back.text
+        assert back.json()["name"] == "restored"
+        assert back.json()["approval"]["threshold"] == 1_000_000
+        assert c.post("/runs", json={"profile": "restored"}).status_code == 200
+        # a built-in exports too, and imports under its company name
+        bay = c.get("/profiles/bayline/export").json()["profile"]
+        assert (
+            c.post("/profiles/import", json={"profile": bay}).json()["name"]
+            == "bayline-property-group"
+        )
+        # validated like a file, bounded like a custom company
+        assert c.post("/profiles/import", json={"profile": {"company": {}}}).status_code == 400
+        huge = {**bay, "generation": {**bay["generation"], "invoices": 10_000}}
+        assert c.post("/profiles/import", json={"profile": huge}).status_code == 400

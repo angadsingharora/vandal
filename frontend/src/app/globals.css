@@ -186,3 +186,13 @@ body {
   .es-scanline { animation: none; display: none; }
   .es-finding, .es-mark { transition: none; }
 }
+
+/* The evidence report prints as a document: white page, no chrome, no page breaks inside a section. */
+@media print {
+  body {
+    background: #fff;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+}

@@ -9,8 +9,10 @@ reads state over JSON and follows runs and jobs over SSE.
 `/settings` holds the demo switches the war room flips: LLM playback (DEMO_PLAYBACK, read by
 vandal/llm.py and vandal/api/jobcache.py) for this server process, and reports the host's
 limits (api/limits.py) and the threat families. `/profiles` lists the companies a run can be
-seeded from and makes new ones (api/routes_profiles.py). `/health` is what a monitor or a
-reviewer reads: version, commit, uptime, persistence, and how busy the server is.
+seeded from and makes new ones (api/routes_profiles.py). `/guard/tools` and
+`/runs/{id}/guard/check` are Guard as an API: what the gate would say to a tool call, without
+making it (api/routes_guard.py). `/health` is what a monitor or a reviewer reads: version,
+commit, uptime, persistence, and how busy the server is.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from pydantic import BaseModel
 
 from vandal.api import (
     routes_blue,
+    routes_guard,
     routes_hunt,
     routes_inject,
     routes_jobs,
@@ -68,7 +71,10 @@ def create_app(store: Store | None = None, persist: bool | None = None) -> FastA
     if store is None and (persist if persist is not None else bool(os.environ.get("DATABASE_URL"))):
         store = Store()
         store.migrate()
-    registry = Registry(store, max_jobs=limits().max_jobs)
+    lim = limits()
+    registry = Registry(
+        store, max_jobs=lim.max_jobs, max_runs=lim.max_runs, jobs_per_owner=lim.jobs_per_client
+    )
     started = time.monotonic()
 
     @asynccontextmanager
@@ -130,6 +136,7 @@ def create_app(store: Store | None = None, persist: bool | None = None) -> FastA
     app.include_router(routes_policies.router)
     app.include_router(routes_profiles.router)
     app.include_router(routes_blue.router)
+    app.include_router(routes_guard.router)
     return app
 
 

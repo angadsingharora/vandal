@@ -80,7 +80,10 @@ def summary(handle: RunHandle) -> dict[str, Any]:
 
 def _create(request: Request, body: NewRun) -> dict[str, Any]:
     handle = deps.registry(request).create_run(
-        deps.profile_name(body.profile), body.seed, deps.policy(body.policy, request)
+        deps.profile_name(body.profile),
+        body.seed,
+        deps.policy(body.policy, request),
+        owner=deps.client(request),
     )
     return summary(handle)
 
@@ -172,8 +175,9 @@ def intake_reads(request: Request, run_id: str) -> list[dict[str, Any]]:
 
 @router.post("/demo/reset")
 def demo_reset(request: Request, body: NewRun | None = None) -> dict[str, Any]:
-    """Drop every run and start one fresh company."""
-    deps.registry(request).reset()
+    """Drop the caller's runs and start one fresh company. A caller with no client id (a bare
+    curl) drops every run."""
+    deps.registry(request).reset(deps.client(request))
     return _create(request, body or NewRun())
 
 
@@ -184,14 +188,19 @@ def create_run(request: Request, body: NewRun | None = None) -> dict[str, Any]:
 
 @router.get("/runs")
 def list_runs(request: Request) -> list[dict[str, Any]]:
+    """The caller's runs, oldest first (every run for a caller with no client id)."""
     return [
         {
             "run_id": h.id,
+            "kind": h.kind,
+            "profile": h.profile,
+            "company": h.state.company,
+            "seed": h.seed,
             "policy": h.policy.version,
             "day": h.state.day,
             "events": len(h.state.events),
         }
-        for h in deps.registry(request).runs.values()
+        for h in deps.registry(request).runs_of(deps.client(request))
     ]
 
 
@@ -285,7 +294,11 @@ def operate(request: Request, run_id: str, body: Operate | None = None) -> dict[
                 handle.writer.flush()
         return summary(handle)
 
-    return deps.registry(request).submit("operate", work, run_id=run_id, days=days).summary()
+    return (
+        deps.registry(request)
+        .submit("operate", work, owner=deps.client(request), run_id=run_id, days=days)
+        .summary()
+    )
 
 
 @router.get("/runs/{run_id}/chain/{payment}")
@@ -305,7 +318,13 @@ def replay(request: Request, body: Replay) -> dict[str, Any]:
     """Replay a trace on a fresh company as a new run; its events stream like any run's."""
     reg = deps.registry(request)
     policy = deps.policy(body.policy, request)
-    handle = reg.create_run(deps.profile_name(body.profile), body.seed, policy, kind="replay")
+    handle = reg.create_run(
+        deps.profile_name(body.profile),
+        body.seed,
+        policy,
+        kind="replay",
+        owner=deps.client(request),
+    )
     with handle.lock:
         result, _, oracle = replay_detailed(
             body.seed,

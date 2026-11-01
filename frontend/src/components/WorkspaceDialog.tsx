@@ -4,11 +4,82 @@
 // here), the run itself, and how each of Strike's jobs is asked for. Saving applies the knobs
 // to the next job; "Save and start a new run" also seeds a fresh company from them.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cx, usd } from "@/lib/format";
 import { useWarRoom, type Workspace } from "@/lib/store";
 import type { AttackerCapabilities, NewProfile, ProfileInfo } from "@/lib/types";
 import { Button, Modal, Spinner } from "./ui";
+
+/** "Acme Dental Supply, acmedental.com" per line → the API's vendor list. A line with no comma
+ * gets a domain made from its name. */
+export function parseVendors(text: string): { name: string; domain?: string }[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [name, domain] = line.split(/[,\t]/).map((x) => x.trim());
+      return domain ? { name, domain } : { name };
+    });
+}
+
+/** Keep the company as a file, and bring one back. */
+function CompanyFile({ picked, onImported }: { picked: ProfileInfo | undefined; onImported: (p: ProfileInfo) => void }) {
+  const s = useWarRoom();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState<"export" | "import" | null>(null);
+
+  const download = async () => {
+    if (!picked || !s.api) return;
+    setBusy("export");
+    try {
+      const out = await s.api.exportProfile(picked.name);
+      const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `vandal-company-${out.name}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      s.setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const upload = async (file: File) => {
+    if (!s.api) return;
+    setBusy("import");
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text) as { name?: string; profile?: Record<string, unknown> };
+      // an exported file, or a bare profile in the shape of profiles/*.yaml
+      const profile = data.profile ?? (data as Record<string, unknown>);
+      const made = await s.api.importProfile({ name: data.name, profile });
+      s.addProfile(made);
+      onImported(made);
+    } catch (err) {
+      s.setError(err instanceof SyntaxError ? "That file is not JSON." : err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-[11px] text-faint">
+      <Button onClick={download} busy={busy === "export"} disabled={!picked} title="The whole company as JSON. A custom company is gone when the backend restarts; this brings it back anywhere.">
+        Download company
+      </Button>
+      <Button onClick={() => fileRef.current?.click()} busy={busy === "import"} title="A company file from Download, or a profile written in the shape of profiles/bayline.yaml">
+        Upload company
+      </Button>
+      <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
+      <span>A custom company lives on the server only until it restarts; a file keeps it.</span>
+    </div>
+  );
+}
 
 const field = "num h-8 w-full rounded border border-line bg-bg px-2 text-xs";
 const label = "flex flex-col gap-1 text-[11px] text-dim";
@@ -73,7 +144,9 @@ function CustomCompany({ base, onMade }: { base: ProfileInfo; onMade: (p: Profil
   const [blocked, setBlocked] = useState(base.risk.lambda_per_blocked / 100);
   const [hold, setHold] = useState(base.risk.mu_per_hold / 100);
   const [attacker, setAttacker] = useState<AttackerCapabilities>(base.attacker);
+  const [vendors, setVendors] = useState("");
   const [busy, setBusy] = useState(false);
+  const vendorList = parseVendors(vendors);
 
   const toggleIn = (key: "change_request_channels" | "senders", id: string) =>
     setAttacker((a) => ({ ...a, [key]: a[key].includes(id) ? a[key].filter((x) => x !== id) : [...a[key], id] }));
@@ -83,6 +156,7 @@ function CustomCompany({ base, onMade }: { base: ProfileInfo; onMade: (p: Profil
     const body: NewProfile = {
       base: base.name,
       company_name: name.trim() || undefined,
+      vendors: vendorList.length ? vendorList : undefined,
       approval: { threshold: Math.round(threshold * 100), match_tolerance_pct: tolerance, min_prior_payments: priors, aggregate_window_days: window },
       generation: { invoices, pending_invoices: pending, history_days: history },
       attacker,
@@ -111,6 +185,25 @@ function CustomCompany({ base, onMade }: { base: ProfileInfo; onMade: (p: Profil
         <Num id="ws-horizon" text="Payment horizon (days)" value={horizon} onChange={setHorizon} min={1} max={60} title="The batch pays approved invoices due within this window" />
         <Num id="ws-blocked" text="Cost per blocked legit payment ($)" value={blocked} onChange={setBlocked} min={0} step={100} title="How much the synthesizer dislikes blocking a legitimate payment" />
         <Num id="ws-hold" text="Cost per hold ($)" value={hold} onChange={setHold} min={0} step={10} title="How much the synthesizer dislikes a hold" />
+      </div>
+      <div>
+        <label htmlFor="ws-vendors" className={label}>
+          Your vendors, one per line (name, then the domain after a comma; optional)
+          <textarea
+            id="ws-vendors"
+            value={vendors}
+            onChange={(e) => setVendors(e.target.value)}
+            rows={4}
+            spellCheck={false}
+            placeholder={"Acme Dental Supply, acmedental.com\nBright Smiles Lab"}
+            className={cx(field, "num-0 h-auto py-1.5 leading-relaxed")}
+          />
+        </label>
+        <p className="mt-1 text-[11px] leading-snug text-faint">
+          They take the place of {base.company}&apos;s first {Math.min(vendorList.length, base.vendors) || "N"} of {base.vendors} vendors: your names and domains, the base&apos;s spend and
+          payment history, so the attack has something to aim at.
+          {vendorList.length > base.vendors && <span className="text-warn"> At most {base.vendors}.</span>}
+        </p>
       </div>
       <div>
         <div className="text-[11px] text-dim">What the attacker can do</div>
@@ -229,9 +322,12 @@ export function WorkspaceDialog({ onClose }: { onClose: () => void }) {
                 This API is an older build without custom companies: only the built-in one is available until the host redeploys from main.
               </p>
             ) : (
-              <Check checked={custom} onChange={setCustom}>
-                Describe a custom company{picked ? ` based on ${picked.company}` : ""}
-              </Check>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <Check checked={custom} onChange={setCustom}>
+                  Describe a custom company{picked ? ` based on ${picked.company}` : ""}
+                </Check>
+                {s.api?.mode === "http" && <CompanyFile picked={picked} onImported={(p) => set({ profile: p.name })} />}
+              </div>
             )}
             {custom && !s.profilesStale && picked && (
               <CustomCompany
