@@ -664,6 +664,57 @@ export interface ProfileInfo {
   vendor_names?: string[];
 }
 
+/** POST /runs/{id}/shadow: one row of an AP export, replayed through Guard on a clone. */
+export interface ShadowStep {
+  tool: string;
+  stage: string;
+  actor: string;
+  decision: Decision;
+  fired: string[];
+  requires: Requirement[];
+  cites: string[];
+  ok: boolean;
+  error: string | null;
+  summary: string;
+}
+
+export interface ShadowRow {
+  n: number;
+  ref: string | null;
+  kind: string;
+  input: { vendor?: string; number?: string; amount?: number; [k: string]: unknown };
+  vendor?: string;
+  vendor_name?: string;
+  invoice?: string;
+  amount_cents?: number;
+  payment?: string;
+  paid?: boolean;
+  payee_account?: string;
+  payee_status?: string | null;
+  payee_source?: string | null;
+  change?: string;
+  change_status?: string;
+  decision: Decision | "unmatched";
+  note: string | null;
+  steps: ShadowStep[];
+}
+
+export interface ShadowReport {
+  run_id: string;
+  policy: string;
+  company: string;
+  summary: {
+    policy: string;
+    rows: number;
+    by_decision: Record<string, number>;
+    money_stopped: Cents;
+    money_through: Cents;
+    money_unverified: Cents;
+    attention: { n: number; ref: string | null; kind: string; vendor_name?: string | null; decision: string; summary: string; requires: Requirement[] }[];
+  };
+  rows: ShadowRow[];
+}
+
 /** GET /profiles/{name}/export: the whole company as JSON, to keep in a file. */
 export interface ProfileExport {
   name: string;

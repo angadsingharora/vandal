@@ -34,6 +34,7 @@ import type {
   RunSummary,
   SearchResult,
   Settings,
+  ShadowReport,
   ThreatPlan,
 } from "./types";
 
@@ -116,6 +117,8 @@ export interface VandalApi {
   /** Guard as an API: what the gate would say to a tool call on this run's books, without making it. */
   guardTools(): Promise<GuardTool[]>;
   guardCheck(runId: string, body: { tool: string; args: Record<string, unknown>; actor?: Actor }): Promise<GuardCheckOut>;
+  /** Shadow mode: an AP export (CSV) replayed through Guard on a clone of the run's books, report only. */
+  shadow(runId: string, body: { csv: string; approve_escalations?: boolean }): Promise<ShadowReport>;
 
   job<R>(id: string): Promise<Job<R>>;
   search(body: SearchBody): Promise<Job<SearchResult>>;
@@ -221,6 +224,8 @@ export class HttpApi implements VandalApi {
   guardTools = () => this.call<GuardTool[]>("GET", "/guard/tools");
   guardCheck = (runId: string, body: { tool: string; args: Record<string, unknown>; actor?: Actor }) =>
     this.call<GuardCheckOut>("POST", `/runs/${runId}/guard/check`, body);
+  shadow = (runId: string, body: { csv: string; approve_escalations?: boolean }) =>
+    this.call<ShadowReport>("POST", `/runs/${runId}/shadow`, body);
 
   job = <R>(id: string) => this.call<Job<R>>("GET", `/jobs/${id}`);
   search = (body: SearchBody) => this.call<Job<SearchResult>>("POST", "/search", body);

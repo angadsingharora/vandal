@@ -1,0 +1,24 @@
+// A month of accounts payable at the demo company, as a finance team would export it: bills,
+// payments, vendor changes, one callback. The same rows as backend/examples/shadow-sample.csv.
+// Row 3 is the lookalike-domain bank change; rows 4 and 5 are the $40,000 bill and payment
+// that follow it.
+
+export const SHADOW_COLUMNS = "kind,vendor,number,amount,po,po_amount,received,channel,sender,routing,account,contact_name,contact_email,contact_phone,method,ref";
+
+export const SHADOW_SAMPLE = `${SHADOW_COLUMNS}
+bill,Harbor Point Construction,HPC-3104,18450.00,PO-7731,,,,,,,,,,,row-1
+payment,,HPC-3104,,,,,,,,,,,,,row-2
+vendor_bank_change,Harbor Point Construction,,,,,,email,drew.silva@harborpointbui1d.com,026000847,9680804765,,,,,row-3
+bill,Harbor Point Construction,HPC-3111,40000.00,PO-7740,,,,,,,,,,,row-4
+payment,,HPC-3111,,,,,,,,,,,,,row-5
+vendor_contact_change,Summit Roofing,,,,,,email,ap@summitroofing.net,,,Dana Reyes,dana@summitroofing.net,415-555-0142,,row-6
+vendor_bank_change,Summit Roofing,,,,,,portal,portal@summitroofing.net,121000248,4471002915,,,,,row-7
+callback,Summit Roofing,,,,,,,,,,,,,phone_outbound,row-8
+bill,Summit Roofing,SR-2210,2493.00,PO-7752,2450.00,,,,,,,,,,row-9
+payment,,SR-2210,,,,,,,,,,,,,row-10
+bill,Pacific Gas Utility,PGU-0912,5755.27,,,,,,,,,,,,row-11
+payment,,PGU-0912,,,,,,,,,,,,,row-12
+bill,Summit Roofing,SR-2211,9800.00,PO-7760,,no,,,,,,,,,row-13
+payment,,SR-2211,,,,,,,,,,,,,row-14
+bill,Nowhere Supplies LLC,NS-1,900.00,,,,,,,,,,,,row-15
+`;

@@ -7,6 +7,7 @@ import { CFO, CONTROLLER, OPERATOR, useWarRoom } from "@/lib/store";
 import type { Decision, VerdictItem } from "@/lib/types";
 import { AskGuardDialog } from "./AskGuardDialog";
 import { IntakePanel } from "./IntakePanel";
+import { ShadowDialog } from "./ShadowDialog";
 import { Badge, Button, DecisionBadge, Empty, LiveDot, Panel, SideTag } from "./ui";
 
 function argsLine(args: Record<string, unknown>): string {
@@ -158,6 +159,7 @@ export function VerdictFeed({ initialFilter = "all" }: { initialFilter?: Decisio
   );
   const alerts = s.alerts.slice(-5).reverse();
   const [asking, setAsking] = useState(false);
+  const [shadowing, setShadowing] = useState(false);
   // Guard as an API lives in the workspace; the demo keeps its script.
   const askable = s.mode === "workspace" && s.api?.mode === "http" && !!(s.focusRunId ?? s.liveRunId);
 
@@ -169,9 +171,14 @@ export function VerdictFeed({ initialFilter = "all" }: { initialFilter?: Decisio
         <>
           {s.operate.phase === "running" && <LiveDot className="text-blue" />}
           {askable && (
-            <Button onClick={() => setAsking(true)} title="What would Guard say to a tool call right now? Nothing is executed.">
-              Ask Guard
-            </Button>
+            <>
+              <Button onClick={() => setShadowing(true)} title="Replay a month of your accounts payable through Guard on a clone. Report only.">
+                Shadow report
+              </Button>
+              <Button onClick={() => setAsking(true)} title="What would Guard say to a tool call right now? Nothing is executed.">
+                Ask Guard
+              </Button>
+            </>
           )}
         </>
       }
@@ -179,6 +186,7 @@ export function VerdictFeed({ initialFilter = "all" }: { initialFilter?: Decisio
       bodyClass="flex flex-col"
     >
       {asking && <AskGuardDialog onClose={() => setAsking(false)} />}
+      {shadowing && <ShadowDialog onClose={() => setShadowing(false)} />}
       <div className="flex shrink-0 gap-1 border-b border-line px-2 py-1.5">
         {FILTERS.map((f) => (
           <button
