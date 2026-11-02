@@ -4,6 +4,9 @@
 #
 # One-time setup: Render → vandal-api → Settings → Deploy Hook → copy the URL, then add it to
 # this repository as the secret RENDER_DEPLOY_HOOK (Settings → Secrets and variables → Actions).
+# Until that secret exists the job skips with a warning and a summary saying what to do; it
+# does not fail, since a red run on every backend merge is noise, not a signal. Deploy by hand
+# from the Render dashboard (Manual Deploy → Deploy latest commit) in the meantime.
 name: deploy-api
 
 on:
@@ -28,8 +31,20 @@ jobs:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
           if [ -z "$HOOK" ]; then
-            echo "::error::RENDER_DEPLOY_HOOK is not set. Copy the deploy hook from Render (Settings → Deploy Hook) into this repository's Actions secrets."
-            exit 1
+            echo "::warning::RENDER_DEPLOY_HOOK is not set, so the API was not deployed. Deploy it by hand from the Render dashboard, or add the secret so this job does it."
+            {
+              echo "## API not deployed"
+              echo
+              echo "The secret \`RENDER_DEPLOY_HOOK\` is not set in this repository, so commit \`${GITHUB_SHA::7}\` was not sent to Render."
+              echo
+              echo "1. Render → vandal-api → Settings → Deploy Hook: copy the URL."
+              echo "2. GitHub → this repository → Settings → Secrets and variables → Actions → New repository secret: \`RENDER_DEPLOY_HOOK\`."
+              echo "3. Re-run this workflow, or merge the next backend change."
+              echo
+              echo "Until then: Render → vandal-api → Manual Deploy → Deploy latest commit."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
           curl -fsS -X POST "$HOOK" > /dev/null
           echo "Render deploy requested for ${GITHUB_SHA::7}."
+          echo "Render deploy requested for \`${GITHUB_SHA::7}\`." >> "$GITHUB_STEP_SUMMARY"
