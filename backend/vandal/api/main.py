@@ -11,8 +11,9 @@ vandal/llm.py and vandal/api/jobcache.py) for this server process, and reports t
 limits (api/limits.py) and the threat families. `/profiles` lists the companies a run can be
 seeded from and makes new ones (api/routes_profiles.py). `/guard/tools` and
 `/runs/{id}/guard/check` are Guard as an API: what the gate would say to a tool call, without
-making it (api/routes_guard.py). `/health` is what a monitor or a reviewer reads: version,
-commit, uptime, persistence, and how busy the server is.
+making it (api/routes_guard.py). `/runs/{id}/shadow` replays a company's real AP activity
+through Guard on a clone, report only (api/routes_shadow.py). `/health` is what a monitor or a
+reviewer reads: version, commit, uptime, persistence, and how busy the server is.
 """
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ from vandal.api import (
     routes_policies,
     routes_profiles,
     routes_runs,
+    routes_shadow,
 )
 from vandal.api.db import Store
 from vandal.api.limits import limits
@@ -137,6 +139,7 @@ def create_app(store: Store | None = None, persist: bool | None = None) -> FastA
     app.include_router(routes_profiles.router)
     app.include_router(routes_blue.router)
     app.include_router(routes_guard.router)
+    app.include_router(routes_shadow.router)
     return app
 
 
