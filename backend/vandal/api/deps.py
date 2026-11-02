@@ -15,6 +15,17 @@ def registry(request: Request) -> Registry:
     return request.app.state.registry
 
 
+def client(request: Request) -> str | None:
+    """Who is asking: the `X-Vandal-Client` header (the war room sends a random id it keeps in
+    the browser), or `?client=` for a stream. None for a bare curl. Runs belong to the client
+    that made them; a reset drops only that client's runs, and `/runs` lists only theirs."""
+    raw = request.headers.get("x-vandal-client") or request.query_params.get("client")
+    if not raw:
+        return None
+    raw = raw.strip()[:64]
+    return raw or None
+
+
 def get_run(request: Request, run_id: str) -> RunHandle:
     try:
         return registry(request).run(run_id)

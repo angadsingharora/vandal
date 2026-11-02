@@ -66,10 +66,15 @@ export function ProvePage() {
             </span>
             <span className="text-xs text-dim">{pack.approvable ? "The evidence pack travels with the rule." : "A failed check keeps it out of Guard's inbox."}</span>
             {pack.cached && <Badge tone="warn">recorded</Badge>}
-            {evidence && (
-              <a href={evidence} download className="ml-auto text-xs text-ink underline" title="The pack as JSON: every check, the scorecard before and after, and the rule itself">
-                Download evidence pack
-              </a>
+            {evidence && verify.jobId && (
+              <span className="ml-auto flex items-center gap-3 text-xs">
+                <a href={`/report/${verify.jobId}`} target="_blank" rel="noreferrer" className="text-ink underline" title="The pack written for a person: the verdict, the rule, every check, the scorecard. Printable.">
+                  Open the report
+                </a>
+                <a href={evidence} download className="text-dim underline hover:text-ink" title="The pack as JSON: every check, the scorecard before and after, and the rule itself">
+                  JSON
+                </a>
+              </span>
             )}
           </div>
         </Reveal>

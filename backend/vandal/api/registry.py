@@ -9,10 +9,16 @@ progress to its own Channel and ends with a `done` or `error` message. A host ca
 many run at once (`max_jobs`; past it `submit` raises JobsBusy, which the API answers with a
 429), and finished jobs are kept to the newest `keep_finished` so a long-lived server stays
 small.
+
+A public host serves many visitors from one process. Runs and jobs carry the `owner` that made
+them (api/deps.client): a reset drops one owner's runs and leaves everyone else's, `max_runs`
+bounds the runs kept (the least recently touched go first), and `jobs_per_owner` keeps one
+visitor from filling the pool.
 """
 
 from __future__ import annotations
 
+import itertools
 import threading
 import traceback
 import uuid
@@ -55,6 +61,11 @@ def _id(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex[:10]}"
 
 
+# Orders runs by last use. A counter, not a clock: a clock's resolution can make two uses in
+# the same tick look simultaneous.
+_CLOCK = itertools.count(1)
+
+
 class JobsBusy(RuntimeError):
     """The host's job limit is reached; try again shortly."""
 
@@ -71,6 +82,12 @@ class RunHandle:
     writer: EventWriter | None = None
     labels: list[OracleLabel] = field(default_factory=list)  # answer key of a replayed trace
     lock: threading.RLock = field(default_factory=threading.RLock)
+    kind: str = "operate"
+    owner: str | None = None  # the client that made it; None for a bare API call
+    touched: int = field(default_factory=lambda: next(_CLOCK))  # last use, for eviction
+
+    def touch(self) -> None:
+        self.touched = next(_CLOCK)
 
     @property
     def state(self):
@@ -86,6 +103,7 @@ class Job:
     error: str | None = None
     meta: dict[str, Any] = field(default_factory=dict)  # what the job was asked to do
     channel: Channel = field(default_factory=Channel)
+    owner: str | None = None
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -105,9 +123,13 @@ class Registry:
         threads: int = 4,
         max_jobs: int = 0,
         keep_finished: int = 200,
+        max_runs: int = 0,
+        jobs_per_owner: int = 0,
     ) -> None:
         self.store = store
         self.max_jobs = max_jobs  # 0: unlimited
+        self.jobs_per_owner = jobs_per_owner  # 0: unlimited
+        self.max_runs = max_runs  # 0: unlimited
         self.keep_finished = keep_finished
         self.runs: dict[str, RunHandle] = {}
         self.jobs: dict[str, Job] = {}
@@ -123,7 +145,9 @@ class Registry:
         seed: int,
         policy: Policy,
         kind: str = "operate",
+        owner: str | None = None,
     ) -> RunHandle:
+        self._evict_runs(keep=1)
         run_id = _id("run")
         channel = Channel()
         writer = None
@@ -153,39 +177,71 @@ class Registry:
             # Live runs let intake ask Claude; replays stay on the reader search used.
             use_llm=kind == "operate",
         )
-        handle = RunHandle(run_id, profile, seed, policy, sb, channel, verdicts, writer)
+        handle = RunHandle(
+            run_id, profile, seed, policy, sb, channel, verdicts, writer, kind=kind, owner=owner
+        )
         self.runs[run_id] = handle
         return handle
 
     def run(self, run_id: str) -> RunHandle:
-        return self.runs[run_id]
+        handle = self.runs[run_id]
+        handle.touch()
+        return handle
 
-    def reset(self) -> None:
-        for handle in self.runs.values():
-            handle.channel.close()
-            handle.verdicts.close()
-            if handle.writer is not None:
-                handle.writer.flush()
-        self.runs.clear()
+    def runs_of(self, owner: str | None) -> list[RunHandle]:
+        """An owner's runs, oldest first. None: every run (a bare API client sees it all)."""
+        return [h for h in self.runs.values() if owner is None or h.owner == owner]
+
+    def _drop(self, run_id: str) -> None:
+        handle = self.runs.pop(run_id)
+        handle.channel.close()
+        handle.verdicts.close()
+        if handle.writer is not None:
+            handle.writer.flush()
+
+    def _evict_runs(self, keep: int = 0) -> None:
+        """Make room for `keep` more runs: past `max_runs`, the least recently touched go."""
+        if not self.max_runs:
+            return
+        over = len(self.runs) + keep - self.max_runs
+        if over <= 0:
+            return
+        for run_id in sorted(self.runs, key=lambda r: self.runs[r].touched)[:over]:
+            self._drop(run_id)
+
+    def reset(self, owner: str | None = None) -> None:
+        """Drop an owner's runs; with no owner, every run."""
+        for run_id in [h.id for h in self.runs_of(owner)]:
+            self._drop(run_id)
 
     # --- jobs -------------------------------------------------------------------------------
 
-    def active(self) -> int:
-        return sum(1 for j in self.jobs.values() if j.status in ("queued", "running"))
+    def active(self, owner: str | None = None) -> int:
+        return sum(
+            1
+            for j in self.jobs.values()
+            if j.status in ("queued", "running") and (owner is None or j.owner == owner)
+        )
 
     def _evict_finished(self) -> None:
         finished = [j.id for j in self.jobs.values() if j.status in ("done", "failed")]
         for job_id in finished[: max(0, len(finished) - self.keep_finished)]:
             del self.jobs[job_id]
 
-    def submit(self, kind: str, work: Callable[[Job], Any], **meta: Any) -> Job:
+    def submit(
+        self, kind: str, work: Callable[[Job], Any], owner: str | None = None, **meta: Any
+    ) -> Job:
         if self.max_jobs and self.active() >= self.max_jobs:
             raise JobsBusy(
                 f"the demo is busy: {self.active()} of {self.max_jobs} jobs running; "
                 "try again in a minute"
             )
+        if owner and self.jobs_per_owner and self.active(owner) >= self.jobs_per_owner:
+            raise JobsBusy(
+                f"you already have {self.active(owner)} job(s) running; wait for them to finish"
+            )
         self._evict_finished()
-        job = Job(id=_id(kind), kind=kind, meta=meta)
+        job = Job(id=_id(kind), kind=kind, meta=meta, owner=owner)
         self.jobs[job.id] = job
 
         def runner() -> None:

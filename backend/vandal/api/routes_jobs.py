@@ -168,7 +168,7 @@ def start_search(request: Request, body: SearchRequest) -> dict[str, Any]:
 
         return jobcache.serve("search", inputs, compute, fresh=body.fresh, on_hit=on_hit)
 
-    return reg.submit("search", work, **meta).summary()
+    return reg.submit("search", work, owner=deps.client(request), **meta).summary()
 
 
 @router.post("/diagnose")
@@ -252,7 +252,7 @@ def start_synthesize(request: Request, body: SynthesizeRequest) -> dict[str, Any
 
         return jobcache.serve("synthesize", inputs, compute, fresh=body.fresh, on_hit=on_hit)
 
-    return reg.submit("synthesize", work, **meta).summary()
+    return reg.submit("synthesize", work, owner=deps.client(request), **meta).summary()
 
 
 @router.post("/verify")
@@ -318,7 +318,13 @@ def start_verify(request: Request, body: VerifyRequest) -> dict[str, Any]:
 
         return jobcache.serve("verify", inputs, compute, fresh=body.fresh, on_hit=on_hit)
 
-    return reg.submit("verify", work, **meta, policy_json=policy.model_dump(mode="json")).summary()
+    return reg.submit(
+        "verify",
+        work,
+        owner=deps.client(request),
+        **meta,
+        policy_json=policy.model_dump(mode="json"),
+    ).summary()
 
 
 @router.get("/metrics")

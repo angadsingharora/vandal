@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readRule } from "./rules.ts";
+import { needs, readRule } from "./rules.ts";
 
 test("T2 reads as the approved instruction binding", () => {
   const r = readRule({ template: "T2", params: { bound_fields: ["amount", "payee_account"], on_mismatch: "hold" } });
@@ -26,4 +26,12 @@ test("T5 shows the threshold in dollars", () => {
 test("an unknown template still lists its parameters", () => {
   const r = readRule({ template: "T9", params: { x: 1 } });
   assert.deepEqual(r.does, ["x: 1"]);
+});
+
+test("a hold says what would clear it, in words", () => {
+  assert.equal(
+    needs({ check: "T1[aac6be].change", accepted_channels: ["phone_outbound"], contact_as_of: "before_request", window_days: 30 }),
+    "T1[aac6be].change needs an outbound phone call to the number on file, to the contact on file before the request, within 30 days",
+  );
+  assert.equal(needs({ check: "T1[x].change", accepted_channels: ["phone_outbound", "portal"] }), "T1[x].change needs an outbound phone call to the number on file or the vendor portal");
 });

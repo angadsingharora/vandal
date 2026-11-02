@@ -84,6 +84,18 @@ const nextId = (prefix: string) => `${prefix}-mock${(++counter).toString().padSt
 export class MockApi implements VandalApi {
   readonly mode = "mock" as const;
   evidenceUrl = () => null; // the recording has no file to hand out
+  // The recording has one company and no Guard API; the workspace's extras say so.
+  exportProfile = async (): Promise<never> => {
+    throw new ApiError(404, "the recorded loop has no company to export; use the live backend");
+  };
+  importProfile = async (): Promise<never> => {
+    throw new ApiError(404, "the recorded loop can't take a company; use the live backend");
+  };
+  guardTools = async () => [];
+  guardCheck = async (): Promise<never> => {
+    throw new ApiError(404, "the recorded loop has no Guard API; use the live backend");
+  };
+  listRuns = async () => [] as import("@/lib/types").RunListItem[];
   private runs = new Map<string, MockRun>();
   private jobs = new Map<string, MockJob>();
   private patches = new Map<string, PatchRequest>();

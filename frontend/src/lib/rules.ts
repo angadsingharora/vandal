@@ -2,7 +2,7 @@
 // the same way the backend compiles them into gate checks (backend/vandal/synth/templates.py).
 // Pure, so the pages and the tests agree.
 
-import type { Control } from "./types.ts";
+import type { Control, Requirement } from "./types.ts";
 
 export interface RuleReading {
   /** The template's human name. */
@@ -55,6 +55,20 @@ function num(v: unknown, d: number): number {
 
 function money(cents: number): string {
   return `$${Math.floor(cents / 100).toLocaleString()}`;
+}
+
+/** What clears an evidence-gated hold, as the verdict feed says it: "T1[aac6be].change needs an
+ * outbound phone call to the number on file, to the contact on file before the request, within
+ * 30 days". */
+export function needs(r: Requirement): string {
+  const channels = list(
+    r.accepted_channels.map((c) => CHANNEL[c] ?? c),
+    "or",
+  );
+  let out = `${r.check} needs ${channels}`;
+  if (r.contact_as_of) out += `, to the contact on file ${r.contact_as_of === "before_request" ? "before the request" : "now"}`;
+  if (r.window_days) out += `, within ${r.window_days} days`;
+  return out;
 }
 
 export function readRule(c: Control): RuleReading {

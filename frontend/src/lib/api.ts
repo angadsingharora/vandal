@@ -1,6 +1,7 @@
 // The war room's view of the backend (backend/vandal/api). One interface, two implementations:
 // HTTP against FastAPI, or the in-browser mock (src/mock) recorded from the real backend.
 
+import { clientId } from "./client";
 import type {
   Actor,
   Approvals,
@@ -10,6 +11,8 @@ import type {
   Entities,
   EvidencePack,
   Explanation,
+  GuardCheckOut,
+  GuardTool,
   HuntResult,
   InjectResult,
   Job,
@@ -25,7 +28,9 @@ import type {
   IntakeRead,
   MessyDocument,
   NewProfile,
+  ProfileExport,
   ProfileInfo,
+  RunListItem,
   RunSummary,
   SearchResult,
   Settings,
@@ -90,7 +95,12 @@ export interface VandalApi {
   /** The companies a run can be seeded from, and deriving a new one (the workspace's custom company). */
   profiles(): Promise<ProfileInfo[]>;
   createProfile(body: NewProfile): Promise<ProfileInfo>;
+  /** The whole company as JSON, and bringing one back (a custom company is gone after a restart). */
+  exportProfile(name: string): Promise<ProfileExport>;
+  importProfile(body: { name?: string; profile: Record<string, unknown> }): Promise<ProfileInfo>;
 
+  /** This client's runs on the server, oldest first. */
+  listRuns(): Promise<RunListItem[]>;
   reset(opts: RunOptions): Promise<RunSummary>;
   createRun(opts: RunOptions): Promise<RunSummary>;
   state(runId: string): Promise<RunSummary>;
@@ -103,6 +113,9 @@ export interface VandalApi {
   chain(runId: string, payment: string): Promise<Chain>;
   operate(runId: string, days: number): Promise<Job>;
   replay(moves: Move[], policy: string, labels?: OracleLabel[], run?: Omit<RunOptions, "policy">): Promise<ReplayOut>;
+  /** Guard as an API: what the gate would say to a tool call on this run's books, without making it. */
+  guardTools(): Promise<GuardTool[]>;
+  guardCheck(runId: string, body: { tool: string; args: Record<string, unknown>; actor?: Actor }): Promise<GuardCheckOut>;
 
   job<R>(id: string): Promise<Job<R>>;
   search(body: SearchBody): Promise<Job<SearchResult>>;
@@ -158,9 +171,12 @@ export class HttpApi implements VandalApi {
   private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
     let res: Response;
     try {
+      // Every call says which browser it is from: the API keeps runs per client (lib/client.ts).
+      const headers: Record<string, string> = { "X-Vandal-Client": clientId() };
+      if (body !== undefined) headers["Content-Type"] = "application/json";
       res = await fetch(this.base + path, {
         method,
-        headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+        headers,
         body: body === undefined ? undefined : JSON.stringify(body),
       });
     } catch {
@@ -182,7 +198,11 @@ export class HttpApi implements VandalApi {
   policies = () => this.call<PolicyInfo[]>("GET", "/policies");
   profiles = () => this.call<ProfileInfo[]>("GET", "/profiles");
   createProfile = (body: NewProfile) => this.call<ProfileInfo>("POST", "/profiles", body);
+  exportProfile = (name: string) => this.call<ProfileExport>("GET", `/profiles/${encodeURIComponent(name)}/export`);
+  importProfile = (body: { name?: string; profile: Record<string, unknown> }) =>
+    this.call<ProfileInfo>("POST", "/profiles/import", body);
 
+  listRuns = () => this.call<RunListItem[]>("GET", "/runs");
   reset = (opts: RunOptions) => this.call<RunSummary>("POST", "/demo/reset", opts);
   createRun = (opts: RunOptions) => this.call<RunSummary>("POST", "/runs", opts);
   state = (runId: string) => this.call<RunSummary>("GET", `/runs/${runId}/state`);
@@ -198,6 +218,9 @@ export class HttpApi implements VandalApi {
     this.call<Job>("POST", `/runs/${runId}/operate`, { days });
   replay = (moves: Move[], policy: string, labels: OracleLabel[] = [], run: Omit<RunOptions, "policy"> = {}) =>
     this.call<ReplayOut>("POST", "/replay", { moves, policy, labels, ...run });
+  guardTools = () => this.call<GuardTool[]>("GET", "/guard/tools");
+  guardCheck = (runId: string, body: { tool: string; args: Record<string, unknown>; actor?: Actor }) =>
+    this.call<GuardCheckOut>("POST", `/runs/${runId}/guard/check`, body);
 
   job = <R>(id: string) => this.call<Job<R>>("GET", `/jobs/${id}`);
   search = (body: SearchBody) => this.call<Job<SearchResult>>("POST", "/search", body);

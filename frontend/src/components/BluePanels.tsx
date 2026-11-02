@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { cx, usd } from "@/lib/format";
+import { needs } from "@/lib/rules";
 import { CFO, CONTROLLER, OPERATOR, useWarRoom } from "@/lib/store";
 import type { Decision, VerdictItem } from "@/lib/types";
+import { AskGuardDialog } from "./AskGuardDialog";
 import { IntakePanel } from "./IntakePanel";
 import { Badge, Button, DecisionBadge, Empty, LiveDot, Panel, SideTag } from "./ui";
 
@@ -117,7 +119,11 @@ function VerdictRow({ v }: { v: VerdictItem }) {
             {v.actor} · {argsLine(v.args)}
           </div>
           {v.fired.length > 0 && <div className="num truncate text-[11px] text-warn">fired {v.fired.join(", ")}</div>}
-          {v.requires.length > 0 && <div className="truncate text-[11px] text-dim">requires {v.requires.join(", ")}</div>}
+          {v.requires.map((r) => (
+            <div key={r.check} className="truncate text-[11px] text-dim" title={needs(r)}>
+              {needs(r)}
+            </div>
+          ))}
         </div>
       </button>
       {open && (
@@ -151,15 +157,28 @@ export function VerdictFeed({ initialFilter = "all" }: { initialFilter?: Decisio
     [s.verdicts, filter],
   );
   const alerts = s.alerts.slice(-5).reverse();
+  const [asking, setAsking] = useState(false);
+  // Guard as an API lives in the workspace; the demo keeps its script.
+  const askable = s.mode === "workspace" && s.api?.mode === "http" && !!(s.focusRunId ?? s.liveRunId);
 
   return (
     <Panel
       title="Guard verdicts · every action checked"
       tag={<SideTag side="blue" />}
-      actions={s.operate.phase === "running" && <LiveDot className="text-blue" />}
+      actions={
+        <>
+          {s.operate.phase === "running" && <LiveDot className="text-blue" />}
+          {askable && (
+            <Button onClick={() => setAsking(true)} title="What would Guard say to a tool call right now? Nothing is executed.">
+              Ask Guard
+            </Button>
+          )}
+        </>
+      }
       className="min-h-[240px]"
       bodyClass="flex flex-col"
     >
+      {asking && <AskGuardDialog onClose={() => setAsking(false)} />}
       <div className="flex shrink-0 gap-1 border-b border-line px-2 py-1.5">
         {FILTERS.map((f) => (
           <button

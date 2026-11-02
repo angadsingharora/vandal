@@ -502,9 +502,57 @@ export interface VerdictItem {
   decision: Decision;
   fired: string[];
   cites: string[];
-  requires: string[];
+  /** Holds that evidence could clear: what it would take. */
+  requires: Requirement[];
   cleared_by: string[];
   chain: Record<string, unknown>;
+}
+
+/** What clears an evidence-gated hold (backend/vandal/contracts/controls.py Requirement, with the
+ * check it belongs to). */
+export interface Requirement {
+  check: string;
+  accepted_channels: string[];
+  contact_as_of?: "current" | "before_request" | null;
+  window_days?: number | null;
+}
+
+/** GET /runs: one of this client's runs on the server. */
+export interface RunListItem {
+  run_id: string;
+  kind: "operate" | "replay" | string;
+  profile: string;
+  company: string;
+  seed: number;
+  policy: string;
+  day: number;
+  events: number;
+}
+
+/** GET /guard/tools: a tool the gate rules on, and its arguments. */
+export interface GuardTool {
+  tool: string;
+  stage: string;
+  stage_help: string;
+  args: { name: string; type: string; required: boolean; default: unknown }[];
+}
+
+/** POST /runs/{id}/guard/check: what Guard would say, without the call being made. */
+export interface GuardCheckOut {
+  run_id: string;
+  policy: string;
+  day: number;
+  tool: string;
+  stage: string;
+  actor: Actor;
+  args: Record<string, unknown>;
+  decision: Decision;
+  fired: string[];
+  cites: string[];
+  requires: Requirement[];
+  missing_facts: string[];
+  summary: string;
+  facts: Record<string, unknown>;
 }
 
 export interface AlertItem {
@@ -612,6 +660,15 @@ export interface ProfileInfo {
   risk: { lambda_per_blocked: Cents; mu_per_hold: Cents };
   operator: { payment_horizon_days: number };
   fixtures: number;
+  /** Every vendor's name, in the order the books carry them. Absent on an older API. */
+  vendor_names?: string[];
+}
+
+/** GET /profiles/{name}/export: the whole company as JSON, to keep in a file. */
+export interface ProfileExport {
+  name: string;
+  company: string;
+  profile: Record<string, unknown>;
 }
 
 export interface AttackerCapabilities {
@@ -629,6 +686,8 @@ export interface NewProfile {
   name?: string;
   base?: string;
   company_name?: string;
+  /** Your vendors, taking the place of the base company's (names and domains; the rest stays). */
+  vendors?: { name: string; domain?: string }[];
   approval?: Partial<Omit<ProfileInfo["approval"], "approvers">>;
   generation?: Partial<ProfileInfo["generation"]>;
   attacker?: Partial<AttackerCapabilities>;
