@@ -1,71 +1,106 @@
 "use client";
 
 // Shadow mode: a month of a company's real accounts payable, replayed through Guard on a clone
-// of the books under the run's policy. Report only: the live run is untouched. Paste or upload
-// the export as CSV (or start from the sample), and read what Guard would have allowed, held,
-// escalated or blocked, and where every payment went.
+// of the books under the run's policy, and under a second policy for the before/after. Report
+// only: the live run is untouched. Paste or upload the export as it comes out of the accounting
+// system (the columns are read through aliases, and the mapping shows before anything runs), or
+// start from the sample. The report is kept on the server and has its own page to send on.
 
-import { useRef, useState } from "react";
-import { cx, usd } from "@/lib/format";
-import { needs } from "@/lib/rules";
+import { useEffect, useRef, useState } from "react";
+import { cx } from "@/lib/format";
 import { SHADOW_COLUMNS, SHADOW_SAMPLE } from "@/lib/shadowSample";
 import { useWarRoom } from "@/lib/store";
-import type { Decision, ShadowReport, ShadowRow } from "@/lib/types";
-import { Badge, Button, DecisionBadge, Modal, Stat } from "./ui";
+import type { ShadowMapping, ShadowReport } from "@/lib/types";
+import { headline, KIND_TEXT, ShadowReportBody } from "./ShadowReportBody";
+import { Button, Modal } from "./ui";
 
 const field = "num w-full rounded border border-line bg-bg px-2 text-xs";
 
-const KIND_TEXT: Record<string, string> = {
-  bill: "bill",
-  payment: "payment",
-  vendor_bank_change: "bank change",
-  vendor_contact_change: "contact change",
-  callback: "callback",
-};
-
-function RowDecision({ row }: { row: ShadowRow }) {
-  if (row.decision === "unmatched") return <Badge tone="dim">unmatched</Badge>;
-  return <DecisionBadge decision={row.decision as Decision} />;
-}
-
-function Why({ row }: { row: ShadowRow }) {
-  const worst = row.steps.find((s) => s.decision === row.decision);
-  if (row.note) return <span className="text-dim">{row.note}</span>;
-  if (row.kind === "payment" && row.paid) {
-    const bad = row.payee_status !== "verified";
-    return (
-      <span className={bad ? "text-bad" : "text-dim"}>
-        {usd(row.amount_cents ?? 0)} to <span className="num">{row.payee_account}</span>, {row.payee_status}
-        {bad && row.payee_source ? ` (${row.payee_source})` : ""}
-      </span>
-    );
-  }
-  if (!worst || worst.decision === "allow") return <span className="text-faint">nothing fired</span>;
+function Mapping({ m }: { m: ShadowMapping }) {
   return (
-    <span className="text-dim">
-      <span className="num text-warn">{worst.fired.join(", ")}</span>
-      {worst.requires.map((r) => (
-        <span key={r.check}> · {needs(r)}</span>
-      ))}
-    </span>
+    <div className="rounded border border-line bg-panel px-3 py-2 text-[11px] leading-relaxed">
+      {m.problem ? (
+        <p className="text-bad">{m.problem}</p>
+      ) : (
+        <p className="text-dim">
+          <span className="text-ink">
+            {m.rows} {m.rows === 1 ? "row" : "rows"}
+          </span>
+          {Object.keys(m.kinds).length > 0 && (
+            <>
+              :{" "}
+              {Object.entries(m.kinds)
+                .map(([k, n]) => `${n} ${KIND_TEXT[k] ?? k}${n === 1 ? "" : "s"}`)
+                .join(", ")}
+            </>
+          )}
+          .
+        </p>
+      )}
+      <p className="mt-1 text-dim">
+        Read as{" "}
+        {m.columns.map((c, i) => (
+          <span key={c.source}>
+            {i > 0 && ", "}
+            <span className="num text-ink">{c.source}</span>
+            {c.source.trim().toLowerCase() !== c.read_as && (
+              <>
+                {" "}
+                → <span className="num">{c.read_as}</span>
+              </>
+            )}
+          </span>
+        ))}
+        {m.ignored.length > 0 && (
+          <>
+            . Ignored: <span className="num text-faint">{m.ignored.join(", ")}</span>
+          </>
+        )}
+        .
+      </p>
+    </div>
   );
 }
 
 export function ShadowDialog({ onClose }: { onClose: () => void }) {
   const s = useWarRoom();
   const runId = s.focusRunId ?? s.liveRunId;
+  const current = s.summary?.policy ?? "v0";
+  const others = s.policies.map((p) => p.name).filter((n) => n !== current);
   const [csv, setCsv] = useState("");
+  const [compare, setCompare] = useState<string>(others.includes("v1") ? "v1" : (others[0] ?? ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mapping, setMapping] = useState<ShadowMapping | null>(null);
   const [report, setReport] = useState<ShadowReport | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // The mapping, a moment after the text settles: which column feeds which, before anything runs.
+  useEffect(() => {
+    const api = s.api;
+    if (!api || !csv.trim()) {
+      setMapping(null);
+      return;
+    }
+    let alive = true;
+    const t = setTimeout(() => {
+      api
+        .shadowMapping(csv)
+        .then((m) => alive && setMapping(m))
+        .catch(() => alive && setMapping(null));
+    }, 350);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [csv, s.api]);
 
   const run = async () => {
     if (!runId || !s.api) return;
     setError(null);
     setBusy(true);
     try {
-      setReport(await s.api.shadow(runId, { csv }));
+      setReport(await s.api.shadow(runId, { csv, compare: compare || null }));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -79,19 +114,23 @@ export function ShadowDialog({ onClose }: { onClose: () => void }) {
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const sum = report?.summary;
-
   return (
     <Modal title="Shadow report" onClose={onClose} wide>
       <p className="text-xs leading-relaxed text-dim">
         A month of your accounts payable, replayed through Guard on a clone of {s.summary?.company ?? "the company"}&apos;s books under{" "}
-        <span className="num text-ink">{s.summary?.policy ?? "v0"}</span>. Nothing here touches the live run. Each row becomes the call the agent would have made; Guard
-        rules on every one. An integration posts the same CSV to <span className="num">POST /runs/{"{id}"}/shadow</span>.
+        <span className="num text-ink">{current}</span>
+        {compare && (
+          <>
+            , and again under <span className="num text-ink">{compare}</span> for the before and after
+          </>
+        )}
+        . Nothing here touches the live run. Each row becomes the call the agent would have made; Guard rules on every one. An integration posts the same
+        CSV to <span className="num">POST /runs/{"{id}"}/shadow</span>.
       </p>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
         <label htmlFor="shadow-csv" className="flex flex-col gap-1 text-[11px] text-dim">
-          The export, as CSV
+          The export, as CSV, as it comes out of QuickBooks, Bill.com, NetSuite or a spreadsheet
           <textarea
             id="shadow-csv"
             value={csv}
@@ -116,13 +155,29 @@ export function ShadowDialog({ onClose }: { onClose: () => void }) {
           </Button>
           <Button onClick={() => fileRef.current?.click()}>Upload a CSV</Button>
           <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
+          <label htmlFor="shadow-compare" className="mt-1 flex flex-col gap-1 text-[11px] text-dim">
+            Compare against
+            <select id="shadow-compare" value={compare} onChange={(e) => setCompare(e.target.value)} className={cx(field, "h-8")}>
+              <option value="">nothing, {current} alone</option>
+              {others.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
           <p>
-            Kinds: <span className="num">bill</span> (vendor, number, amount, po), <span className="num">payment</span> (number), <span className="num">vendor_bank_change</span> and{" "}
-            <span className="num">vendor_contact_change</span> (vendor, channel, sender, the new details), <span className="num">callback</span> (vendor, method). Vendors match by
-            name, domain or id against this company&apos;s vendor master.
+            Column names from the usual systems are read as is (Vendor Name, Invoice #, Transaction Type, PO Number…). Kinds: bill, payment, bank change,
+            contact change, callback. Vendors match by name, domain or id against this company&apos;s vendor master.
           </p>
         </div>
       </div>
+
+      {mapping && !report && (
+        <div className="mt-3">
+          <Mapping m={mapping} />
+        </div>
+      )}
 
       {error && (
         <p role="alert" className="mt-3 text-xs text-bad">
@@ -130,72 +185,30 @@ export function ShadowDialog({ onClose }: { onClose: () => void }) {
         </p>
       )}
 
-      {report && sum && (
-        <div className="mt-5 space-y-4">
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded border border-line bg-line sm:grid-cols-3 lg:grid-cols-6">
-            <Stat label="Rows" value={sum.rows} />
-            <Stat label="Allowed" value={sum.by_decision.allow ?? 0} />
-            <Stat label="Held or blocked" value={(sum.by_decision.hold ?? 0) + (sum.by_decision.block ?? 0)} tone={(sum.by_decision.hold ?? 0) + (sum.by_decision.block ?? 0) > 0 ? "ok" : undefined} />
-            <Stat label="Escalated" value={sum.by_decision.escalate ?? 0} />
-            <Stat label="Paid" value={usd(sum.money_through, { cents: false })} />
-            <Stat label="To unverified accounts" value={usd(sum.money_unverified, { cents: false })} tone={sum.money_unverified > 0 ? "bad" : "ok"} sub={sum.money_unverified > 0 ? "money Guard let through to an account nothing verified" : "nothing reached an unverified account"} />
+      {report && (
+        <div className="mt-5">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className="text-sm font-semibold text-ink">{headline(report)}</h2>
+            {report.job_id && (
+              <a
+                href={`/report/shadow/${report.job_id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-ink underline"
+                title="The same report on its own page, to print or send on. It lives on the server as long as it runs."
+              >
+                Open the report
+              </a>
+            )}
           </div>
-
-          {sum.attention.length > 0 && (
-            <div>
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-faint">Needs a look</h3>
-              <ul className="mt-2 space-y-1.5">
-                {sum.attention.map((a, i) => (
-                  <li key={i} className={cx("rounded border px-3 py-2 text-xs", a.decision === "paid_unverified" ? "border-bad/40 bg-bad/[0.06]" : "border-warn/40 bg-warn/[0.05]")}>
-                    <span className="num text-faint">#{a.n}</span> <span className="text-ink">{KIND_TEXT[a.kind] ?? a.kind}</span>
-                    {a.vendor_name && <span className="text-dim"> · {a.vendor_name}</span>}
-                    <div className="mt-0.5 text-dim">{a.summary}</div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="overflow-x-auto rounded border border-line">
-            <table className="w-full border-collapse bg-panel text-xs">
-              <thead>
-                <tr className="border-b border-line text-left text-[10px] uppercase tracking-wider text-faint">
-                  <th className="px-2 py-1.5 font-medium">#</th>
-                  <th className="px-2 py-1.5 font-medium">Row</th>
-                  <th className="px-2 py-1.5 font-medium">Vendor</th>
-                  <th className="px-2 py-1.5 font-medium">Guard</th>
-                  <th className="px-2 py-1.5 font-medium">Why</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.rows.map((r) => (
-                  <tr key={r.n} className={cx("border-b border-line/60 align-top last:border-b-0", r.decision !== "allow" && "bg-raised/50")}>
-                    <td className="num px-2 py-1.5 text-faint">{r.n}</td>
-                    <td className="px-2 py-1.5 text-ink">
-                      {KIND_TEXT[r.kind] ?? r.kind}
-                      {r.input.number && <span className="num text-dim"> {r.input.number}</span>}
-                      {r.input.amount != null && <span className="num text-dim"> {usd(Math.round(r.input.amount * 100))}</span>}
-                      {r.ref && <span className="num text-faint"> · {r.ref}</span>}
-                    </td>
-                    <td className="px-2 py-1.5 text-dim">{r.vendor_name ?? r.input.vendor ?? ""}</td>
-                    <td className="px-2 py-1.5">
-                      <RowDecision row={r} />
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <Why row={r} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ShadowReportBody report={report} />
         </div>
       )}
 
       <footer className="mt-5 flex items-center gap-3 border-t border-line pt-4">
         <span className="min-w-0 flex-1 text-[11px] text-faint">Every row runs on day 0 of a fresh clone; the report is about what Guard says, not the calendar.</span>
         <Button onClick={onClose}>Close</Button>
-        <Button tone="blue" onClick={run} busy={busy} disabled={!runId || !csv.trim()}>
+        <Button tone="blue" onClick={run} busy={busy} disabled={!runId || !csv.trim() || (mapping?.problem != null)}>
           Run the shadow report
         </Button>
       </footer>

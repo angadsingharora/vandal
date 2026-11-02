@@ -263,6 +263,16 @@ class Registry:
         self.pool.submit(runner)
         return job
 
+    def record(self, kind: str, result: Any, owner: str | None = None, **meta: Any) -> Job:
+        """Keep work that already finished (a shadow report) as a done job, so it has an id
+        to fetch later. Counts against nothing: no pool, no owner cap."""
+        self._evict_finished()
+        job = Job(id=_id(kind), kind=kind, status="done", result=result, meta=meta, owner=owner)
+        job.channel.publish("done", {"status": "done"})
+        job.channel.close()
+        self.jobs[job.id] = job
+        return job
+
     def job(self, job_id: str) -> Job:
         return self.jobs[job_id]
 
