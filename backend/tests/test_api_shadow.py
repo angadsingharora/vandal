@@ -79,7 +79,7 @@ def test_the_live_run_is_untouched_and_rows_work_as_json(client) -> None:
 def test_the_errors_and_the_columns(client) -> None:
     rid = client.post("/runs").json()["run_id"]
     assert client.post(f"/runs/{rid}/shadow", json={}).status_code == 400
-    bad = client.post(f"/runs/{rid}/shadow", json={"csv": "vendor,amount\nx,1\n"})
+    bad = client.post(f"/runs/{rid}/shadow", json={"csv": "date,notes\n2026-01-01,x\n"})
     assert bad.status_code == 400 and "kind" in bad.json()["detail"]
     bad = client.post(f"/runs/{rid}/shadow", json={"csv": "kind,vendor\nrefund,x\n"})
     assert bad.status_code == 400 and "unknown kind" in bad.json()["detail"]
@@ -101,3 +101,63 @@ def test_the_errors_and_the_columns(client) -> None:
         "vendor_contact_change",
         "callback",
     }
+
+
+QUICKBOOKS = """Date,Transaction Type,Num,Vendor Name,Memo,Amount,PO Number
+2026-03-02,Bill,HPC-3104,Harbor Point Construction,March draw,"$18,450.00",PO-7731
+2026-03-05,Bill Payment (Check),HPC-3104,Harbor Point Construction,,"18,450.00",
+2026-03-09,Vendor Update,,Harbor Point Construction,,,
+"""
+
+
+def test_a_quickbooks_export_is_read_through_the_aliases(client) -> None:
+    m = client.post("/shadow/mapping", json={"csv": QUICKBOOKS}).json()
+    assert {c["source"]: c["read_as"] for c in m["columns"]} == {
+        "Transaction Type": "kind",
+        "Num": "number",
+        "Vendor Name": "vendor",
+        "Amount": "amount",
+        "PO Number": "po",
+    }
+    assert m["ignored"] == ["Date", "Memo"] and m["problem"] is None
+    assert m["rows"] == 3 and m["kinds"] == {"bill": 1, "payment": 1, "vendor_bank_change": 1}
+    rid = client.post("/runs", json={"policy": "v1"}).json()["run_id"]
+    out = client.post(f"/runs/{rid}/shadow", json={"csv": QUICKBOOKS}).json()
+    assert [r["decision"] for r in out["rows"]] == ["allow", "allow", "hold"]
+    assert out["rows"][1]["amount_cents"] == 1_845_000
+
+
+def test_kind_is_inferred_from_the_columns_a_row_fills(client) -> None:
+    csv = (
+        "Vendor,Invoice #,Total,Routing Number,Account Number,Verified By\n"
+        "Summit Roofing,SR-9,100,,,\n"
+        ",SR-9,,,,\n"
+        "Summit Roofing,,,1,2,\n"
+        "Summit Roofing,,,,,phone_outbound\n"
+    )
+    m = client.post("/shadow/mapping", json={"csv": csv}).json()
+    assert m["kinds"] == {"bill": 1, "payment": 1, "vendor_bank_change": 1, "callback": 1}
+    m = client.post("/shadow/mapping", json={"csv": "Vendor,Notes\nSummit Roofing,x\n"}).json()
+    assert m["rows"] == 0 and "can't tell" in m["problem"]
+
+
+def test_compare_runs_the_month_under_both_policies(client) -> None:
+    csv = SAMPLE.read_text()
+    rid = client.post("/runs", json={"policy": "v0"}).json()["run_id"]
+    out = client.post(f"/runs/{rid}/shadow", json={"csv": csv, "compare": "v1"}).json()
+    assert out["policy"] == "v0" and out["compare"]["policy"] == "v1"
+    assert out["summary"]["money_unverified"] == 4_249_300
+    assert out["compare"]["summary"]["money_unverified"] == 0
+    d = out["delta"]
+    assert d["before"] == "v0" and d["after"] == "v1"
+    assert d["money_unverified"] == -4_249_300 and d["held_or_blocked"] > 0
+    assert any(m["n"] == 3 and m["before"] == "allow" and m["after"] == "hold" for m in d["moved"])
+    # the report is kept as a job, so it has an address
+    job = client.get(f"/jobs/{out['job_id']}").json()
+    assert job["kind"] == "shadow" and job["status"] == "done"
+    assert job["result"]["delta"]["money_unverified"] == -4_249_300
+    assert job["meta"]["compare"] == "v1" and job["meta"]["rows"] == 15
+    # comparing a policy with itself, or one that doesn't exist
+    same = client.post(f"/runs/{rid}/shadow", json={"csv": csv, "compare": "v0"}).json()
+    assert same["compare"] is None and same["delta"] is None
+    assert client.post(f"/runs/{rid}/shadow", json={"csv": csv, "compare": "v9"}).status_code == 400

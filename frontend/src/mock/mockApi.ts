@@ -98,6 +98,9 @@ export class MockApi implements VandalApi {
   shadow = async (): Promise<never> => {
     throw new ApiError(404, "the recorded loop has no shadow mode; use the live backend");
   };
+  shadowMapping = async (): Promise<never> => {
+    throw new ApiError(404, "the recorded loop has no shadow mode; use the live backend");
+  };
   listRuns = async () => [] as import("@/lib/types").RunListItem[];
   private runs = new Map<string, MockRun>();
   private jobs = new Map<string, MockJob>();

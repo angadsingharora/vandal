@@ -699,20 +699,58 @@ export interface ShadowRow {
   steps: ShadowStep[];
 }
 
+export interface ShadowSummary {
+  policy: string;
+  rows: number;
+  by_decision: Record<string, number>;
+  money_stopped: Cents;
+  money_through: Cents;
+  money_unverified: Cents;
+  attention: { n: number; ref: string | null; kind: string; vendor_name?: string | null; decision: string; summary: string; requires: Requirement[] }[];
+}
+
+/** A row whose decision moved between the two policies. */
+export interface ShadowMoved {
+  n: number;
+  ref: string | null;
+  kind: string;
+  vendor_name?: string | null;
+  before: string;
+  after: string;
+  amount_cents?: number | null;
+  summary: string;
+}
+
+export interface ShadowDelta {
+  before: string;
+  after: string;
+  money_unverified: Cents;
+  money_stopped: Cents;
+  held_or_blocked: number;
+  moved: ShadowMoved[];
+}
+
 export interface ShadowReport {
+  /** The report is kept as a finished job: /report/shadow/{job_id}. */
+  job_id?: string;
   run_id: string;
   policy: string;
   company: string;
-  summary: {
-    policy: string;
-    rows: number;
-    by_decision: Record<string, number>;
-    money_stopped: Cents;
-    money_through: Cents;
-    money_unverified: Cents;
-    attention: { n: number; ref: string | null; kind: string; vendor_name?: string | null; decision: string; summary: string; requires: Requirement[] }[];
-  };
+  summary: ShadowSummary;
   rows: ShadowRow[];
+  /** The same rows under another policy (`compare`), and what it changes. */
+  compare: { policy: string; summary: ShadowSummary; rows: ShadowRow[] } | null;
+  delta: ShadowDelta | null;
+}
+
+/** POST /shadow/mapping: how a CSV's columns are read, before anything runs. */
+export interface ShadowMapping {
+  columns: { source: string; read_as: string }[];
+  ignored: string[];
+  missing: string[];
+  rows: number;
+  kinds: Record<string, number>;
+  problem: string | null;
 }
 
 /** GET /profiles/{name}/export: the whole company as JSON, to keep in a file. */

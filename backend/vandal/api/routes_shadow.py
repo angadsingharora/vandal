@@ -16,6 +16,17 @@ is reported as unmatched rather than guessed. A bill that had a purchase order n
 arrived): the PO and receipt are seeded on the clone so the three-way match has something to
 match, as the company's own books would. Every row runs on day 0 of the clone: the report is
 about what Guard says to each action, not about the calendar.
+
+Real exports don't come with this header. Column names from the usual accounting systems
+(QuickBooks, Bill.com, NetSuite, Xero: "Vendor Name", "Invoice #", "Transaction Type", "PO
+Number", ...) are read through an alias table, `kind` is taken from the source's own type
+column or inferred from which columns a row fills, and `POST /shadow/mapping` says, before
+anything runs, how each column was read and which were ignored.
+
+With `compare` set to another policy the same rows run on a second clone under that policy,
+and the report carries both results and the difference: what the proposed rule would have
+stopped last month that the current one let through. Every report is kept as a finished job
+(`job_id`), so `/report/shadow/{job_id}` can be opened later or sent on.
 """
 
 from __future__ import annotations
@@ -33,6 +44,7 @@ from vandal.api.routes_guard import _say
 from vandal.contracts.controls import DECISION_ORDER
 from vandal.contracts.entities import Actor, PurchaseOrder, Receipt, Vendor
 from vandal.sandbox import Sandbox, new_sandbox
+from vandal.synth.templates import Policy
 from vandal.twin.flows import (
     TOOLS,
     CallbackArgs,
@@ -74,6 +86,163 @@ COLUMNS = [
 ]
 
 
+# How accounting systems name the columns shadow mode reads. Keys are normalized headers
+# (lowercase, non-alphanumerics dropped); values are shadow columns.
+ALIASES: dict[str, str] = {
+    "kind": "kind",
+    "type": "kind",
+    "transactiontype": "kind",
+    "txntype": "kind",
+    "doctype": "kind",
+    "recordtype": "kind",
+    "vendor": "vendor",
+    "vendorname": "vendor",
+    "vendorid": "vendor",
+    "payee": "vendor",
+    "supplier": "vendor",
+    "suppliername": "vendor",
+    "name": "vendor",
+    "contact": "vendor",
+    "entity": "vendor",
+    "number": "number",
+    "num": "number",
+    "no": "number",
+    "invoice": "number",
+    "invoicenumber": "number",
+    "invoiceno": "number",
+    "invoice#": "number",
+    "billnumber": "number",
+    "billno": "number",
+    "bill#": "number",
+    "docnumber": "number",
+    "documentnumber": "number",
+    "refno": "number",
+    "amount": "amount",
+    "total": "amount",
+    "totalamount": "amount",
+    "amountpaid": "amount",
+    "openbalance": "amount",
+    "amountdue": "amount",
+    "grossamount": "amount",
+    "po": "po",
+    "ponumber": "po",
+    "pono": "po",
+    "po#": "po",
+    "purchaseorder": "po",
+    "purchaseordernumber": "po",
+    "poamount": "po_amount",
+    "purchaseorderamount": "po_amount",
+    "received": "received",
+    "goodsreceived": "received",
+    "receipt": "received",
+    "itemreceipt": "received",
+    "channel": "channel",
+    "source": "channel",
+    "receivedvia": "channel",
+    "via": "channel",
+    "sender": "sender",
+    "senderemail": "sender",
+    "from": "sender",
+    "fromemail": "sender",
+    "requestedby": "sender",
+    "routing": "routing",
+    "routingnumber": "routing",
+    "aba": "routing",
+    "bankrouting": "routing",
+    "account": "account",
+    "accountnumber": "account",
+    "bankaccount": "account",
+    "bankaccountnumber": "account",
+    "acct": "account",
+    "contactname": "contact_name",
+    "newcontact": "contact_name",
+    "contactemail": "contact_email",
+    "email": "contact_email",
+    "contactphone": "contact_phone",
+    "phone": "contact_phone",
+    "method": "method",
+    "verifiedby": "method",
+    "verificationmethod": "method",
+    "verification": "method",
+    "ref": "ref",
+    "reference": "ref",
+    "id": "ref",
+    "transactionid": "ref",
+    "txnid": "ref",
+}
+
+# How those systems name the kinds. Normalized the same way as headers.
+KIND_ALIASES: dict[str, str] = {
+    "bill": "bill",
+    "invoice": "bill",
+    "vendorbill": "bill",
+    "vendorinvoice": "bill",
+    "ap": "bill",
+    "payable": "bill",
+    "payment": "payment",
+    "billpayment": "payment",
+    "billpaymentcheck": "payment",
+    "billpaymentcreditcard": "payment",
+    "billpaymentach": "payment",
+    "vendorpayment": "payment",
+    "check": "payment",
+    "ach": "payment",
+    "wire": "payment",
+    "expense": "payment",
+    "paid": "payment",
+    "vendorbankchange": "vendor_bank_change",
+    "bankchange": "vendor_bank_change",
+    "bankupdate": "vendor_bank_change",
+    "bankdetailschange": "vendor_bank_change",
+    "vendorupdate": "vendor_bank_change",
+    "achchange": "vendor_bank_change",
+    "paymentdetailschange": "vendor_bank_change",
+    "vendorcontactchange": "vendor_contact_change",
+    "contactchange": "vendor_contact_change",
+    "contactupdate": "vendor_contact_change",
+    "callback": "callback",
+    "verification": "callback",
+    "verified": "callback",
+    "callbackverification": "callback",
+    "portalverification": "callback",
+}
+
+
+def _norm(text: str) -> str:
+    return "".join(ch for ch in text.strip().lower() if ch.isalnum() or ch == "#")
+
+
+def map_columns(headers: list[str]) -> tuple[dict[str, str], list[str]]:
+    """Source header -> shadow column, and the source headers nothing reads. A shadow column
+    named in two source headers keeps the first."""
+    mapped: dict[str, str] = {}
+    ignored: list[str] = []
+    taken: set[str] = set()
+    for h in headers:
+        col = ALIASES.get(_norm(h or ""))
+        if col is None or col in taken:
+            ignored.append(h)
+            continue
+        mapped[h] = col
+        taken.add(col)
+    return mapped, ignored
+
+
+def infer_kind(data: dict[str, Any]) -> str | None:
+    """A row with no type column: what it is from which columns it fills."""
+    if data.get("routing") or data.get("account"):
+        return "vendor_bank_change"
+    if data.get("contact_name") or data.get("contact_email") or data.get("contact_phone"):
+        return "vendor_contact_change"
+    if data.get("method"):
+        return "callback"
+    if data.get("vendor") and data.get("amount") not in (None, ""):
+        return "bill"
+    if data.get("number"):
+        return "payment"
+    return None
+
+
 class Row(BaseModel):
     """One thing that happened in accounts payable. Which fields matter depends on `kind`:
     a bill has a vendor, number and amount; a payment names the bill's number; a change has
@@ -108,25 +277,44 @@ class ShadowBody(BaseModel):
     # Over-threshold payments wait for a human; in shadow the human is assumed to have approved,
     # as they did in reality, so the chain reaches execution and Guard's execute-time checks.
     approve_escalations: bool = True
+    # Another policy to run the same rows under, for the before/after.
+    compare: str | None = Field(default=None, max_length=60)
+
+
+class MappingBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    csv: str = Field(max_length=400_000)
 
 
 def rows_from_csv(text: str) -> list[Row]:
     reader = csv.DictReader(io.StringIO(text))
-    if not reader.fieldnames or "kind" not in [f.strip().lower() for f in reader.fieldnames]:
+    mapped, _ = map_columns(list(reader.fieldnames or []))
+    cols = set(mapped.values())
+    if not cols or not (
+        "kind" in cols or cols & {"vendor", "number", "routing", "account", "method"}
+    ):
         raise HTTPException(
-            400, f"the CSV needs a header with at least 'kind'; columns: {', '.join(COLUMNS)}"
+            400,
+            "the CSV needs a header shadow mode can read: 'kind' or a vendor, number, bank "
+            f"or contact column; columns: {', '.join(COLUMNS)}",
         )
     rows: list[Row] = []
     for n, raw in enumerate(reader, start=2):
-        clean = {(k or "").strip().lower(): (v or "").strip() for k, v in raw.items()}
+        clean = {mapped[k]: (v or "").strip() for k, v in raw.items() if k in mapped}
         if not any(clean.values()):
             continue
-        kind = clean.get("kind", "").lower().replace(" ", "_").replace("-", "_")
-        if kind not in KINDS:
-            raise HTTPException(
-                400, f"line {n}: unknown kind {clean.get('kind')!r}; one of {', '.join(KINDS)}"
-            )
         data: dict[str, Any] = {k: v for k, v in clean.items() if k in COLUMNS and v}
+        raw_kind = data.pop("kind", "")
+        kind = KIND_ALIASES.get(_norm(raw_kind)) if raw_kind else infer_kind(data)
+        if kind is None and raw_kind:
+            raise HTTPException(
+                400, f"line {n}: unknown kind {raw_kind!r}; one of {', '.join(KINDS)}"
+            )
+        if kind is None:
+            raise HTTPException(
+                400, f"line {n}: can't tell what this row is; give it a kind ({', '.join(KINDS)})"
+            )
         data["kind"] = kind
         for money in ("amount", "po_amount"):
             if money in data:
@@ -156,9 +344,11 @@ def _worst(decisions: list[str]) -> str:
 class Shadow:
     """Replays rows on one clone and keeps the report."""
 
-    def __init__(self, handle: RunHandle, approve_escalations: bool) -> None:
+    def __init__(
+        self, handle: RunHandle, approve_escalations: bool, policy: Policy | None = None
+    ) -> None:
         self.sb: Sandbox = new_sandbox(
-            handle.sandbox.profile, seed=handle.seed, policy=handle.policy, use_llm=False
+            handle.sandbox.profile, seed=handle.seed, policy=policy or handle.policy, use_llm=False
         )
         self.approve_escalations = approve_escalations
         self.bills: dict[str, str] = {}  # bill number -> invoice id on the clone
@@ -474,11 +664,70 @@ def summarize(rows: list[dict[str, Any]], policy: str) -> dict[str, Any]:
     }
 
 
+def delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    """What the compared policy changes: money, counts, and the rows whose decision moved."""
+    moved = []
+    for b, a in zip(before["rows"], after["rows"], strict=True):
+        if b["decision"] != a["decision"] or bool(b.get("paid")) != bool(a.get("paid")):
+            moved.append(
+                {
+                    "n": a["n"],
+                    "ref": a.get("ref"),
+                    "kind": a["kind"],
+                    "vendor_name": a.get("vendor_name"),
+                    "before": b["decision"],
+                    "after": a["decision"],
+                    "amount_cents": a.get("amount_cents"),
+                    "summary": next(
+                        (s["summary"] for s in a["steps"] if s["decision"] == a["decision"]),
+                        a.get("note") or "",
+                    ),
+                }
+            )
+    sb, sa = before["summary"], after["summary"]
+    return {
+        "before": sb["policy"],
+        "after": sa["policy"],
+        "money_unverified": sa["money_unverified"] - sb["money_unverified"],
+        "money_stopped": sa["money_stopped"] - sb["money_stopped"],
+        "held_or_blocked": (sa["by_decision"].get("hold", 0) + sa["by_decision"].get("block", 0))
+        - (sb["by_decision"].get("hold", 0) + sb["by_decision"].get("block", 0)),
+        "moved": moved,
+    }
+
+
+@router.post("/shadow/mapping")
+def shadow_mapping(body: MappingBody) -> dict[str, Any]:
+    """How a CSV's columns are read, before anything runs: which source column feeds which
+    shadow column, which are ignored, and what kinds the rows come out as."""
+    reader = csv.DictReader(io.StringIO(body.csv))
+    headers = list(reader.fieldnames or [])
+    mapped, ignored = map_columns(headers)
+    try:
+        rows = rows_from_csv(body.csv)
+        problem = None
+    except HTTPException as err:
+        rows, problem = [], str(err.detail)
+    kinds: dict[str, int] = {}
+    for r in rows:
+        kinds[r.kind] = kinds.get(r.kind, 0) + 1
+    return {
+        "columns": [{"source": h, "read_as": mapped[h]} for h in headers if h in mapped],
+        "ignored": ignored,
+        "missing": [c for c in ("vendor", "number", "amount") if c not in mapped.values()],
+        "rows": len(rows),
+        "kinds": kinds,
+        "problem": problem,
+    }
+
+
 @router.get("/shadow/columns")
 def shadow_columns() -> dict[str, Any]:
     """The CSV header shadow mode reads, and what each kind of row needs."""
     return {
         "columns": COLUMNS,
+        "aliases": ALIASES,
+        "kind_aliases": KIND_ALIASES,
         "kinds": {
             "bill": (
                 "vendor, number, amount (dollars); po (its purchase order number, if it had "
@@ -510,13 +759,41 @@ def shadow(request: Request, run_id: str, body: ShadowBody) -> dict[str, Any]:
     rows = body.rows if body.rows is not None else rows_from_csv(body.csv or "")
     if not rows:
         raise HTTPException(400, "no rows")
+    other = deps.policy(body.compare, request) if body.compare else None
+    if other is not None and other.version == handle.policy.version:
+        other = None
     with handle.lock:
         shadow = Shadow(handle, body.approve_escalations)
+        twin = Shadow(handle, body.approve_escalations, other) if other else None
     report = shadow.run(rows)
-    return {
+    out: dict[str, Any] = {
         "run_id": run_id,
         "policy": handle.policy.version,
         "company": shadow.state.company,
         "summary": summarize(report, handle.policy.version),
         "rows": report,
+        "compare": None,
+        "delta": None,
     }
+    if twin is not None and other is not None:
+        twin_rows = twin.run(rows)
+        out["compare"] = {
+            "policy": other.version,
+            "summary": summarize(twin_rows, other.version),
+            "rows": twin_rows,
+        }
+        out["delta"] = delta(out, out["compare"])
+    # kept as a finished job, so the report has an address
+    job = deps.registry(request).record(
+        "shadow",
+        out,
+        owner=deps.client(request),
+        run_id=run_id,
+        policy=handle.policy.version,
+        compare=other.version if other else None,
+        rows=len(rows),
+        company=shadow.state.company,
+    )
+    out["job_id"] = job.id
+    job.result = out
+    return out
