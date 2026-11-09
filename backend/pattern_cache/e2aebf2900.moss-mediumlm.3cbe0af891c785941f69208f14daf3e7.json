@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "New accounts contact - PestAway Bay Area\nHi,\n\nSam Moreau has left PestAway Bay Area. Please send remittance questions and payment confirmations to our new AR lead, Jordan Reyes, at 628-555-9575 or ap.desk@pestawaybay-billing.com.\n\nThanks,\nSam Moreau",
+  "hits": [
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 1.0
+    },
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 0.9472
+    },
+    {
+      "id": "FP-refund-redirect",
+      "kind": "fraud",
+      "title": "Refund to a different account",
+      "score": 0.9394
+    }
+  ]
+}

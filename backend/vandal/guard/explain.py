@@ -12,6 +12,9 @@ root cause), the gate verdicts that decided each step, the checks that fired, an
   - Pushback ("this vendor is fine, just pay it") never clears a hold. Explaining has no tools:
     the answer restates which rule holds the item, what evidence would clear it, and that a
     decision goes through the approvals inbox.
+  - Every inbound message the trace cites is matched against known vendor-fraud patterns
+    (guard/patterns.py, Moss semantic search). The matches ride along in `resembles`, outside the
+    claims: they are advisory, never cited as a reason, and never change a hold.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from vandal.guard.patterns import Recall, recall_messages
 from vandal.synth.coverage import build_chain
 from vandal.twin.state import State
 
@@ -51,6 +55,7 @@ class Explanation(BaseModel):
     source: Literal["llm", "deterministic"]
     pushback: bool = False
     notes: list[str] = []
+    resembles: list[Recall] = []
 
     @property
     def answer(self) -> str:
@@ -264,8 +269,10 @@ def explain(
     entity_id: str,
     question: str | None = None,
     use_llm: bool = True,
+    patterns: bool = True,
 ) -> Explanation:
     claims = trace(state, entity_type, entity_id)
+    resembles = recall_messages(state, [x for c in claims for x in c.cites]) if patterns else []
     allowed = resolvable(state)
     # The trace is built from the record, so this only fails on a bug. Keep a claim with what
     # does resolve, and say so; drop it only if nothing does. Never cite what isn't there.
@@ -310,7 +317,8 @@ def explain(
         claims=claims,
         source=source,
         pushback=pushback,
-        notes=notes,
+        notes=notes + [r.note for r in resembles if r.note],
+        resembles=resembles,
     )
 
 
@@ -320,11 +328,12 @@ def explain_safely(
     entity_id: str,
     question: str | None = None,
     use_llm: bool = True,
+    patterns: bool = True,
 ) -> dict[str, Any]:
     """For the API: a typed error instead of an exception."""
     if entity_type not in ("payment", "invoice", "change_request"):
         return {"error": f"can't explain {entity_type!r}"}
     try:
-        return explain(state, entity_type, entity_id, question, use_llm).model_dump()
+        return explain(state, entity_type, entity_id, question, use_llm, patterns).model_dump()
     except KeyError:
         return {"error": f"no {entity_type} {entity_id}"}

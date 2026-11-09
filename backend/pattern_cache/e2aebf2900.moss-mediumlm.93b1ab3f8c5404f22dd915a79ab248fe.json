@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Updated remittance details - Recology Waste\nHello,\n\nPlease note Recology Waste has moved banking providers. Effective immediately, please remit all open invoices to:\n\nRouting: 026056240\nAccount: 1832539348\n\nThe previous account ending 0586 will be closed this week.\n\nThanks,\nMorgan Garcia",
+  "hits": [
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 1.0
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9574
+    },
+    {
+      "id": "FP-refund-redirect",
+      "kind": "fraud",
+      "title": "Refund to a different account",
+      "score": 0.9394
+    }
+  ]
+}

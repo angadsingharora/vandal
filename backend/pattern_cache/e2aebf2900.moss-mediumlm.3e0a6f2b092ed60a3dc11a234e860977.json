@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "New accounts contact - Bayside Plumbing\nHi,\n\nSam Cohen has left Bayside Plumbing. Please send remittance questions and payment confirmations to our new AR lead, Jordan Reyes, at 628-555-7377 or ap.desk@baysidep1umbing.com.\n\nThanks,\nSam Cohen",
+  "hits": [
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 1.0
+    },
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 0.9472
+    },
+    {
+      "id": "FP-new-domain",
+      "kind": "fraud",
+      "title": "Vendor email domain changed",
+      "score": 0.9339
+    }
+  ]
+}

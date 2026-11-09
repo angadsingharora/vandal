@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Updated remittance details - Prism Painting\nHello,\n\nPlease note Prism Painting has moved banking providers. Effective immediately, please remit all open invoices to:\n\nRouting: 026085055\nAccount: 8576293992\n\nThe previous account ending 2326 will be closed this week.\n\nThanks,\nMorgan Garcia",
+  "hits": [
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 1.0
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9574
+    },
+    {
+      "id": "FP-new-domain",
+      "kind": "fraud",
+      "title": "Vendor email domain changed",
+      "score": 0.9237
+    }
+  ]
+}

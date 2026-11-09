@@ -1,5 +1,5 @@
 """Blue's routes: the verdict feed (B4), approvals and segregation of duties (B3), applying
-policy patches (B3), and cited explanations (B5)."""
+policy patches (B3), cited explanations (B5), and fraud-pattern recall (B6)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from vandal.api import deps
 from vandal.contracts.entities import Actor
+from vandal.guard import patterns
 from vandal.guard.approvals import InboxError
 from vandal.guard.explain import explain_safely
 from vandal.synth.templates import Policy
@@ -22,6 +23,10 @@ class Decision(BaseModel):
     actor: Actor
     approve: bool
     reason: str = ""
+
+
+class RecallBody(BaseModel):
+    text: str
 
 
 class Submit(BaseModel):
@@ -141,3 +146,25 @@ def explain_route(
     if "error" in out:
         raise HTTPException(404 if out["error"].startswith("no ") else 400, out["error"])
     return out
+
+
+@router.get("/patterns")
+def pattern_library() -> dict[str, Any]:
+    """The known vendor-fraud and routine AP patterns that messages are matched against."""
+    return {
+        "version": patterns.LIBRARY_VERSION,
+        "index": patterns.INDEX_NAME,
+        "moss": patterns.configured(),
+        "patterns": [p.model_dump() for p in patterns.LIBRARY],
+    }
+
+
+@router.post("/patterns/recall")
+def pattern_recall(body: RecallBody) -> dict[str, Any]:
+    """The closest known patterns to any text, e.g. a message before it reaches the Operator.
+    Advisory: it decides nothing."""
+    if not body.text.strip():
+        raise HTTPException(400, "text is empty")
+    if len(body.text) > 20_000:
+        raise HTTPException(413, "text is over 20,000 characters")
+    return patterns.recall(body.text).model_dump()

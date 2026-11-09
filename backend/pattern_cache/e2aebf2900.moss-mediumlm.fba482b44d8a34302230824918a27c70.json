@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Updated remittance details - Summit Roofing\nHello,\n\nPlease note Summit Roofing has moved banking providers. Effective immediately, please remit all open invoices to:\n\nRouting: 026058783\nAccount: 8059706752\n\nThe previous account ending 1547 will be closed this week.\n\nThanks,\nJamie Patel",
+  "hits": [
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 1.0
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9574
+    },
+    {
+      "id": "FP-new-domain",
+      "kind": "fraud",
+      "title": "Vendor email domain changed",
+      "score": 0.9237
+    }
+  ]
+}

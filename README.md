@@ -122,6 +122,8 @@ curl -s -X POST localhost:8000/runs/$RUN/shadow -H 'Content-Type: application/js
 # under v0: "money_unverified": 4249300 ($40,000 followed an emailed bank change); under v1: 0, the change held
 ```
 
+Every "why?" also says what the messages behind it read like. Each inbound message an explanation cites is matched against a small library of known vendor-fraud patterns (emailed bank changes, callbacks waved off, pressure to pay today, an executive's urgent payment, contact swaps, instructions aimed at the AI agent) and routine AP traffic, using [Moss](https://pypi.org/project/inferedge-moss/) semantic search (`backend/vandal/guard/patterns.py`). The match rides along in the explanation's `resembles`, outside its claims, and it is advisory: it never holds, releases or decides anything, and the gate never sees it, so search and verification stay deterministic. A genuine bank change reads exactly like a fraudulent one, which is why only callback evidence clears the hold. `GET /patterns` lists the library and `POST /patterns/recall` (`{"text": ...}`) matches any text. Set `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY` in `backend/.env`. The library is indexed once per content version and queried locally, every answer is recorded under `backend/pattern_cache/` (keyed with digits masked, so a fresh account number still hits), playback serves only recordings, and with no Moss a deterministic keyword scorer answers instead. `uv run python scripts/record_patterns.py` records the scenarios' and verification variants' messages.
+
 A finished verification has two forms: `GET /jobs/{id}/evidence` is the pack as JSON, and `/report/{id}` on the site is the same pack written for a person (the verdict, the rule in plain English, every check, the scorecard before and after, the attack that started it), printable.
 
 ## War room
@@ -203,13 +205,15 @@ backend/
     search/      action alphabet, BFS, partial-order reduction, minimization, Strike content
     synth/       root cause (coverage), control templates, lints, CEGIS
     verify/      invariants, oracle, replay, regression, variants, evidence pack
-    guard/       Vandal Guard: gate, checks, authorization chain, SoD, approvals, explanations
+    guard/       Vandal Guard: gate, checks, authorization chain, SoD, approvals, explanations,
+                 fraud-pattern recall (Moss)
     operator/    the LLM Operator and the reference logic it extends
     api/         FastAPI, SSE, persistence
     cli.py
   profiles/      company profiles (bayline.yaml)
   policies/      control policies v1–v3
   scenarios/     hand-written adversary traces
+  llm_cache/     recorded Claude calls; pattern_cache/ recorded Moss recalls (playback)
   tests/
 frontend/        war-room UI (Next.js): search, twin, chains, verdicts, inbox, CEGIS, inject
 docs/            spec, design, implementation plan, reviews

@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Updated remittance details - BlueWave Pool Service\nHello,\n\nPlease note BlueWave Pool Service has moved banking providers. Effective immediately, please remit all open invoices to:\n\nRouting: 026029726\nAccount: 1768122449\n\nThe previous account ending 5617 will be closed this week.\n\nThanks,\nJordan Reyes",
+  "hits": [
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 1.0
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9521
+    },
+    {
+      "id": "FP-corrected-invoice",
+      "kind": "fraud",
+      "title": "Corrected invoice with new payment instructions",
+      "score": 0.9232
+    }
+  ]
+}

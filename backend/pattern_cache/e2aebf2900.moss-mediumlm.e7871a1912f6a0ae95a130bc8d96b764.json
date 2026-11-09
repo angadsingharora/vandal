@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Updated remittance details - Tidewater Flooring\nHello,\n\nPlease note Tidewater Flooring has moved banking providers. Effective immediately, please remit all open invoices to:\n\nRouting: 026030923\nAccount: 6766307425\n\nThe previous account ending 0025 will be closed this week.\n\nThanks,\nJordan Patel",
+  "hits": [
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 1.0
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9574
+    },
+    {
+      "id": "FP-new-domain",
+      "kind": "fraud",
+      "title": "Vendor email domain changed",
+      "score": 0.9237
+    }
+  ]
+}

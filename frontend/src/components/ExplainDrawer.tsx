@@ -64,6 +64,32 @@ export function ExplainDrawer() {
                 </li>
               ))}
             </ol>
+            {(d.resembles ?? []).length > 0 && (
+              <section aria-label="Known fraud patterns" className="space-y-1.5">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-dim">Reads like</h3>
+                {d.resembles!.map((r) => (
+                  <div key={r.message} className="rounded border border-line p-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="num text-[10px] text-blue">{r.message}</span>
+                      {r.match ? (
+                        <Badge tone="warn">{r.match.title}</Badge>
+                      ) : (
+                        <Badge tone="dim">routine: {r.hits[0]?.title ?? "no match"}</Badge>
+                      )}
+                      <span className="ml-auto text-[10px] text-faint">
+                        {r.source === "lexical" ? "keyword match" : "Moss semantic search"}
+                      </span>
+                    </div>
+                    {r.hits.length > 1 && (
+                      <p className="mt-1 text-[11px] text-faint">
+                        also near: {r.hits.slice(1).map((h) => h.title).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                ))}
+                <p className="text-[11px] text-faint">Advisory. A pattern match never holds or releases a payment; only recorded evidence clears a hold.</p>
+              </section>
+            )}
             {d.notes.length > 0 && (
               <ul className="text-[11px] text-faint">
                 {d.notes.map((n, i) => (

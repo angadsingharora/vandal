@@ -603,6 +603,23 @@ export interface Explanation {
   source: "llm" | "deterministic";
   pushback: boolean;
   notes: string[];
+  /** B6: cited messages matched against known fraud patterns (Moss). Advisory only. */
+  resembles?: PatternRecall[];
+}
+
+export interface PatternHit {
+  id: string;
+  kind: "fraud" | "routine";
+  title: string;
+  score: number;
+}
+
+export interface PatternRecall {
+  message: string;
+  source: "moss" | "recorded" | "lexical";
+  hits: PatternHit[];
+  match: PatternHit | null;
+  note: string | null;
 }
 
 export interface PolicyInfo {

@@ -1,10 +1,10 @@
 """Slow tests (full searches, CEGIS, verification packs) are skipped by default so the everyday
 suite stays fast. Run everything with `uv run pytest --slow` (or VANDAL_SLOW=1).
 
-The suite never calls Claude: backend/.env isn't loaded, the API key is cleared, and each test
-gets an empty LLM cache and an empty job cache, so every caller takes its deterministic path
-and no test leaves a recording in the repo. The one live check in
-test_llm.py runs only with VANDAL_LIVE_LLM=1."""
+The suite never calls Claude or Moss: backend/.env isn't loaded, the API and Moss keys are
+cleared, and each test gets an empty LLM cache, job cache, and pattern cache, so every caller
+takes its deterministic path and no test leaves a recording in the repo. The live checks run
+only with VANDAL_LIVE_LLM=1 (test_llm.py) or VANDAL_LIVE_MOSS=1 (test_patterns.py)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,13 @@ import pytest
 
 # Before any test module imports vandal.api.main, whose module-level app would load backend/.env.
 os.environ["VANDAL_DOTENV"] = "0"
-for _var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "DEMO_PLAYBACK"):
+for _var in (
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "DEMO_PLAYBACK",
+    "MOSS_PROJECT_ID",
+    "MOSS_PROJECT_KEY",
+):
     os.environ.pop(_var, None)
 
 
@@ -24,6 +30,7 @@ def _offline_llm(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
 
     monkeypatch.setenv("LLM_CACHE_DIR", str(tmp_path / "llm_cache"))
     monkeypatch.setenv("JOB_CACHE_DIR", str(tmp_path / "job_cache"))
+    monkeypatch.setenv("PATTERN_CACHE_DIR", str(tmp_path / "pattern_cache"))
     monkeypatch.setattr(llm, "_client_cache", None)
     yield
     # custom companies (POST /profiles) live in the process; no test sees another's

@@ -31,3 +31,9 @@ services:
       # Optional: set it in the dashboard for live model calls, then turn playback off.
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Optional: Moss fraud-pattern recall for messages that aren't recorded in pattern_cache/.
+      # Playback serves only recordings, so these matter only with playback off.
+      - key: MOSS_PROJECT_ID
+        sync: false
+      - key: MOSS_PROJECT_KEY
+        sync: false

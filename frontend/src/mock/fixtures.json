@@ -20682,7 +20682,40 @@
   ],
   "source": "llm",
   "pushback": false,
-  "notes": []
+  "notes": [],
+  "resembles": [
+   {
+    "message": "MSG-0001",
+    "source": "recorded",
+    "hits": [
+     {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 1.0
+     },
+     {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9574
+     },
+     {
+      "id": "FP-corrected-invoice",
+      "kind": "fraud",
+      "title": "Corrected invoice with new payment instructions",
+      "score": 0.9453
+     }
+    ],
+    "match": {
+     "id": "FP-bank-moved",
+     "kind": "fraud",
+     "title": "Bank details changed by email",
+     "score": 1.0
+    },
+    "note": null
+   }
+  ]
  },
  "synthesize": {
   "id": "synthesize-7b6001692c",

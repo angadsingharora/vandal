@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Updated remittance details - Rentroll Software\nHello,\n\nPlease note Rentroll Software has moved banking providers. Effective immediately, please remit all open invoices to:\n\nRouting: 026038523\nAccount: 3771418013\n\nThe previous account ending 9207 will be closed this week.\n\nThanks,\nJordan Reyes",
+  "hits": [
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 1.0
+    },
+    {
+      "id": "FP-corrected-invoice",
+      "kind": "fraud",
+      "title": "Corrected invoice with new payment instructions",
+      "score": 0.9688
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9339
+    }
+  ]
+}

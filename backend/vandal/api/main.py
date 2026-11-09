@@ -44,6 +44,7 @@ from vandal.api import (
 from vandal.api.db import Store
 from vandal.api.limits import limits
 from vandal.api.registry import JobsBusy, Registry
+from vandal.guard import patterns
 from vandal.llm import load_env, playback
 from vandal.search.alphabet import SCENARIOS
 
@@ -81,6 +82,7 @@ def create_app(store: Store | None = None, persist: bool | None = None) -> FastA
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        patterns.warm()  # index and load the fraud-pattern library in the background, if Moss
         yield
         registry.shutdown()
 

@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Updated remittance details - ApplianceCare Pro\nHello,\n\nPlease note ApplianceCare Pro has moved banking providers. Effective immediately, please remit all open invoices to:\n\nRouting: 026089294\nAccount: 4205940298\n\nThe previous account ending 6288 will be closed this week.\n\nThanks,\nJordan Reyes",
+  "hits": [
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 1.0
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9574
+    },
+    {
+      "id": "FP-corrected-invoice",
+      "kind": "fraud",
+      "title": "Corrected invoice with new payment instructions",
+      "score": 0.9453
+    }
+  ]
+}

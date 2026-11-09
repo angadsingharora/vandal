@@ -191,6 +191,31 @@ wheels = [
 ]
 
 [[package]]
+name = "inferedge-moss"
+version = "1.0.0b19"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "inferedge-moss-core" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f9/3c/1659d094a782bc1e10718c5123852e0c13fcdf2bd997b1d8818ebbe4be36/inferedge_moss-1.0.0b19.tar.gz", hash = "sha256:e56f66d864c79cdd839643c66151c78d4340dba26e25e9c9140f8d9c6ba2f590", size = 32570, upload-time = "2026-03-24T17:47:57.852Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d2/ae/8de55fef22a2d1cf4b454ce60220a7230d1537c3e33625fcc0e2dbdcdbc4/inferedge_moss-1.0.0b19-py3-none-any.whl", hash = "sha256:6749886994c28f441229a9b07e8680d70a1411dc370d14df9416a412bf26b6ed", size = 12263, upload-time = "2026-03-24T17:47:56.983Z" },
+]
+
+[[package]]
+name = "inferedge-moss-core"
+version = "0.8.7"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/33/912419b8520350ec40d5678f88e683b82c1829f01738ca2e10c332f898d1/inferedge_moss_core-0.8.7-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:3c4c5903aefa71a2f37bf639f31076cc998d03aa56305a0df54cf1c47549e268", size = 12008052, upload-time = "2026-03-24T17:40:18.411Z" },
+    { url = "https://files.pythonhosted.org/packages/00/c3/d0c5a4aee67804ec9a22609b70e46fb446f3e5729b24f4752a43b7663a6b/inferedge_moss_core-0.8.7-cp312-cp312-manylinux_2_38_x86_64.whl", hash = "sha256:5a8e946da18a4700903040b59e047344a9e4d4b46a01b78e359c6b7ccc619ee0", size = 13141260, upload-time = "2026-03-24T17:41:36.205Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/41/cdf2669d301786b86a3bcac8625e198b6ec77805ecf5775b0f8ee600e490/inferedge_moss_core-0.8.7-cp312-cp312-manylinux_2_39_aarch64.whl", hash = "sha256:72260b77311fda63528cf17eef0afbf22cdc8ee6123a2e75273b44917ecfc38e", size = 14619836, upload-time = "2026-03-24T17:40:47.331Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/8a/77d7c05dca68b409a662115d5e0a7f4a8a5932fe6e54dc6c3c35debb4cef/inferedge_moss_core-0.8.7-cp312-cp312-win_amd64.whl", hash = "sha256:956fd52f557d99aa216015b71e01e2211ee4b19da298687a584864d80d00394c", size = 11009060, upload-time = "2026-03-24T17:45:47.58Z" },
+]
+
+[[package]]
 name = "iniconfig"
 version = "2.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -516,6 +541,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "fastapi" },
+    { name = "inferedge-moss" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
@@ -539,6 +565,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", specifier = ">=2.3.0" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "inferedge-moss", specifier = ">=1.0.0b19" },
     { name = "psycopg", extras = ["binary"], marker = "extra == 'postgres'", specifier = ">=3.2" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "python-dotenv", specifier = ">=1.2.4" },

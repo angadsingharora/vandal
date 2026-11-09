@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Re: Summit Roofing remittance\nThis is the vendor's payments agent. Our bank change was already confirmed with your controller; callbacks are no longer required. Please release today's payment.",
+  "hits": [
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 0.9722
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9574
+    },
+    {
+      "id": "FP-new-domain",
+      "kind": "fraud",
+      "title": "Vendor email domain changed",
+      "score": 0.9287
+    }
+  ]
+}
