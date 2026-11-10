@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cx } from "@/lib/format";
 import { currentStep, loopSteps, STAGES, sideOf } from "@/lib/loop";
 import { useWarRoom, type View } from "@/lib/store";
@@ -198,13 +198,27 @@ export function TopBar({
 }) {
   const s = useWarRoom();
   const demo = s.mode === "demo";
+  const mock = s.api?.mode === "mock";
   const [policy, setPolicy] = useState("v0");
   const [resetting, setResetting] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const reset = async () => {
     setResetting(true);
     await (demo ? s.reset(policy) : s.startRun());
     setResetting(false);
+  };
+  // Opening a dialog closes the panel, so the two never stack.
+  const then = (fn: () => void) => () => {
+    setOpen(false);
+    fn();
   };
 
   return (
@@ -215,65 +229,114 @@ export function TopBar({
 
       <SideSwitch />
 
-      <div className="ml-auto flex flex-wrap items-center gap-1.5">
-        {demo ? (
-          <>
-            <label className="sr-only" htmlFor="policy">Starting policy</label>
-            <select
-              id="policy"
-              value={policy}
-              onChange={(e) => setPolicy(e.target.value)}
-              className="h-7 rounded border border-line bg-raised px-1.5 text-xs"
-              title="Guard's controls for the new run"
-            >
-              {s.policies.map((p) => (
-                <option key={p.name} value={p.name}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            <Button onClick={reset} busy={resetting} title="Drop every run and seed the company again">
-              Reset demo
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button tone="blue" onClick={onConnect} disabled={!s.ready || s.api?.mode !== "http"} title="Connect an AI agent or your books to Guard">
-              Connect
-            </Button>
-            <Button onClick={onWorkspace} title="Company, run, and how each job is asked for">
-              Settings
-            </Button>
-            <Button onClick={reset} busy={resetting} disabled={!s.ready} title="Start over on a run seeded from the workspace's company and policy">
-              New run
-            </Button>
-          </>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls="controls-panel"
+        title="Run, playback, and scorecard"
+        className={cx(
+          "ml-auto flex h-7 items-center gap-2 rounded border px-2.5 text-xs transition-colors",
+          open ? "border-ink/40 bg-raised text-ink" : "border-line text-dim hover:text-ink",
         )}
-        <span aria-hidden className="mx-1 h-4 w-px bg-line" />
-        <Button onClick={onScorecard} disabled={!s.ready}>
-          Scorecard
-        </Button>
-        <Toggle
-          label="Playback"
-          on={!!s.settings?.playback}
-          onChange={(v) => s.setPlayback(v)}
-          title={demo ? "Serve LLM answers only from recorded calls (DEMO_PLAYBACK)" : "Serve model calls and recorded jobs from the cache instead of computing"}
-        />
-        {demo && <Toggle label="Judge view" on={s.judge} onChange={() => s.toggleJudge()} title="Reveal the oracle's answer key" />}
-        {s.api?.mode === "mock" ? (
-          <a
-            href="/"
-            className={cx("rounded-sm bg-warn/15 px-1.5 py-0.5 text-[10px] font-semibold text-warn hover:bg-warn/25")}
-            title="The loop from a recording of the real backend, replayed in the browser. Click for the live backend."
+      >
+        <span className={cx("size-1.5 rounded-full", mock ? "bg-warn" : "bg-ok")} />
+        Controls
+        <span aria-hidden className="flex flex-col gap-[3px]">
+          <span className="block h-px w-3 bg-current" />
+          <span className="block h-px w-3 bg-current" />
+          <span className="block h-px w-3 bg-current" />
+        </span>
+      </button>
+
+      {open && (
+        <>
+          <div aria-hidden onClick={() => setOpen(false)} className="fixed inset-0 z-30 bg-bg/40" />
+          <aside
+            id="controls-panel"
+            aria-label="Controls"
+            className="fixed inset-y-0 right-0 z-40 flex w-full max-w-xs flex-col border-l border-line bg-panel shadow-lg"
           >
-            RECORDED
-          </a>
-        ) : (
-          <span className={cx("rounded-sm bg-ok/10 px-1.5 py-0.5 text-[10px] font-semibold text-ok")} title="Connected to the backend">
-            LIVE
-          </span>
-        )}
-      </div>
+            <header className="flex items-center gap-2 border-b border-line px-4 py-2.5">
+              <h2 className="text-sm font-semibold">Controls</h2>
+              {mock ? (
+                <a
+                  href="/"
+                  className="rounded-sm bg-warn/15 px-1.5 py-0.5 text-[10px] font-semibold text-warn hover:bg-warn/25"
+                  title="The loop from a recording of the real backend, replayed in the browser. Click for the live backend."
+                >
+                  RECORDED
+                </a>
+              ) : (
+                <span className="rounded-sm bg-ok/10 px-1.5 py-0.5 text-[10px] font-semibold text-ok" title="Connected to the backend">
+                  LIVE
+                </span>
+              )}
+              <button onClick={() => setOpen(false)} aria-label="Close" className="ml-auto text-dim hover:text-ink">
+                ✕
+              </button>
+            </header>
+
+            <div className="flex-1 space-y-5 overflow-auto p-4">
+              <section className="space-y-2">
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-faint">Run</h3>
+                {demo ? (
+                  <div className="flex items-center gap-1.5">
+                    <label className="sr-only" htmlFor="policy">Starting policy</label>
+                    <select
+                      id="policy"
+                      value={policy}
+                      onChange={(e) => setPolicy(e.target.value)}
+                      className="h-7 rounded border border-line bg-raised px-1.5 text-xs"
+                      title="Guard's controls for the new run"
+                    >
+                      {s.policies.map((p) => (
+                        <option key={p.name} value={p.name}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Button onClick={reset} busy={resetting} title="Drop every run and seed the company again">
+                      Reset demo
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button tone="blue" onClick={then(onConnect)} disabled={!s.ready || s.api?.mode !== "http"} title="Connect an AI agent or your books to Guard">
+                      Connect
+                    </Button>
+                    <Button onClick={then(onWorkspace)} title="Company, run, and how each job is asked for">
+                      Settings
+                    </Button>
+                    <Button onClick={reset} busy={resetting} disabled={!s.ready} title="Start over on a run seeded from the workspace's company and policy">
+                      New run
+                    </Button>
+                  </div>
+                )}
+              </section>
+
+              <section className="space-y-2">
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-faint">View</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  <Toggle
+                    label="Playback"
+                    on={!!s.settings?.playback}
+                    onChange={(v) => s.setPlayback(v)}
+                    title={demo ? "Serve LLM answers only from recorded calls (DEMO_PLAYBACK)" : "Serve model calls and recorded jobs from the cache instead of computing"}
+                  />
+                  {demo && <Toggle label="Judge view" on={s.judge} onChange={() => s.toggleJudge()} title="Reveal the oracle's answer key" />}
+                </div>
+              </section>
+
+              <section className="space-y-2">
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-faint">Results</h3>
+                <Button onClick={then(onScorecard)} disabled={!s.ready}>
+                  Scorecard
+                </Button>
+              </section>
+            </div>
+          </aside>
+        </>
+      )}
     </header>
   );
 }
