@@ -94,44 +94,6 @@ body {
   .reveal { animation-duration: 1ms; }
 }
 
-/* Landing page: each block rises in, staggered by an inline animation-delay. */
-@keyframes rise-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: none; }
-}
-.rise {
-  animation: rise-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-/* Below the fold, a block waits (invisible) until it scrolls into view, then rises. */
-.waiting {
-  opacity: 0;
-}
-/* The scroll cue under the hero: a small arrow that bobs until the visitor moves. */
-@keyframes bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(4px); }
-}
-.bob {
-  animation: bob 1.6s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .bob { animation: none; }
-}
-
-/* The loop rail: a line draws across under the steps as they light up in order. */
-@keyframes draw-x {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
-}
-.draw {
-  transform-origin: left;
-  animation: draw-x 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-@media (prefers-reduced-motion: reduce) {
-  .rise, .draw { animation: none; }
-  .waiting { opacity: 1; }
-}
-
 /* The landing page is the first paint (no fade-in); it fades out before it unmounts. */
 @keyframes welcome-out { from { opacity: 1; } to { opacity: 0; } }
 .welcome-leave { animation: welcome-out 200ms ease-in both; pointer-events: none; }
