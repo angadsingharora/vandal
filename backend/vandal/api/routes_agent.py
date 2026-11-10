@@ -116,13 +116,27 @@ def _bearer(request: Request) -> str | None:
     return auth[7:].strip() if auth.lower().startswith("bearer ") else None
 
 
+def _current_run(request: Request, owner: str | None) -> RunHandle | None:
+    """The owner's newest live run: where a connection goes when its run was replaced."""
+    if owner is None:
+        return None
+    live = [h for h in deps.registry(request).runs_of(owner) if h.kind == "operate"]
+    return live[-1] if live else None
+
+
 def _run_of(request: Request, conn: Connection) -> RunHandle:
+    """The connection's run. A New run (say, under another policy) replaces the owner's run;
+    the agent follows to the new one, so its MCP URL and token keep working."""
     try:
         return deps.registry(request).run(conn.run_id)
     except KeyError:
-        raise HTTPException(
-            410, f"run {conn.run_id} is gone (the server restarted or reset it); reconnect"
-        ) from None
+        handle = _current_run(request, conn.owner)
+        if handle is None:
+            raise HTTPException(
+                410, f"run {conn.run_id} is gone (the server restarted); make a new connection"
+            ) from None
+        conn.run_id = handle.id
+        return handle
 
 
 # --- what the agent sees --------------------------------------------------------------------
@@ -452,6 +466,20 @@ def execute(
     return out
 
 
+def _target(inp: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    """The tool and arguments a check_action or call_tool names. Agents send the arguments
+    under `args` or alongside `tool`, and name the tool either way (execute_payment or
+    payments.execute); all of those mean the same call."""
+    name = str(inp.get("tool", ""))
+    agent_tool = BY_NAME.get(name)
+    if agent_tool is not None and agent_tool.tool:
+        name = agent_tool.tool
+    args = inp.get("args")
+    if not isinstance(args, dict):
+        args = {k: v for k, v in inp.items() if k not in ("tool", "args")}
+    return name, args
+
+
 def dispatch(
     handle: RunHandle, conn: Connection, name: str, inp: dict[str, Any], via: str
 ) -> dict[str, Any]:
@@ -466,10 +494,11 @@ def dispatch(
         conn.last_seen = time.time()
         conn.clients.add(via)
         return books(handle)
-    if t.name == "check_action":
-        return dry_check(handle, conn, str(inp.get("tool", "")), dict(inp.get("args") or {}))
-    if t.name == "call_tool":
-        return execute(handle, conn, str(inp.get("tool", "")), dict(inp.get("args") or {}), via)
+    if t.name in ("check_action", "call_tool"):
+        tool, args = _target(inp)
+        if t.name == "check_action":
+            return dry_check(handle, conn, tool, args)
+        return execute(handle, conn, tool, args, via)
     assert t.tool
     return execute(handle, conn, t.tool, inp, via)
 
@@ -504,7 +533,11 @@ def create_connection(request: Request, run_id: str, body: NewConnection | None 
 
 @router.get("/runs/{run_id}/connections")
 def list_connections(request: Request, run_id: str) -> list[dict[str, Any]]:
-    deps.get_run(request, run_id)
+    handle = deps.get_run(request, run_id)
+    runs = deps.registry(request).runs
+    for c in _store(request).values():
+        if c.run_id not in runs and c.owner is not None and c.owner == handle.owner:
+            c.run_id = handle.id  # its run was replaced by this one
     return [c.public() for c in _store(request).values() if c.run_id == run_id]
 
 
