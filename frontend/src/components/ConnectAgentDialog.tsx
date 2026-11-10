@@ -12,18 +12,18 @@ import { useWarRoom } from "@/lib/store";
 import type { AgentBooks, AgentCall, AgentConnection, AgentRunOut, AgentStep } from "@/lib/types";
 import { Button, DecisionBadge, Modal, Spinner } from "./ui";
 
-// The token is shown once by the API; this tab keeps it so the snippets survive a reopen.
+// The token is shown once by the API; this browser keeps it so the snippets survive a reload.
 const TOKEN_KEY = "vandal.agentTokens";
 function savedTokens(): Record<string, string> {
   try {
-    return JSON.parse(sessionStorage.getItem(TOKEN_KEY) ?? "{}");
+    return JSON.parse(localStorage.getItem(TOKEN_KEY) ?? "{}");
   } catch {
     return {};
   }
 }
 function saveToken(id: string, token: string) {
   try {
-    sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ ...savedTokens(), [id]: token }));
+    localStorage.setItem(TOKEN_KEY, JSON.stringify({ ...savedTokens(), [id]: token }));
   } catch {}
 }
 
@@ -82,12 +82,11 @@ function Snippet({ code }: { code: string }) {
   );
 }
 
-type Way = "claude-code" | "claude-desktop" | "python" | "curl";
+type Way = "claude-code" | "claude-desktop" | "python";
 const WAYS: { id: Way; label: string }[] = [
   { id: "claude-code", label: "Claude Code" },
   { id: "claude-desktop", label: "Claude Desktop" },
   { id: "python", label: "Python" },
-  { id: "curl", label: "curl" },
 ];
 
 function HowToConnect({ base, token, mcpUrl, local }: { base: string; token: string; mcpUrl: string; local: boolean }) {
@@ -108,13 +107,6 @@ def call(tool, **args):
 
 call("validate_invoice", invoice=inv["id"])
 call("request_approval", invoice=inv["id"])`;
-  const curl = `curl -s ${base}/agent/v1/books \\
-  -H "Authorization: Bearer ${token}"
-
-curl -s ${base}/agent/v1/call \\
-  -H "Authorization: Bearer ${token}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"tool": "validate_invoice", "args": {"invoice": "INV-1058"}}'`;
 
   return (
     <div>
@@ -158,7 +150,6 @@ curl -s ${base}/agent/v1/call \\
             <Snippet code={python} />
           </>
         )}
-        {way === "curl" && <Snippet code={curl} />}
       </div>
     </div>
   );
@@ -310,7 +301,7 @@ function RunAgent({ conn, books }: { conn: AgentConnection; books: AgentBooks | 
   );
 }
 
-export function ConnectAgentDialog({ onClose, onSettings }: { onClose: () => void; onSettings: () => void }) {
+export function ConnectAgentDialog({ onClose, onSettings, onBooks }: { onClose: () => void; onSettings: () => void; onBooks: () => void }) {
   const s = useWarRoom();
   const runId = s.liveRunId;
   const [conns, setConns] = useState<AgentConnection[]>([]);
@@ -394,14 +385,23 @@ export function ConnectAgentDialog({ onClose, onSettings }: { onClose: () => voi
   const live = conn && conn.last_seen && Date.now() / 1000 - conn.last_seen < 120;
 
   return (
-    <Modal title="Connect an agent" onClose={onClose} wide>
+    <Modal title="Connect to Vandal" onClose={onClose} wide>
       <div className="space-y-4">
-        <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
-          <p className="min-w-0 flex-1 text-[13px] leading-relaxed text-dim">
-            Point any AI agent at <span className="font-semibold text-ink">{s.summary?.company ?? "the company"}</span>&apos;s books. It reads them and
-            moves money only through Vandal Guard, which rules on every call before anything happens: the same gate, the same evidence, whatever
-            agent is on the other end.
-          </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md border-2 border-blue bg-blue/5 p-4">
+            <div className="text-sm font-semibold text-ink">Connect an AI agent</div>
+            <p className="mt-1 text-xs leading-relaxed text-dim">
+              Your agent works {s.summary?.company ?? "the company"}&apos;s books over MCP or REST. Guard checks every call before money moves.
+            </p>
+          </div>
+          <button type="button" onClick={onBooks} className="rounded-md border border-line p-4 text-left hover:border-dim">
+            <div className="text-sm font-semibold text-ink">Connect your books →</div>
+            <p className="mt-1 text-xs leading-relaxed text-dim">
+              Upload an AP export from QuickBooks, Bill.com, NetSuite or Xero. See what Guard would have stopped last month.
+            </p>
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
           <div className="flex shrink-0 items-center gap-2 text-[11px] text-dim">
             Guard policy <span className="num rounded-sm border border-line px-1.5 py-px text-ink">{policy ?? "…"}</span>
             <button type="button" onClick={onSettings} className="underline-offset-4 hover:text-ink hover:underline">
@@ -476,14 +476,13 @@ export function ConnectAgentDialog({ onClose, onSettings }: { onClose: () => voi
                     </>
                   ) : (
                     <p className="text-[11px] text-dim">
-                      The token for this connection was shown in another tab and isn&apos;t kept. Its calls still show on the right; make a new connection
-                      for a fresh token.
+                      This connection was made in another browser. Make a new connection to get a URL here.
                     </p>
                   )}
                 </section>
               )}
 
-              {conn && token && (
+              {conn && token && s.settings?.api_key && (
                 <section className="rounded border border-line p-3">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-ink">Or run a Claude agent here</h3>
                   <p className="mt-0.5 text-[11px] leading-snug text-faint">

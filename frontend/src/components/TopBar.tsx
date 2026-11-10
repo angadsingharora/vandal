@@ -238,8 +238,8 @@ export function TopBar({
           </>
         ) : (
           <>
-            <Button tone="blue" onClick={onConnect} disabled={!s.ready || s.api?.mode !== "http"} title="Plug your own AI agent into these books, with Guard in its path">
-              Connect agent
+            <Button tone="blue" onClick={onConnect} disabled={!s.ready || s.api?.mode !== "http"} title="Connect an AI agent or your books to Guard">
+              Connect
             </Button>
             <Button onClick={onWorkspace} title="Company, run, and how each job is asked for">
               Settings

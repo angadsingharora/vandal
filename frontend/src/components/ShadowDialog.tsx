@@ -115,7 +115,7 @@ export function ShadowDialog({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal title="Shadow report" onClose={onClose} wide>
+    <Modal title="Connect your books: shadow report" onClose={onClose} wide>
       <p className="text-xs leading-relaxed text-dim">
         A month of your accounts payable, replayed through Guard on a clone of {s.summary?.company ?? "the company"}&apos;s books under{" "}
         <span className="num text-ink">{current}</span>
