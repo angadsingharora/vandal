@@ -15,6 +15,7 @@ import { ScorecardDialog } from "./ScorecardDialog";
 import { LoopStrip, PageNav, TopBar } from "./TopBar";
 import { wantsWelcome, wantsWorkspace, Welcome } from "./Welcome";
 import { WorkspaceDialog } from "./WorkspaceDialog";
+import { ConnectAgentDialog } from "./ConnectAgentDialog";
 
 /** DESIGN §14 as seven pages, one per step of the loop. Blue (Guard) operates, approves and
  * enforces; Red (Strike) attacks a clone, diagnoses, fixes and proves. In the demo, the stepper
@@ -29,7 +30,7 @@ export function WarRoom() {
   const stage = useWarRoom((s) => s.stage);
   const mode = useWarRoom((s) => s.mode);
   const setMode = useWarRoom((s) => s.setMode);
-  const [dialog, setDialog] = useState<"inject" | "scorecard" | "workspace" | null>(null);
+  const [dialog, setDialog] = useState<"inject" | "scorecard" | "workspace" | "connect" | null>(null);
   // The landing page is the first paint: the server and the first client render both show it,
   // and only the two routes that skip it (?mock=1, ?workspace=1) take it down after mount.
   // Deciding after mount the other way round flashed the war room before the landing page.
@@ -53,7 +54,7 @@ export function WarRoom() {
 
   return (
     <div className="flex min-h-screen flex-col lg:h-screen lg:overflow-hidden">
-      <TopBar onScorecard={() => setDialog("scorecard")} onWelcome={() => setWelcome(true)} onWorkspace={() => setDialog("workspace")} />
+      <TopBar onScorecard={() => setDialog("scorecard")} onWelcome={() => setWelcome(true)} onWorkspace={() => setDialog("workspace")} onConnect={() => setDialog("connect")} />
       {mode === "demo" ? <LoopStrip /> : <PageNav />}
       {error && (
         <div role="alert" className="flex items-center gap-3 border-b border-bad/40 bg-bad/10 px-4 py-1.5 text-xs text-bad">
@@ -81,7 +82,8 @@ export function WarRoom() {
       {dialog === "inject" && <InjectDialog onClose={() => setDialog(null)} />}
       {dialog === "scorecard" && <ScorecardDialog onClose={() => setDialog(null)} />}
       {dialog === "workspace" && <WorkspaceDialog onClose={() => setDialog(null)} />}
-      {welcome && <Welcome onClose={() => setWelcome(false)} onWorkspace={() => setDialog("workspace")} />}
+      {dialog === "connect" && <ConnectAgentDialog onClose={() => setDialog(null)} onSettings={() => setDialog("workspace")} />}
+      {welcome && <Welcome onClose={() => setWelcome(false)} onWorkspace={() => setDialog("connect")} />}
       <ExplainDrawer />
     </div>
   );

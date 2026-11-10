@@ -4,6 +4,9 @@
 import { clientId } from "./client";
 import type {
   Actor,
+  AgentBooks,
+  AgentConnection,
+  AgentRunOut,
   Approvals,
   CEGISResult,
   Chain,
@@ -118,6 +121,14 @@ export interface VandalApi {
   /** Guard as an API: what the gate would say to a tool call on this run's books, without making it. */
   guardTools(): Promise<GuardTool[]>;
   guardCheck(runId: string, body: { tool: string; args: Record<string, unknown>; actor?: Actor }): Promise<GuardCheckOut>;
+  /** Connect your own agent: a token bound to a run's books, what it has done, and a Claude
+   * agent run server-side through it. `agentUrl` is where an outside agent reaches the API. */
+  createConnection(runId: string, name: string): Promise<AgentConnection>;
+  connections(runId: string): Promise<AgentConnection[]>;
+  runAgent(runId: string, connId: string, instruction: string): Promise<AgentRunOut>;
+  /** `peek`: the workspace looking, not the agent calling; it doesn't count as the agent connecting. */
+  agentBooks(token: string, peek?: boolean): Promise<AgentBooks>;
+  agentUrl(path: string): string;
   /** Shadow mode: an AP export (CSV) replayed through Guard on a clone of the run's books, report only. */
   shadow(runId: string, body: { csv: string; approve_escalations?: boolean; compare?: string | null }): Promise<ShadowReport>;
   /** How a CSV's columns will be read (aliases for QuickBooks, Bill.com, NetSuite headers), before running it. */
@@ -227,6 +238,25 @@ export class HttpApi implements VandalApi {
   guardTools = () => this.call<GuardTool[]>("GET", "/guard/tools");
   guardCheck = (runId: string, body: { tool: string; args: Record<string, unknown>; actor?: Actor }) =>
     this.call<GuardCheckOut>("POST", `/runs/${runId}/guard/check`, body);
+  createConnection = (runId: string, name: string) =>
+    this.call<AgentConnection>("POST", `/runs/${runId}/connections`, { name });
+  connections = (runId: string) => this.call<AgentConnection[]>("GET", `/runs/${runId}/connections`);
+  runAgent = (runId: string, connId: string, instruction: string) =>
+    this.call<AgentRunOut>("POST", `/runs/${runId}/connections/${connId}/claude`, { instruction });
+  agentBooks = async (token: string, peek = false) => {
+    // The agent's own door, with the agent's credential: proof the endpoint answers it.
+    let res: Response;
+    try {
+      res = await fetch(this.base + "/agent/v1/books", {
+        headers: { Authorization: `Bearer ${token}`, ...(peek ? { "X-Vandal-Peek": "1" } : {}) },
+      });
+    } catch {
+      throw new ApiError(0, `can't reach the backend at ${this.base}`);
+    }
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? res.statusText);
+    return (await res.json()) as AgentBooks;
+  };
+  agentUrl = (path: string) => new URL(path, this.base.endsWith("/") ? this.base : this.base + "/").toString();
   shadow = (runId: string, body: { csv: string; approve_escalations?: boolean; compare?: string | null }) =>
     this.call<ShadowReport>("POST", `/runs/${runId}/shadow`, body);
   shadowMapping = (csv: string) => this.call<ShadowMapping>("POST", "/shadow/mapping", { csv });

@@ -95,6 +95,17 @@ export class MockApi implements VandalApi {
   guardCheck = async (): Promise<never> => {
     throw new ApiError(404, "the recorded loop has no Guard API; use the live backend");
   };
+  createConnection = async (): Promise<never> => {
+    throw new ApiError(404, "the recorded loop can't take an outside agent; use the live backend");
+  };
+  connections = async () => [];
+  runAgent = async (): Promise<never> => {
+    throw new ApiError(404, "the recorded loop can't run an agent; use the live backend");
+  };
+  agentBooks = async (): Promise<never> => {
+    throw new ApiError(404, "the recorded loop has no agent API; use the live backend");
+  };
+  agentUrl = (path: string) => path;
   shadow = async (): Promise<never> => {
     throw new ApiError(404, "the recorded loop has no shadow mode; use the live backend");
   };
