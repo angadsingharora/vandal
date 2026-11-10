@@ -198,11 +198,14 @@ def run(c, *, no_llm: bool = False, depth: int = 2, log=print) -> dict[str, Any]
         f" -> {version} $0; intake {cards['v0']['extraction_accuracy']:.0%} fields"
     )
 
-    on = ok(c, "post", "/settings", json={"playback": True})
-    assert on["playback"] is True
-    off = ok(c, "post", "/settings", json={"playback": False})
-    assert off["playback"] is False
-    log("playback toggle  on, then off")
+    # The switch is server-wide: put it back the way it was, or a run against a live host
+    # leaves everyone's demo computing (slowly) instead of replaying.
+    was = ok(c, "get", "/settings")["playback"]
+    flipped = ok(c, "post", "/settings", json={"playback": not was})
+    assert flipped["playback"] is (not was)
+    back = ok(c, "post", "/settings", json={"playback": was})
+    assert back["playback"] is was
+    log(f"playback toggle  flipped and restored ({'on' if was else 'off'})")
 
     return {
         "timings": dict(t),

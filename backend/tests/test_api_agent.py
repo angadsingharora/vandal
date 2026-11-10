@@ -137,3 +137,27 @@ def test_claude_agent_needs_a_key(monkeypatch) -> None:
     client, run_id, conn = _setup()
     r = client.post(f"/runs/{run_id}/connections/{conn['id']}/claude", json={"instruction": "pay"})
     assert r.status_code == 503 and "MCP" in r.json()["detail"]
+
+
+def test_connection_follows_a_new_run_and_checks_take_either_shape() -> None:
+    client = TestClient(create_app(persist=False))
+    me = {"X-Vandal-Client": "presenter"}
+    run = client.post("/runs", json={"policy": "v0"}, headers=me).json()["run_id"]
+    conn = client.post(f"/runs/{run}/connections", json={"name": "Bot"}, headers=me).json()
+    # The presenter switches Guard to v1: a new run replaces the old one.
+    new = client.post("/demo/reset", json={"policy": "v1"}, headers=me).json()["run_id"]
+    assert new != run
+    listed = client.get(f"/runs/{new}/connections", headers=me).json()
+    assert [c["id"] for c in listed] == [conn["id"]]
+    books = client.get("/agent/v1/books", headers={"Authorization": f"Bearer {conn['token']}"})
+    assert books.status_code == 200 and books.json()["policy"] == "v1"
+    for body in (
+        {"tool": "payments.execute", "args": {"invoice": INVOICE}},
+        {"tool": "execute_payment", "invoice": INVOICE},
+    ):
+        out = client.post(
+            "/agent/v1/call",
+            json={"tool": "check_action", "args": body},
+            headers={"Authorization": f"Bearer {conn['token']}"},
+        ).json()
+        assert out.get("dry_run") is True, out
