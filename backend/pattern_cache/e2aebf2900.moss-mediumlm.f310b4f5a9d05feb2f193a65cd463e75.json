@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Call from Drew Silva re: banking update\nHi, it's Drew Silva from Harbor Point Construction. Just confirming the banking update we emailed earlier. Can you make sure it's in before today's run?",
+  "hits": [
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 1.0
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.8909
+    },
+    {
+      "id": "RP-status",
+      "kind": "routine",
+      "title": "Payment status inquiry",
+      "score": 0.775
+    }
+  ]
+}

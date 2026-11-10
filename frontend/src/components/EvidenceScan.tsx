@@ -221,6 +221,11 @@ function BooksEvidence() {
   if (!out) return null;
   const violations = out.result.violations;
   const books = ["INV-1", "INV-7"].some((v) => out.result.violated.includes(v)) ? "don't tie out" : "balance";
+  // the entities Guard can explain, named by the violations: "why?" on the clone this page shows
+  const kinds: Record<string, string> = { PAY: "payment", INV: "invoice", CR: "change_request" };
+  const explainable = [...new Set(violations.map((v) => v.subject))]
+    .map((id) => [kinds[id.split("-")[0]], id] as const)
+    .filter((x): x is readonly [string, string] => !!x[0]);
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Block label="What the agent saw">
@@ -256,6 +261,16 @@ function BooksEvidence() {
           ))}
           {violations.length === 0 && <li className="text-xs text-dim">No violation recorded on the replay.</li>}
         </ul>
+        {explainable.length > 0 && (
+          <div className="mx-3 mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px]">
+            <span className="text-dim">Ask Guard</span>
+            {explainable.map(([type, id]) => (
+              <button key={id} onClick={() => void s.explain(type, id)} className="text-blue hover:underline">
+                why? <span className="num">{id}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </Block>
     </div>
   );
@@ -396,6 +411,22 @@ export function EvidenceScan() {
           <div className="es-finding on mx-3 mb-3 border-l-2 border-red py-1 pl-2 text-[12px] font-medium text-red">
             <span className="num">{a.paid?.amount != null ? usd(a.paid.amount) : s.attack ? usd(s.attack.finding.exposure) : "The payment"}</span> followed this
             message.
+          </div>
+        )}
+        {step > a.findings.length && (a.cr || a.paid) && (
+          // "why?" on the clone this page shows: Guard's cited trace, and what the message reads like
+          <div className="mx-3 mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px]">
+            <span className="text-dim">Ask Guard</span>
+            {a.cr && (
+              <button onClick={() => void s.explain("change_request", a.cr!.id)} className="text-blue hover:underline">
+                why? <span className="num">{a.cr.id}</span>
+              </button>
+            )}
+            {a.paid && (
+              <button onClick={() => void s.explain("payment", a.paid!.id)} className="text-blue hover:underline">
+                why? <span className="num">{a.paid.id}</span>
+              </button>
+            )}
           </div>
         )}
         {step > a.findings.length && judgeLabels.length > 0 && (

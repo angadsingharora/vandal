@@ -14,6 +14,8 @@ seeded from and makes new ones (api/routes_profiles.py). `/guard/tools` and
 making it (api/routes_guard.py). `/runs/{id}/shadow` replays a company's real AP activity
 through Guard on a clone, report only (api/routes_shadow.py). `/health` is what a monitor or a
 reviewer reads: version, commit, uptime, persistence, and how busy the server is.
+`/runs/{id}/connections`, `/agent/v1/*` and `/mcp` connect an outside agent to a run, with
+Guard in its path (api/routes_agent.py).
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from vandal.api import (
+    routes_agent,
     routes_blue,
     routes_guard,
     routes_hunt,
@@ -134,6 +137,7 @@ def create_app(store: Store | None = None, persist: bool | None = None) -> FastA
         return settings()
 
     app.include_router(routes_runs.router)
+    app.include_router(routes_agent.router)
     app.include_router(routes_inject.router)
     app.include_router(routes_hunt.router)
     app.include_router(routes_jobs.router)

@@ -189,10 +189,12 @@ export function TopBar({
   onScorecard,
   onWelcome,
   onWorkspace,
+  onConnect,
 }: {
   onScorecard: () => void;
   onWelcome: () => void;
   onWorkspace: () => void;
+  onConnect: () => void;
 }) {
   const s = useWarRoom();
   const demo = s.mode === "demo";
@@ -236,6 +238,9 @@ export function TopBar({
           </>
         ) : (
           <>
+            <Button tone="blue" onClick={onConnect} disabled={!s.ready || s.api?.mode !== "http"} title="Plug your own AI agent into these books, with Guard in its path">
+              Connect agent
+            </Button>
             <Button onClick={onWorkspace} title="Company, run, and how each job is asked for">
               Settings
             </Button>

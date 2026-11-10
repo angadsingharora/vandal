@@ -800,3 +800,63 @@ export interface NewProfile {
   risk?: Partial<ProfileInfo["risk"]>;
   operator?: Partial<ProfileInfo["operator"]>;
 }
+
+// --- Connect your own agent (backend/vandal/api/routes_agent.py) ----------------------------
+
+/** One tool call an outside agent made through a connection, as Guard ruled on it. */
+export interface AgentCall {
+  n: number;
+  /** Unix seconds. */
+  at: number;
+  via: "rest" | "mcp" | "claude";
+  tool: string;
+  args: Record<string, unknown>;
+  decision: Decision;
+  fired: string[];
+  ok: boolean;
+  summary: string;
+}
+
+/** An agent bound to one run's books. The token comes back only when it is made. */
+export interface AgentConnection {
+  id: string;
+  name: string;
+  run_id: string;
+  /** The actor id its calls carry in the verdict feed, e.g. agent:acme-ap-bot. */
+  actor: string;
+  created: number;
+  last_seen: number | null;
+  total_calls: number;
+  clients: ("rest" | "mcp" | "claude")[];
+  calls: AgentCall[];
+  token_hint: string;
+  token?: string;
+}
+
+export type AgentStep =
+  | { type: "text"; text: string }
+  | { type: "tool"; name: string; input: Record<string, unknown>; result?: { ok?: boolean; decision?: Decision; summary?: string; error?: string } };
+
+export interface AgentRunOut {
+  model: string;
+  stop_reason: string | null;
+  transcript: AgentStep[];
+  connection: AgentConnection;
+}
+
+/** GET /agent/v1/books: the books in the shape an agent reads. Amounts are cents. */
+export interface AgentBooks {
+  company: string;
+  day: number;
+  policy: string;
+  approval_threshold_cents: number;
+  cash_cents: number;
+  vendors: {
+    id: string;
+    name: string;
+    domain: string;
+    bank_account: { id: string; routing: string; account_last4: string; status: string } | null;
+    contact: { name: string; email: string } | null;
+  }[];
+  open_invoices: { id: string; vendor: string; vendor_name: string; number: string; amount_cents: number; status: string; due_day: number; kind: string }[];
+}

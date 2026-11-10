@@ -392,8 +392,8 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
     }
   };
 
-  // The workspace: same backend, same pages, no tour. Its settings open right away so the
-  // first thing seen is what can be changed.
+  // The workspace: same backend, same pages, no tour. Connecting an agent opens right away, so
+  // the first thing seen is how to plug one in; the settings are one click from there.
   const workspace = () => {
     if (entering) return;
     s.setMode("workspace");
@@ -457,7 +457,7 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
                   {s.ready ? "Start the demo" : s.waking ? "Waking the host…" : "Connecting…"}
                 </Button>
                 {!mock && (
-                  <Button onClick={workspace} disabled={!s.ready} className="h-10 px-5 text-sm font-semibold" title="No tour. Every knob is in the settings.">
+                  <Button onClick={workspace} disabled={!s.ready} className="h-10 px-5 text-sm font-semibold" title="No tour: connect your own AI agent to the books, with Guard in its path. Every knob is in the settings.">
                     Open the workspace
                   </Button>
                 )}
@@ -478,7 +478,8 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
               </p>
               <p className="mt-3 max-w-xl text-xs leading-relaxed text-faint">
                 The demo is a guided seven-step loop on a simulated property manager with 80 vendor invoices. The workspace is the same
-                war room with nothing scripted: your company, your rules, your attacker. No real money moves in either.
+                war room with nothing scripted: connect your own AI agent over MCP or REST and watch Guard rule on every call, with your
+                company, your rules, your attacker. No real money moves in either.
               </p>
             </Rise>
           </div>

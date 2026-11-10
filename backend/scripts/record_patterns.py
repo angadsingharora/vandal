@@ -1,20 +1,25 @@
 """Record Moss pattern recalls for the demo's messages, so playback shows Moss answers offline.
 
-Replays every trace in scenarios/, five days of legitimate operations, and every held-out
-variant verification draws from (verify/variants.grid), then asks Moss about each inbound message
-with text. Recordings are keyed with digits masked, so they cover the fresh account numbers
-Strike writes into each attack. Recordings land in PATTERN_CACHE_DIR (default
-backend/pattern_cache/) and are safe to commit: each holds the message text and the pattern ids.
+Replays every trace in scenarios/, five days of legitimate operations, every held-out variant
+verification draws from (verify/variants.grid), and the plan "Try your own scenario" makes in
+playback for each suggestion it offers (and the smoke test's never-seen threat), then asks Moss
+about each inbound message with text. Recordings are keyed with digits masked, so they cover the
+fresh account numbers Strike writes into each attack. Recordings land in PATTERN_CACHE_DIR
+(default backend/pattern_cache/) and are safe to commit: each holds the message text and the
+pattern ids.
 
     uv run python scripts/record_patterns.py          # needs MOSS_PROJECT_ID / MOSS_PROJECT_KEY
 """
 
 from __future__ import annotations
 
+import os
+import re
 import sys
 from functools import partial
 from pathlib import Path
 
+from vandal.contracts.moves import Move
 from vandal.guard import patterns
 from vandal.llm import load_env
 from vandal.sandbox import new_sandbox
@@ -23,6 +28,7 @@ from vandal.verify.replay import Trace, replay_detailed
 from vandal.verify.variants import grid
 
 BACKEND = Path(__file__).resolve().parents[1]
+INJECT_DIALOG = BACKEND.parent / "frontend" / "src" / "components" / "InjectDialog.tsx"
 
 
 def messages(state) -> list[str]:
@@ -34,6 +40,42 @@ def messages(state) -> list[str]:
             if text:
                 out.append(text)
     return out
+
+
+def threats() -> list[str]:
+    """The suggestions the war room's "Try your own scenario" offers, and the smoke test's."""
+    from demo_smoke import NEVER_SEEN
+
+    source = INJECT_DIALOG.read_text()
+    block = re.search(r"const EXAMPLES = \[(.*?)\];", source, re.S)
+    if not block:
+        raise SystemExit(f"no EXAMPLES list in {INJECT_DIALOG}")
+    return re.findall(r'"([^"]+)"', block.group(1)) + [NEVER_SEEN]
+
+
+def inject_plans() -> list[list[Move]]:
+    """Each threat read into moves the way the deployed demo reads it: playback on, so a recorded
+    Claude reading where there is one and the keyword reader and templates where there isn't."""
+    from fastapi.testclient import TestClient
+
+    from vandal.api.main import create_app
+
+    before = os.environ.get("DEMO_PLAYBACK")
+    os.environ["DEMO_PLAYBACK"] = "true"
+    try:
+        with TestClient(create_app(persist=False)) as c:
+            run = c.post("/runs").json()["run_id"]
+            plans = []
+            for text in threats():
+                body = {"description": text, "dry_run": True}
+                plan = c.post(f"/runs/{run}/inject", json=body).json()["plan"]
+                plans.append([Move.model_validate(m) for m in plan["moves"]])
+            return plans
+    finally:
+        if before is None:
+            os.environ.pop("DEMO_PLAYBACK", None)
+        else:
+            os.environ["DEMO_PLAYBACK"] = before
 
 
 def main() -> int:
@@ -50,6 +92,9 @@ def main() -> int:
     texts += messages(new_sandbox("bayline").operate(5).run.state)
     for variant in grid(new_sandbox("bayline").run.state, load_profile("bayline")):
         _, sb, _ = replay_detailed(7, variant.moves, sandbox=partial(new_sandbox, "bayline"))
+        texts += messages(sb.run.state)
+    for moves in inject_plans():
+        _, sb, _ = replay_detailed(7, moves, sandbox=partial(new_sandbox, "bayline"))
         texts += messages(sb.run.state)
     sources: dict[str, int] = {}
     unique = {patterns._key(t): t for t in texts}

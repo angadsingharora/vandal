@@ -1,0 +1,292 @@
+{
+ "cache_key": "jobs-v1.search.34e1b7fa2d9dd4e66b17184c7268fd010c9bede3d37c6df5caa03a9fe113c4a7",
+ "inputs": {
+  "depth": 2,
+  "exhaustive": false,
+  "policy": {
+   "controls": [],
+   "diff": [],
+   "parent": null,
+   "version": "v0"
+  },
+  "profile": "bayline",
+  "scenario": "a",
+  "seed": 7
+ },
+ "kind": "search",
+ "recorded_at": "2026-11-10T03:23:08+00:00",
+ "result": {
+  "alphabet": 65,
+  "best": {
+   "exposure": 4000000,
+   "moves": [
+    {
+     "at": 2,
+     "kind": "change_request",
+     "params": {
+      "channel": "email",
+      "fields": "bank",
+      "sender": "lookalike",
+      "vendor": "V-007"
+     }
+    }
+   ],
+   "violated": [
+    "INV-2",
+    "INV-4",
+    "INV-5"
+   ]
+  },
+  "deduped": 16,
+  "depth": 2,
+  "explored": 65,
+  "families": [],
+  "findings": [
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "violated": [
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "compromised_mailbox",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "violated": [
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 1595342,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-021"
+      }
+     }
+    ],
+    "violated": [
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 1595342,
+    "moves": [
+     {
+      "at": 0,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "compromised_mailbox",
+       "vendor": "V-021"
+      }
+     }
+    ],
+    "violated": [
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 1,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 1,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "compromised_mailbox",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 1595342,
+    "moves": [
+     {
+      "at": 1,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-021"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 1595342,
+    "moves": [
+     {
+      "at": 1,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "compromised_mailbox",
+       "vendor": "V-021"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 2,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 4000000,
+    "moves": [
+     {
+      "at": 2,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "compromised_mailbox",
+       "vendor": "V-007"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 1595342,
+    "moves": [
+     {
+      "at": 2,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "lookalike",
+       "vendor": "V-021"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   },
+   {
+    "exposure": 1595342,
+    "moves": [
+     {
+      "at": 2,
+      "kind": "change_request",
+      "params": {
+       "channel": "email",
+       "fields": "bank",
+       "sender": "compromised_mailbox",
+       "vendor": "V-021"
+      }
+     }
+    ],
+    "violated": [
+     "INV-2",
+     "INV-4",
+     "INV-5"
+    ]
+   }
+  ],
+  "levels": [
+   65
+  ],
+  "ms_per_run": 2.1015884616645053,
+  "pruned": 0,
+  "runs_per_second": 475.8305530512751,
+  "scenario": "a",
+  "seconds": 0.13660325000819284,
+  "workers": 1
+ }
+}
