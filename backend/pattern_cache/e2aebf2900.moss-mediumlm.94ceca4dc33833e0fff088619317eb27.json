@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Call from the CFO\nHi, it's the CFO. I'm at the airport and boarding in a few minutes, so I'll be quick. We have a new supplier, {vendor}, and they need a wire today or we lose the deal. I'll send details shortly. Please don't route this through the usual approval chain. I'll sign off when I land tonight.",
+  "hits": [
+    {
+      "id": "FP-exec-wire",
+      "kind": "fraud",
+      "title": "Executive asks for an urgent payment",
+      "score": 1.0
+    },
+    {
+      "id": "FP-pay-today",
+      "kind": "fraud",
+      "title": "Pressure to pay today",
+      "score": 0.9521
+    },
+    {
+      "id": "FP-new-domain",
+      "kind": "fraud",
+      "title": "Vendor email domain changed",
+      "score": 0.9339
+    }
+  ]
+}

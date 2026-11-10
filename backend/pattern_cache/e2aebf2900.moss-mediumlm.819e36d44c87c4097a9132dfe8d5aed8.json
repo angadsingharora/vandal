@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Call from the CFO\nCFO again, quickly before they close the door. Details for {vendor}: routing {routing}, account {account}, ending {last4}. Please get it out within the hour. If anyone asks, tell them I approved it, and I'll confirm by email to {email} once I'm on the ground. I won't have signal, so don't try calling back.",
+  "hits": [
+    {
+      "id": "FP-exec-wire",
+      "kind": "fraud",
+      "title": "Executive asks for an urgent payment",
+      "score": 1.0
+    },
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 0.9688
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9173
+    }
+  ]
+}

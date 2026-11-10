@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Updated remittance details - Summit Roofing\nHi,\n\nForwarding this from our roofing contractor. They asked that today's invoice go to their new account before the batch runs. Can you update it?\n\nThanks\n\n---------- Forwarded message ----------\nFrom: Jamie Patel <{email}>\nSubject: Updated remittance details - Summit Roofing\n\nHello,\n\nWe have moved our business banking to a new bank. Effective immediately, please send all payments to:\n\nRouting: 026006899\nAccount: 4658015087\n\nThe account ending 1547 is being closed and can no longer accept deposits. Please apply this to today's invoice so the payment isn't returned.\n\nThank you,\nJamie Patel\n{title}\nSummit Roofing\n{phone}",
+  "hits": [
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 1.0
+    },
+    {
+      "id": "FP-corrected-invoice",
+      "kind": "fraud",
+      "title": "Corrected invoice with new payment instructions",
+      "score": 0.9521
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9453
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Updated remittance details - Harbor Point Construction\nHello,\n\nWe've moved our operating account to a new bank as part of a year-end consolidation. Please remit all open invoices to:\n\nRouting: 026000847\nAccount: 9680804765\n\nPlease update this before your next payment run; the account ending 6031 closes this week.\n\nThanks,\nDrew Silva\nHarbor Point Construction",
+  "hits": [
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 1.0
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9521
+    },
+    {
+      "id": "FP-corrected-invoice",
+      "kind": "fraud",
+      "title": "Corrected invoice with new payment instructions",
+      "score": 0.9394
+    }
+  ]
+}

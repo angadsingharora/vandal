@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Refund of overpayment - Quarry Lane Architects\nHello, we overpaid our rent this month by mistake. Please send the credit to our new account, ending in the last four digits below, as soon as you can. Thank you.",
+  "hits": [
+    {
+      "id": "FP-refund-redirect",
+      "kind": "fraud",
+      "title": "Refund to a different account",
+      "score": 1.0
+    },
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9688
+    },
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 0.8808
+    }
+  ]
+}

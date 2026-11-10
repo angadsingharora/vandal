@@ -1,0 +1,24 @@
+{
+  "library": "e2aebf2900",
+  "text": "Re: Summit Roofing remittance\nHi,\n\nFollowing up on our banking update. Our crew finished the roof last week, and we need today's payment to cover materials. Please make sure it goes to the account ending {last4}, not the old one ending {old_last4}, which is now closed.\n\nThe property manager's office already has the new details. There's no need to call our old number, since that line is being transferred. You can reach me at {phone} if needed.\n\nThanks for getting this into today's batch.\n\n{signer}\n{vendor}",
+  "hits": [
+    {
+      "id": "FP-contact-swap",
+      "kind": "fraud",
+      "title": "Accounts contact replaced",
+      "score": 0.9771
+    },
+    {
+      "id": "FP-bank-moved",
+      "kind": "fraud",
+      "title": "Bank details changed by email",
+      "score": 0.9629
+    },
+    {
+      "id": "FP-exec-wire",
+      "kind": "fraud",
+      "title": "Executive asks for an urgent payment",
+      "score": 0.9086
+    }
+  ]
+}
