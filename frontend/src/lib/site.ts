@@ -5,7 +5,7 @@ export const SITE = {
   tagline: "Security for AI finance agents",
   /** The one-sentence answer to "what is it". */
   what: "Vandal is the control layer for companies handing accounts payable to AI agents. It checks every action before money moves, and it keeps attacking its own checks so they get stronger with every change.",
-  url: "https://frontend-dusky-eight-92.vercel.app",
+  url: "https://usevandal.vercel.app",
   github: "https://github.com/angadsingharora/vandal",
   /** Where a pilot or demo request goes. Set in one place so it is easy to change. */
   email: "angadsingharora@gmail.com",
