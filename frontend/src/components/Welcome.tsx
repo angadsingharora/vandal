@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cx } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
 import { SITE } from "@/lib/site";
@@ -28,6 +28,15 @@ function markUrl(workspace: boolean) {
   else url.searchParams.delete("workspace");
   url.searchParams.delete("welcome");
   window.history.replaceState(null, "", url.pathname + (url.search || ""));
+}
+
+/** A block that rises in after `delay` ms (globals.css `.rise`): the landing's entrance. */
+function Rise({ delay, className, children }: { delay: number; className?: string; children: ReactNode }) {
+  return (
+    <div className={cx("rise", className)} style={{ animationDelay: `${delay}ms` }}>
+      {children}
+    </div>
+  );
 }
 
 /** The landing: what Vandal is, and two ways in. The workspace opens on connecting an agent or
@@ -85,34 +94,44 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
   return (
     <div className={cx("fixed inset-0 z-50 overflow-y-auto bg-bg", leaving && "welcome-leave")}>
       <div role="dialog" aria-modal aria-labelledby="welcome-title" className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 py-8 sm:px-10">
-        <SiteHeader current="/" />
+        <Rise delay={0}>
+          <SiteHeader current="/" />
+        </Rise>
 
         <main className="my-auto py-16">
-          <h1 id="welcome-title" className="text-[2.4rem] font-bold leading-[1.05] tracking-tight text-ink sm:text-5xl">
-            Your books can balance while the money goes to the wrong person.
-          </h1>
-          <p className="mt-6 max-w-xl text-[15px] leading-relaxed text-dim">{SITE.what}</p>
+          <Rise delay={80}>
+            <h1 id="welcome-title" className="text-[2.4rem] font-bold leading-[1.05] tracking-tight text-ink sm:text-5xl">
+              Your books can balance while the money goes to the wrong person.
+            </h1>
+          </Rise>
+          <Rise delay={200}>
+            <p className="mt-6 max-w-xl text-[15px] leading-relaxed text-dim">{SITE.what}</p>
+          </Rise>
 
-          <div className="mt-10 flex flex-wrap items-center gap-3">
-            {!mock && (
-              <Button tone="blue" onClick={workspace} disabled={!s.ready} className="h-11 px-6 text-sm font-semibold">
-                {s.ready ? "Open the workspace" : s.waking ? "Waking the server…" : "Connecting…"}
+          <Rise delay={320}>
+            <div className="mt-10 flex flex-wrap items-center gap-3">
+              {!mock && (
+                <Button tone="blue" onClick={workspace} disabled={!s.ready} className="h-11 px-6 text-sm font-semibold">
+                  {s.ready ? "Open the workspace" : s.waking ? "Waking the server…" : "Connecting…"}
+                </Button>
+              )}
+              <Button onClick={demo} busy={entering} disabled={!s.ready} className="h-11 px-6 text-sm font-semibold">
+                Watch the demo
               </Button>
-            )}
-            <Button onClick={demo} busy={entering} disabled={!s.ready} className="h-11 px-6 text-sm font-semibold">
-              Watch the demo
-            </Button>
-          </div>
-          <p className="mt-3 max-w-xl text-xs leading-relaxed text-faint">
-            The workspace connects your AI agent or your AP export to Guard. The demo walks through an attack, the fix, and the proof.
-          </p>
-          <p role="status" className="mt-6 flex items-center gap-2 text-xs text-dim">
-            <span className={cx("inline-block size-1.5 rounded-full", link.dot)} />
-            {link.text}
-          </p>
+            </div>
+            <p className="mt-3 max-w-xl text-xs leading-relaxed text-faint">
+              The workspace connects your AI agent or your AP export to Guard. The demo walks through an attack, the fix, and the proof.
+            </p>
+            <p role="status" className="mt-6 flex items-center gap-2 text-xs text-dim">
+              <span className={cx("inline-block size-1.5 rounded-full", link.dot)} />
+              {link.text}
+            </p>
+          </Rise>
         </main>
 
-        <SiteFooter />
+        <Rise delay={460}>
+          <SiteFooter />
+        </Rise>
       </div>
     </div>
   );
