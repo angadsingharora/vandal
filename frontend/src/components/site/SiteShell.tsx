@@ -30,7 +30,7 @@ export function SiteFooter({ className }: { className?: string }) {
   return (
     <footer className={cx("flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-t border-line pt-6 text-xs text-faint", className)}>
       <span>
-        {SITE.name} · {SITE.tagline}. Everything on this site runs on a simulated company; no real money moves.
+        {SITE.name} · {SITE.tagline}. Your agent is real; the company it works on is simulated. No real money moves.
       </span>
       <span className="flex items-baseline gap-4">
         <Link href="/about" className="underline-offset-4 hover:text-ink hover:underline">
