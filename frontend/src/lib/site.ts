@@ -5,8 +5,8 @@ export const SITE = {
   tagline: "Security for AI finance agents",
   /** The landing page's big sentence, and the share card's. */
   headline: "Your AI agent will get scammed. Vandal makes sure it never pays.",
-  /** Words in the headline that take a side's color: the attack in Strike red, Vandal in Guard blue. */
-  headlineTones: { scammed: "red", Vandal: "blue" } as Record<string, "red" | "blue">,
+  /** Words in the headline that take a color; the rest stay ink. Vandal is red, the brand's color. */
+  headlineTones: { Vandal: "red" } as Record<string, "red" | "blue">,
   /** The one-sentence answer to "what is it". */
   what: "Vandal is the control layer for companies handing accounts payable to AI agents. It checks every action before money moves, and it keeps attacking its own checks so they get stronger with every change.",
   url: "https://usevandal.vercel.app",
