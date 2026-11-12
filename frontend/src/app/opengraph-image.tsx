@@ -28,8 +28,19 @@ export default function Image() {
           <span style={{ color: "#959ca9", letterSpacing: 2, textTransform: "uppercase", fontSize: 20 }}>{SITE.tagline}</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-          <div style={{ fontSize: 72, fontWeight: 700, lineHeight: 1.04, letterSpacing: -2, maxWidth: 1000 }}>
-            {SITE.headline}
+          <div style={{ display: "flex", flexWrap: "wrap", fontSize: 72, fontWeight: 700, lineHeight: 1.04, letterSpacing: -2, maxWidth: 1000 }}>
+            {SITE.headline.split(/\b/).map((word, i) => {
+              const tone = SITE.headlineTones[word];
+              return tone ? (
+                <span key={i} style={{ color: tone === "red" ? "#d14343" : "#2f6be0", whiteSpace: "pre" }}>
+                  {word}
+                </span>
+              ) : (
+                <span key={i} style={{ whiteSpace: "pre" }}>
+                  {word}
+                </span>
+              );
+            })}
           </div>
           <div style={{ fontSize: 28, color: "#5d6472", lineHeight: 1.35, maxWidth: 980 }}>
             Vandal checks every action an AI finance agent takes before money moves, and keeps attacking its own checks so they

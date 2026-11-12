@@ -104,7 +104,15 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
               {/* Each sentence starts its own line. */}
               {SITE.headline.split(/(?<=\.) /).map((line) => (
                 <span key={line} className="block">
-                  {line}
+                  {line.split(/\b/).map((word, i) =>
+                    SITE.headlineTones[word] ? (
+                      <span key={i} className={SITE.headlineTones[word] === "red" ? "text-red" : "text-blue"}>
+                        {word}
+                      </span>
+                    ) : (
+                      word
+                    ),
+                  )}
                 </span>
               ))}
             </h1>
