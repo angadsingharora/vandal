@@ -11,7 +11,7 @@ services:
     envVars:
       # The frontend's origin; add more comma-separated if you deploy it elsewhere.
       - key: VANDAL_CORS_ORIGINS
-        value: https://frontend-dusky-eight-92.vercel.app,http://localhost:3000
+        value: https://usevandal.vercel.app,https://frontend-dusky-eight-92.vercel.app,http://localhost:3000
       # Serve model calls from the recorded cache, so the demo needs no API key.
       - key: DEMO_PLAYBACK
         value: "true"
