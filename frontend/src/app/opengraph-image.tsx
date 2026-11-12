@@ -29,7 +29,7 @@ export default function Image() {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
           <div style={{ fontSize: 72, fontWeight: 700, lineHeight: 1.04, letterSpacing: -2, maxWidth: 1000 }}>
-            Your books can balance while the money goes to the wrong person.
+            {SITE.headline}
           </div>
           <div style={{ fontSize: 28, color: "#5d6472", lineHeight: 1.35, maxWidth: 980 }}>
             Vandal checks every action an AI finance agent takes before money moves, and keeps attacking its own checks so they

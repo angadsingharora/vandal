@@ -3,6 +3,8 @@
 export const SITE = {
   name: "Vandal",
   tagline: "Security for AI finance agents",
+  /** The landing page's big sentence, and the share card's. */
+  headline: "Your AI agent will get scammed. Vandal makes sure it never pays.",
   /** The one-sentence answer to "what is it". */
   what: "Vandal is the control layer for companies handing accounts payable to AI agents. It checks every action before money moves, and it keeps attacking its own checks so they get stronger with every change.",
   url: "https://usevandal.vercel.app",
