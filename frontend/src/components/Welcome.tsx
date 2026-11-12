@@ -93,14 +93,14 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
 
   return (
     <div className={cx("fixed inset-0 z-50 overflow-y-auto bg-bg", leaving && "welcome-leave")}>
-      <div role="dialog" aria-modal aria-labelledby="welcome-title" className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-6 py-8 sm:px-10">
+      <div role="dialog" aria-modal aria-labelledby="welcome-title" className="mx-auto flex min-h-full w-full max-w-6xl flex-col px-6 py-8 sm:px-10">
         <Rise delay={0}>
           <SiteHeader current="/" />
         </Rise>
 
         <main className="my-auto py-16">
           <Rise delay={80}>
-            <h1 id="welcome-title" className="text-[2.4rem] font-bold leading-[1.05] tracking-tight text-ink sm:text-5xl">
+            <h1 id="welcome-title" className="text-[2.4rem] font-bold leading-[1.05] tracking-tight text-ink sm:text-5xl xl:text-6xl">
               {/* Each sentence starts its own line. */}
               {SITE.headline.split(/(?<=\.) /).map((line) => (
                 <span key={line} className="block">
