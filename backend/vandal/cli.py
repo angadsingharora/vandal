@@ -1,4 +1,4 @@
-"""vandal seed | run | attack | search | synth | verify | inject | intake"""
+"""vandal seed | run | attack | search | synth | verify | inject | intake | hunt | hunt-messages"""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ COMMANDS: dict[str, tuple[str, str]] = {
     "verify": ("Run the verification suite against a policy", "R7"),
     "inject": ("Run a user-authored threat in plain language", "R9"),
     "hunt": ("try attacks beyond the preset search, drawn from a written playbook", "R13"),
+    "hunt-messages": ("an attacker model writes fraud messages; the real intake reads them", "R14"),
     "rebuild": ("Rebuild a persisted run from its events and check its hash", "R12"),
     "intake": ("Score the LLM Operator's intake on the messy-document items", "O1"),
 }
@@ -656,12 +657,71 @@ def cmd_hunt(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_hunt_messages(args: argparse.Namespace) -> int:
+    import json
+    from functools import partial
+    from pathlib import Path
+
+    from vandal.sandbox import new_sandbox
+    from vandal.search.message_hunt import Budget, message_hunt
+
+    policy = _policy(args)
+    _print_policy(policy)
+    factory = partial(new_sandbox, args.profile, policy=policy, use_llm=True)
+    budget = Budget(attempts=args.attempts, max_calls=args.max_calls, max_tokens=args.max_tokens)
+
+    def show(a) -> None:
+        m, o = a.message, a.outcome
+        print(f'\nattempt {a.n}: {m.channel} from {m.sender}  "{m.subject}"')
+        print(f"  rationale: {a.rationale}")
+        if o.dropped:
+            print(f"  dropped  {o.dropped}")
+            return
+        if o.read:
+            r = o.read
+            fields = " ".join(
+                f"{k}={v}"
+                for k, v in (("vendor", r.vendor), ("routing", r.routing), ("account", r.account))
+                if v
+            )
+            print(f"  intake   {r.intent} {fields} (read by {r.source})".rstrip())
+        for g in o.actions:
+            fired = f" fired: {', '.join(g.fired)}" if g.fired else ""
+            print(f"  guard    {g.decision} {g.tool}{fired}")
+        for c in o.cases:
+            print(f"  case     {c}")
+        if o.violated:
+            print(f"  BROKE    {', '.join(o.violated)}  exposure ${o.exposure / 100:,.2f}")
+        else:
+            print("  held: no invariant broken")
+
+    r = message_hunt(factory, seed=args.seed, budget=budget, on_attempt=show)
+    print(f"\n{r.reason}")
+    print(
+        f"policy {r.policy}: {r.hits} hits in {len(r.attempts)} attempts "
+        f"(success rate {r.success_rate:.0%}), total exposure ${r.total_exposure / 100:,.2f}, "
+        f"{r.calls} model calls"
+    )
+    if r.best:
+        b = r.best
+        print(
+            f"best: attempt {b.attempt} from {b.message.sender}, broke {', '.join(b.violated)}, "
+            f"exposure ${b.exposure / 100:,.2f} (threat family {b.scenario})"
+        )
+    out = Path(args.out or f"hunts/messages-{r.policy}-seed{r.seed}.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(r.model_dump(mode="json"), indent=2, sort_keys=True) + "\n")
+    print(f"wrote {out}")
+    return 1 if r.hits else 0
+
+
 IMPLEMENTED: dict[str, Callable[[argparse.Namespace], int]] = {
     "rebuild": cmd_rebuild,
     "synth": cmd_synth,
     "verify": cmd_verify,
     "inject": cmd_inject,
     "hunt": cmd_hunt,
+    "hunt-messages": cmd_hunt_messages,
     "search": cmd_search,
     "seed": cmd_seed,
     "run": cmd_run,
@@ -687,6 +747,7 @@ def build_parser() -> argparse.ArgumentParser:
             "inject",
             "intake",
             "hunt",
+            "hunt-messages",
         ):
             cmd.add_argument("--profile", default="bayline", help="profile name or YAML path")
             cmd.add_argument("--seed", type=int, default=DEFAULT_SEED)
@@ -697,7 +758,16 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "intake":
             cmd.add_argument("--target", type=float, default=0.9, help="accuracy to reach")
             cmd.add_argument("--show", help="print one item by id, e.g. MSY-003")
-        if name in ("run", "attack", "search", "verify", "synth", "inject", "hunt"):
+        if name in (
+            "run",
+            "attack",
+            "search",
+            "verify",
+            "synth",
+            "inject",
+            "hunt",
+            "hunt-messages",
+        ):
             cmd.add_argument("--policy", help="v0, a name under policies/, or a JSON path")
         if name == "synth":
             cmd.add_argument("--no-llm", action="store_true", help="enumerative sweep only")
@@ -763,6 +833,15 @@ def build_parser() -> argparse.ArgumentParser:
             cmd.add_argument("--attempts", type=int, default=6, help="hypotheses to test")
             cmd.add_argument(
                 "--keep-going", action="store_true", help="keep hunting after the first hit"
+            )
+        if name == "hunt-messages":
+            cmd.add_argument("--attempts", type=int, default=6, help="messages to write (1-24)")
+            cmd.add_argument(
+                "--max-calls", type=int, default=48, help="model calls in all (attacker + intake)"
+            )
+            cmd.add_argument("--max-tokens", type=int, default=8000, help="tokens per model call")
+            cmd.add_argument(
+                "--out", help="report JSON (default hunts/messages-<policy>-seed<n>.json)"
             )
     return parser
 
