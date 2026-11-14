@@ -382,6 +382,45 @@ def _inbound_confirmation(sb: SandboxLike, move: Move, index: int, oracle: Oracl
     _deliver(sb, message, oracle)
 
 
+def _inbound_message(sb: SandboxLike, move: Move, index: int, oracle: Oracle) -> None:
+    """A message the attacker wrote in its own words (search/message_hunt.py). It arrives with no
+    structured fields, so the Operator's intake decides what it is and what to do; nothing here
+    tells the company what the message asks for. The oracle learns the truth: the sender is the
+    attacker, and the receiving account named in `mule_routing`/`mule_account` is the
+    attacker's."""
+    p = move.params
+    caps = sb.profile.attacker_capabilities
+    state = sb.run.state
+    channel = str(p.get("channel", "email"))
+    sender = str(p.get("sender", "")).strip()
+    body = str(p.get("body", ""))
+    if channel not in caps.change_request_channels:
+        raise IllegalMove(f"attacker can't send messages by {channel}")
+    if not sender or not body:
+        raise IllegalMove("an inbound message needs a sender and a body")
+    domain = sender.rpartition("@")[2].lower()
+    real = any(domain == v.domain.lower() for v in state.vendors.values())
+    needs = "compromised_mailbox" if real else "lookalike"
+    if needs not in caps.senders:
+        raise IllegalMove(f"attacker can't send as {needs} ({sender})")
+    if p.get("mule_routing") and p.get("mule_account"):
+        oracle.add(
+            account_key(str(p["mule_routing"]), str(p["mule_account"])), "attacker_controlled"
+        )
+    msg_id = _message_id(state)
+    oracle.add(msg_id, "true_sender", "attacker")
+    message = ChannelEvent(
+        id=msg_id,
+        day=state.day,
+        channel=channel,
+        sender=sender,
+        subject=str(p.get("subject", "")),
+        body=body,
+        meta={},
+    )
+    _deliver(sb, message, oracle)
+
+
 def _trigger_batch(sb: SandboxLike, move: Move, index: int, oracle: Oracle) -> None:
     sb.operator.on_event(
         ChannelEvent(
@@ -539,6 +578,7 @@ MOVES: dict[str, Callable[[SandboxLike, Move, int, Oracle], None]] = {
     "submit_invoice": _submit_invoice,
     "message": _message,
     "trigger_batch": _trigger_batch,
+    "inbound_message": _inbound_message,
     "fault": _fault,
     "retry": _retry,
     "deposit": _deposit,

@@ -10,3 +10,6 @@ node_modules/
 .ruff_cache/
 backend/evidence/
 .vercel
+
+# message hunt reports (vandal hunt-messages)
+backend/hunts/

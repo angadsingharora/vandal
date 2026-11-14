@@ -39,6 +39,7 @@ from vandal.api import (
     routes_hunt,
     routes_inject,
     routes_jobs,
+    routes_message_hunt,
     routes_policies,
     routes_profiles,
     routes_runs,
@@ -140,6 +141,7 @@ def create_app(store: Store | None = None, persist: bool | None = None) -> FastA
     app.include_router(routes_agent.router)
     app.include_router(routes_inject.router)
     app.include_router(routes_hunt.router)
+    app.include_router(routes_message_hunt.router)
     app.include_router(routes_jobs.router)
     app.include_router(routes_policies.router)
     app.include_router(routes_profiles.router)

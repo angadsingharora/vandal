@@ -25,7 +25,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from vandal.contracts.entities import OracleLabel
-from vandal.contracts.moves import Move, MoveKind
+from vandal.contracts.moves import Move
 from vandal.search.alphabet import SCENARIOS, customer_classes, vendor_classes
 from vandal.twin.profile import Profile
 from vandal.twin.state import State
@@ -158,8 +158,24 @@ class _LLMParam(BaseModel):
     value: str | int
 
 
+# The kinds a described threat can plan. inbound_message is left out: free text is the message
+# hunt's (search/message_hunt.py), and the list is part of this schema, so of every recording's key.
+PlannedKind = Literal[
+    "change_request",
+    "inbound_confirmation",
+    "submit_invoice",
+    "fault",
+    "trigger_batch",
+    "retry",
+    "deposit",
+    "refund_request",
+    "tick",
+    "message",
+]
+
+
 class _LLMMove(BaseModel):
-    kind: MoveKind
+    kind: PlannedKind
     at: int
     # Structured output can't fill a free-form dict (it comes back as {}), so the catalog's
     # parameters travel as key/value pairs and are folded into Move.params here.
