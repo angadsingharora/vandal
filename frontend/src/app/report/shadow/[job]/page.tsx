@@ -9,7 +9,7 @@ import { use, useEffect, useState } from "react";
 import { getApi, type VandalApi } from "@/lib/api";
 import { SITE } from "@/lib/site";
 import type { Job, ShadowReport } from "@/lib/types";
-import { headline, ShadowReportBody } from "@/components/ShadowReportBody";
+import { finding, ShadowReportBody } from "@/components/ShadowReportBody";
 
 export default function ShadowReportPage({ params }: { params: Promise<{ job: string }> }) {
   const { job: jobId } = use(params);
@@ -68,21 +68,15 @@ export default function ShadowReportPage({ params }: { params: Promise<{ job: st
 
         {report && sum && (
           <main className="mt-12">
-            <h1 className="text-3xl font-bold leading-tight tracking-tight text-ink sm:text-4xl">{headline(report)}</h1>
+            <h1 className="text-3xl font-bold leading-tight tracking-tight text-ink sm:text-4xl">{finding(report)}</h1>
             <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-dim">
-              {sum.rows} rows of accounts payable at <span className="text-ink">{report.company}</span>, replayed through Guard on a clone of the books under{" "}
-              <span className="num text-ink">{sum.policy}</span>
-              {other && (
-                <>
-                  {" "}
-                  and again under <span className="num text-ink">{other.policy}</span>
-                </>
-              )}
-              . Each row became the calls the agent would have made, and Guard ruled on every one. Nothing here moved real money; the live books were not
+              {sum.rows} rows of accounts payable at <span className="text-ink">{report.company}</span>, replayed through Vandal&apos;s checks on a copy of the books{" "}
+              {other ? "twice: under today's rules, and again with the proposed rule" : "under today's rules"}. Each row became the actions an AP agent would
+              have taken, and every one was checked. Nothing here moved real money; the live books were not
               touched.
             </p>
             <div className="mt-10">
-              <ShadowReportBody report={report} />
+              <ShadowReportBody report={report} plain />
             </div>
             <footer className="mt-12 border-t border-line pt-6 text-xs text-faint">
               {SITE.name} · {SITE.tagline}. Every row ran on day 0 of a fresh clone; the report is about what Guard says, not the calendar. Report{" "}

@@ -9,10 +9,9 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getApi, type VandalApi } from "@/lib/api";
-import { usd } from "@/lib/format";
 import { SHADOW_SAMPLE } from "@/lib/shadowSample";
 import type { ShadowMapping, ShadowReport } from "@/lib/types";
-import { KIND_TEXT, ShadowReportBody } from "@/components/ShadowReportBody";
+import { finding, KIND_TEXT, ShadowReportBody } from "@/components/ShadowReportBody";
 import { linkClass, SiteFooter, SiteHeader } from "@/components/site/SiteShell";
 import { Button } from "@/components/ui";
 
@@ -39,17 +38,6 @@ async function baseline(api: VandalApi): Promise<string> {
   const mine = await api.listRuns().catch(() => []);
   const run = mine.filter((r) => r.kind === "operate" && r.policy === BEFORE).at(-1);
   return run ? run.run_id : (await api.createRun({ policy: BEFORE })).run_id;
-}
-
-/** The finding in a sentence, for someone who has never heard of a policy version. */
-function finding(report: ShadowReport): string {
-  const through = report.summary.money_unverified;
-  const after = report.compare?.summary.money_unverified ?? through;
-  if (through === 0) return "Every payment went to a verified account.";
-  const money = usd(through, { cents: false });
-  if (after === 0) return `${money} went to accounts nobody verified. One rule would have stopped all of it.`;
-  if (after < through) return `${money} went to accounts nobody verified. One rule would have stopped ${usd(through - after, { cents: false })} of it.`;
-  return `${money} went to accounts nobody verified.`;
 }
 
 export default function CheckPage() {
@@ -201,9 +189,8 @@ export default function CheckPage() {
             <div ref={reportRef} className="mt-14 scroll-mt-8 border-t border-line pt-10">
               <h2 className="max-w-4xl text-2xl font-bold leading-tight tracking-tight text-ink sm:text-3xl">{finding(report)}</h2>
               <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-dim">
-                {report.summary.rows} rows, once under the baseline rules (<span className="num text-ink">{report.policy}</span>) and once with the rule Vandal
-                proposes (<span className="num text-ink">{report.compare?.policy ?? AFTER}</span>): a changed bank account pays out only after a call back to the
-                contact already on file.
+                {report.summary.rows} rows, once under the rules a company starts with and once with the rule Vandal proposes: a changed bank account pays out only
+                after a call back to the contact already on file.
                 {report.enrolled && report.enrolled.length > 0 && (
                   <>
                     {" "}
@@ -213,7 +200,7 @@ export default function CheckPage() {
                 )}
               </p>
               <div className="mt-8">
-                <ShadowReportBody report={report} />
+                <ShadowReportBody report={report} plain />
               </div>
 
               <div className="mt-12 grid gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-3">
