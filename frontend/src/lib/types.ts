@@ -755,6 +755,8 @@ export interface ShadowReport {
   company: string;
   summary: ShadowSummary;
   rows: ShadowRow[];
+  /** Vendors the books didn't know, taken from the export (`enroll`). */
+  enrolled?: string[];
   /** The same rows under another policy (`compare`), and what it changes. */
   compare: { policy: string; summary: ShadowSummary; rows: ShadowRow[] } | null;
   delta: ShadowDelta | null;
