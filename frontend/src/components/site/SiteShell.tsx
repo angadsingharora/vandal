@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import { cx } from "@/lib/format";
 import { NAV, SITE } from "@/lib/site";
 
-/** The header the landing page and the company pages share: wordmark and three links. */
-export function SiteHeader({ current, className }: { current: "/" | "/about" | "/contact"; className?: string }) {
+/** The header the landing page and the company pages share: wordmark and the site's links. */
+export function SiteHeader({ current, className }: { current: "/" | "/check" | "/about" | "/contact"; className?: string }) {
   return (
     <header className={cx("flex items-baseline justify-between gap-6", className)}>
       <Link href="/" className="text-base font-semibold tracking-tight text-ink">

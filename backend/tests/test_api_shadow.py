@@ -161,3 +161,32 @@ def test_compare_runs_the_month_under_both_policies(client) -> None:
     same = client.post(f"/runs/{rid}/shadow", json={"csv": csv, "compare": "v0"}).json()
     assert same["compare"] is None and same["delta"] is None
     assert client.post(f"/runs/{rid}/shadow", json={"csv": csv, "compare": "v9"}).status_code == 400
+
+
+REAL = """Vendor Name,Invoice #,Amount,Transaction Type,channel,sender,routing,account
+Acme Janitorial,INV-88,1250.00,Bill,,,,
+Acme Janitorial,INV-88,,Bill Payment,,,,
+Acme Janitorial,,,vendor_bank_change,email,billing@acme-janitorial-pay.com,026009593,99887766
+Acme Janitorial,INV-91,4100.00,Bill,,,,
+Acme Janitorial,INV-91,,Bill Payment,,,,
+"""
+
+
+def test_an_export_with_the_companys_own_vendors(client) -> None:
+    rid = client.post("/runs", json={"policy": "v0"}).json()["run_id"]
+    # as is, nothing in the file is on the books
+    plain = client.post(f"/runs/{rid}/shadow", json={"csv": REAL}).json()
+    assert plain["summary"]["by_decision"]["unmatched"] == 5 and plain["enrolled"] == []
+    # enrolled, the vendor is on file and its rows run: the emailed change goes through under
+    # v0 and the next payment follows it; under v1 the change is held and the money stays put
+    out = client.post(
+        f"/runs/{rid}/shadow", json={"csv": REAL, "enroll": True, "compare": "v1"}
+    ).json()
+    assert out["enrolled"] == ["Acme Janitorial"]
+    assert out["summary"]["by_decision"]["unmatched"] == 0
+    assert out["rows"][1]["paid"] and out["rows"][1]["payee_status"] == "verified"
+    assert out["rows"][4]["paid"] and out["rows"][4]["payee_status"] == "unverified"
+    assert out["summary"]["money_unverified"] == 410_000
+    assert out["compare"]["rows"][2]["decision"] == "hold"
+    assert out["compare"]["summary"]["money_unverified"] == 0
+    assert all(r["enrolled"] for r in out["rows"])

@@ -42,7 +42,14 @@ from vandal.api import deps
 from vandal.api.registry import RunHandle
 from vandal.api.routes_guard import _say
 from vandal.contracts.controls import DECISION_ORDER
-from vandal.contracts.entities import Actor, PurchaseOrder, Receipt, Vendor
+from vandal.contracts.entities import (
+    Actor,
+    PurchaseOrder,
+    Receipt,
+    Vendor,
+    VendorBankAccount,
+    VendorContact,
+)
 from vandal.sandbox import Sandbox, new_sandbox
 from vandal.synth.templates import Policy
 from vandal.twin.flows import (
@@ -279,6 +286,10 @@ class ShadowBody(BaseModel):
     approve_escalations: bool = True
     # Another policy to run the same rows under, for the before/after.
     compare: str | None = Field(default=None, max_length=60)
+    # A real export names the company's own vendors, not the run's. With `enroll` a vendor the
+    # books don't know is put on the clone's vendor master as the export first names it (a
+    # contact and a verified account on file), so its rows run instead of coming back unmatched.
+    enroll: bool = False
 
 
 class MappingBody(BaseModel):
@@ -345,7 +356,11 @@ class Shadow:
     """Replays rows on one clone and keeps the report."""
 
     def __init__(
-        self, handle: RunHandle, approve_escalations: bool, policy: Policy | None = None
+        self,
+        handle: RunHandle,
+        approve_escalations: bool,
+        policy: Policy | None = None,
+        enroll: bool = False,
     ) -> None:
         self.sb: Sandbox = new_sandbox(
             handle.sandbox.profile, seed=handle.seed, policy=policy or handle.policy, use_llm=False
@@ -355,6 +370,8 @@ class Shadow:
         self.dimension = handle.sandbox.profile.properties[0].id
         self.approvers = handle.sandbox.profile.approval_matrix.approvers
         self.steps: list[dict[str, Any]] = []
+        self.enroll = enroll
+        self.enrolled: dict[str, str] = {}  # vendor id -> name, for vendors taken from the export
 
     @property
     def state(self):
@@ -390,7 +407,45 @@ class Shadow:
         for v in self.state.vendors.values():
             if key in (v.id.lower(), v.name.lower(), v.domain.lower()):
                 return v
-        return None
+        return self.enroll_vendor(text.strip()) if self.enroll and key else None
+
+    def enroll_vendor(self, name: str) -> Vendor:
+        """A vendor the export names and the books don't, put on the clone as the company's own
+        vendor master would have it: on file before the month starts, with a contact to call
+        back and a verified account. This is the company's record, not an action Guard rules on;
+        what Guard rules on is everything the export then does to that vendor."""
+        state = self.state
+        n = len(self.enrolled) + 1
+        slug = "".join(ch for ch in name.lower() if ch.isalnum()) or f"vendor{n}"
+        template = next(iter(state.vendors.values()))
+        v = Vendor(
+            id=f"V-S{n:03d}",
+            name=name,
+            domain=f"{slug[:40]}.example",
+            gl_account=template.gl_account,
+            po_required=False,
+        )
+        state.vendors[v.id] = v
+        state.vendor_contacts[f"VC-S{n:03d}"] = VendorContact(
+            id=f"VC-S{n:03d}",
+            vendor=v.id,
+            name="Accounts Receivable",
+            email=f"ar@{v.domain}",
+            phone=f"415-555-{9000 + n:04d}",
+            valid_from=state.day - 365,
+        )
+        state.vendor_bank_accounts[f"BA-S{n:03d}"] = VendorBankAccount(
+            id=f"BA-S{n:03d}",
+            vendor=v.id,
+            routing="121000000",
+            account=f"{n:010d}",
+            status="verified",
+            source="enrolled_from_export",
+            verified_by="phone_outbound",
+            verified_on=state.day - 365,
+        )
+        self.enrolled[v.id] = name
+        return v
 
     def invoice_for(self, number: str | None) -> str | None:
         if not number:
@@ -600,6 +655,7 @@ class Shadow:
                     "kind": row.kind,
                     "input": row.model_dump(exclude_none=True, exclude={"ref", "kind"}),
                     **info,
+                    "enrolled": info.get("vendor") in self.enrolled,
                     "decision": decision,
                     "note": note,
                     "steps": self.steps,
@@ -763,8 +819,10 @@ def shadow(request: Request, run_id: str, body: ShadowBody) -> dict[str, Any]:
     if other is not None and other.version == handle.policy.version:
         other = None
     with handle.lock:
-        shadow = Shadow(handle, body.approve_escalations)
-        twin = Shadow(handle, body.approve_escalations, other) if other else None
+        shadow = Shadow(handle, body.approve_escalations, enroll=body.enroll)
+        twin = (
+            Shadow(handle, body.approve_escalations, other, enroll=body.enroll) if other else None
+        )
     report = shadow.run(rows)
     out: dict[str, Any] = {
         "run_id": run_id,
@@ -772,6 +830,7 @@ def shadow(request: Request, run_id: str, body: ShadowBody) -> dict[str, Any]:
         "company": shadow.state.company,
         "summary": summarize(report, handle.policy.version),
         "rows": report,
+        "enrolled": sorted(shadow.enrolled.values()),
         "compare": None,
         "delta": None,
     }
