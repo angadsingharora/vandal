@@ -139,12 +139,18 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
                   {s.ready ? "Open the workspace" : s.waking ? "Waking the server…" : "Connecting…"}
                 </Button>
               )}
-              <Button onClick={demo} busy={entering} disabled={!s.ready} className="h-11 px-6 text-sm font-semibold">
-                Watch the demo
-              </Button>
+              {mock ? (
+                <Button onClick={demo} busy={entering} disabled={!s.ready} className="h-11 px-6 text-sm font-semibold">
+                  Watch the demo
+                </Button>
+              ) : (
+                <button type="button" onClick={demo} disabled={!s.ready || entering} className="h-11 px-2 text-sm text-dim underline-offset-4 hover:text-ink hover:underline disabled:opacity-50">
+                  {entering ? "Starting the demo…" : "or watch the demo"}
+                </button>
+              )}
             </div>
             <p className="mt-3 max-w-xl text-xs leading-relaxed text-faint">
-              The check replays a month of payables and shows what Vandal would have stopped. The workspace connects your AI agent. The demo walks through an attack, the fix, and the proof.
+No agent yet? The check replays a month of payables and shows what Vandal would have stopped. Have one? The workspace puts Vandal in front of it.
             </p>
             <p role="status" className="mt-6 flex items-center gap-2 text-xs text-dim">
               <span className={cx("inline-block size-1.5 rounded-full", link.dot)} />

@@ -27,6 +27,16 @@ function RowDecision({ decision }: { decision: ShadowRow["decision"] }) {
 /** Why a row came out as it did, in a sentence with nothing of the workspace's in it. */
 export function plainWhy(row: ShadowRow): { text: string; tone: "bad" | "dim" | "faint" } {
   if (row.note) return { text: row.note.charAt(0).toUpperCase() + row.note.slice(1) + ".", tone: "dim" };
+  if (row.kind === "payment" && row.paid && row.inferred_change) {
+    const amount = usd(row.amount_cents ?? 0);
+    const to = `a new account for this vendor (ending ${row.inferred_change.account}, was ${row.inferred_change.was})`;
+    if (row.payee_status !== "verified") return { text: `${amount} paid to ${to}. Nothing in the file shows the change was verified.`, tone: "bad" };
+    const held = row.steps.find((s) => s.decision === "hold" && s.requires.length > 0);
+    return {
+      text: `The switch to ${to} is held${held ? ` until it is confirmed by ${held.requires.map(clears).join("; and by ")}` : ""}. ${amount} goes to the account on file.`,
+      tone: "dim",
+    };
+  }
   if (row.kind === "payment" && row.paid) {
     const amount = usd(row.amount_cents ?? 0);
     return row.payee_status === "verified"

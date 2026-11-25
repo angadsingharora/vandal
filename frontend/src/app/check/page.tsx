@@ -96,6 +96,8 @@ export default function CheckPage() {
   };
 
   const changes = mapping ? (mapping.kinds.vendor_bank_change ?? 0) + (mapping.kinds.vendor_contact_change ?? 0) : 0;
+  // Payments that say where they went are enough: a new account for a vendor is a change.
+  const paidTo = mapping?.columns.some((c) => c.read_as === "account") ?? false;
   const status = down ? "The server is not answering. Try again in a minute." : !api ? (slow ? "Waking the server. It sleeps when idle and takes about a minute." : "Connecting…") : null;
 
   return (
@@ -124,8 +126,8 @@ export default function CheckPage() {
             <section className="bg-panel p-6">
               <h2 className="text-sm font-semibold text-ink">Or run your own</h2>
               <p className="mt-1.5 text-[13px] leading-relaxed text-dim">
-                A CSV export of bills and payments from QuickBooks, Bill.com, NetSuite, Xero or a spreadsheet. Your vendors are read from the file. Findings come
-                from the rows where a vendor&apos;s bank details or contact changed, so add those if your export leaves them out (
+                A CSV export of bills and payments from QuickBooks, Bill.com, NetSuite, Xero or a spreadsheet. Your vendors are read from the file. If each payment carries the account it was paid to, a
+                vendor paid at a new account is read as a bank change; rows that record a change or a call back say more (
                 <a href={`data:text/csv;charset=utf-8,${encodeURIComponent(SHADOW_SAMPLE)}`} download="vandal-sample-month.csv" className={linkClass}>
                   the sample shows the shape
                 </a>
@@ -158,9 +160,9 @@ export default function CheckPage() {
                         . Read {mapping.columns.map((c) => c.source).join(", ")}
                         {mapping.ignored.length > 0 && <>; ignored {mapping.ignored.join(", ")}</>}.
                       </p>
-                      {changes === 0 && (
+                      {changes === 0 && !paidTo && (
                         <p className="mt-1.5 text-warn">
-                          This file has no bank or contact changes, so every payment will go to the account on file and the report will have little to say.
+                          This file has no bank or contact changes and no column for the account each payment went to, so the report will have little to say.
                         </p>
                       )}
                     </>
@@ -191,6 +193,13 @@ export default function CheckPage() {
               <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-dim">
                 {report.summary.rows} rows, once under the rules a company starts with and once with the rule Vandal proposes: a changed bank account pays out only
                 after a call back to the contact already on file.
+                {!!report.inferred_changes && (
+                  <>
+                    {" "}
+                    {report.inferred_changes} {report.inferred_changes === 1 ? "payment went" : "payments went"} to a new account for the vendor, and each was
+                    read as a bank change that arrived by email.
+                  </>
+                )}
                 {report.enrolled && report.enrolled.length > 0 && (
                   <>
                     {" "}

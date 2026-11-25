@@ -711,6 +711,9 @@ export interface ShadowRow {
   payee_source?: string | null;
   change?: string;
   change_status?: string;
+  /** A payment to an account the export had not paid this vendor at before: read as a bank
+   * change (last four digits of the new account and of the one before it). */
+  inferred_change?: { account: string; was: string };
   decision: Decision | "unmatched";
   note: string | null;
   steps: ShadowStep[];
@@ -757,6 +760,8 @@ export interface ShadowReport {
   rows: ShadowRow[];
   /** Vendors the books didn't know, taken from the export (`enroll`). */
   enrolled?: string[];
+  /** Payments that went to a new account for their vendor, each read as a bank change. */
+  inferred_changes?: number;
   /** The same rows under another policy (`compare`), and what it changes. */
   compare: { policy: string; summary: ShadowSummary; rows: ShadowRow[] } | null;
   delta: ShadowDelta | null;

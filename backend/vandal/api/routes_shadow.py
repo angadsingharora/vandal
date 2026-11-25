@@ -237,7 +237,8 @@ def map_columns(headers: list[str]) -> tuple[dict[str, str], list[str]]:
 
 def infer_kind(data: dict[str, Any]) -> str | None:
     """A row with no type column: what it is from which columns it fills."""
-    if data.get("routing") or data.get("account"):
+    # an account on a row that names a bill is where that bill was paid, not a change request
+    if (data.get("routing") or data.get("account")) and not data.get("number"):
         return "vendor_bank_change"
     if data.get("contact_name") or data.get("contact_email") or data.get("contact_phone"):
         return "vendor_contact_change"
@@ -372,6 +373,7 @@ class Shadow:
         self.steps: list[dict[str, Any]] = []
         self.enroll = enroll
         self.enrolled: dict[str, str] = {}  # vendor id -> name, for vendors taken from the export
+        self.paid_to: dict[str, str] = {}  # vendor id -> the account the export last paid it at
 
     @property
     def state(self):
@@ -512,6 +514,7 @@ class Shadow:
             "vendor_name": self.state.vendors[inv.vendor].name,
             "amount_cents": inv.amount,
         }
+        info |= self.new_account(self.state.vendors[inv.vendor], row)
         ref = InvoiceRef(invoice=iid)
         if inv.status == "received":
             self.call("invoices.validate", ref)
@@ -567,6 +570,34 @@ class Shadow:
                 "payee_source": acct.source if acct else None,
             }
         return info, None
+
+    def new_account(self, v: Vendor, row: Row) -> dict[str, Any]:
+        """A payment row that says which account it was paid to. Most exports have no record
+        of a vendor's bank details changing, but they do have this, and it is enough: the first
+        account a vendor is paid at is taken as the one on file, and a different one later
+        means the details changed in between. That change is put to Guard as the request it
+        must have been, on the channel the file gives no reason to trust (email, from the
+        vendor's own address), before the payment runs."""
+        acct = "".join(ch for ch in (row.account or "") if ch.isalnum())
+        if not acct:
+            return {}
+        before = self.paid_to.get(v.id)
+        self.paid_to[v.id] = acct
+        if before is None or before == acct:
+            return {}
+        routing = "".join(ch for ch in (row.routing or "") if ch.isdigit()) or "000000000"
+        self.call(
+            "vendors.change_request",
+            ChangeRequestArgs(
+                vendor=v.id,
+                fields="bank",
+                channel="email",
+                sender=f"ap@{v.domain}",
+                routing=routing,
+                account=acct,
+            ),
+        )
+        return {"inferred_change": {"account": acct[-4:], "was": before[-4:]}}
 
     def change(
         self, row: Row, fields: Literal["bank", "contact"]
@@ -789,7 +820,11 @@ def shadow_columns() -> dict[str, Any]:
                 "vendor, number, amount (dollars); po (its purchase order number, if it had "
                 "one), po_amount (dollars, when it differs), received (no: goods never arrived)"
             ),
-            "payment": "number (of a bill in this file, or on the books)",
+            "payment": (
+                "number (of a bill in this file, or on the books); account (and routing) it was "
+                "paid to, if the export has it: a vendor paid at a new account is read as a "
+                "bank change"
+            ),
             "vendor_bank_change": (
                 "vendor, channel (email | portal | agent_msg), sender (email address), "
                 "routing, account"
@@ -831,6 +866,7 @@ def shadow(request: Request, run_id: str, body: ShadowBody) -> dict[str, Any]:
         "summary": summarize(report, handle.policy.version),
         "rows": report,
         "enrolled": sorted(shadow.enrolled.values()),
+        "inferred_changes": sum(1 for r in report if r.get("inferred_change")),
         "compare": None,
         "delta": None,
     }

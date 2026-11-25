@@ -190,3 +190,43 @@ def test_an_export_with_the_companys_own_vendors(client) -> None:
     assert out["compare"]["rows"][2]["decision"] == "hold"
     assert out["compare"]["summary"]["money_unverified"] == 0
     assert all(r["enrolled"] for r in out["rows"])
+
+
+PAID_TO = """Vendor Name,Invoice #,Amount,Transaction Type,Account Number
+Acme Janitorial,INV-88,1250.00,Bill,
+Acme Janitorial,INV-88,,Bill Payment,****4410
+Acme Janitorial,INV-91,4100.00,Bill,
+Acme Janitorial,INV-91,,Bill Payment,****7766
+Acme Janitorial,INV-95,900.00,Bill,
+Acme Janitorial,INV-95,,Bill Payment,****7766
+Delta Elevator Co,D-204,9400.00,Bill,
+Delta Elevator Co,D-204,,Bill Payment,****0031
+"""
+
+
+def test_a_vendor_paid_at_a_new_account_is_read_as_a_bank_change(client) -> None:
+    rid = client.post("/runs", json={"policy": "v0"}).json()["run_id"]
+    out = client.post(
+        f"/runs/{rid}/shadow", json={"csv": PAID_TO, "enroll": True, "compare": "v1"}
+    ).json()
+    rows, twin = out["rows"], out["compare"]["rows"]
+    # the first account a vendor is paid at is the one on file: nothing to say
+    assert "inferred_change" not in rows[1] and "inferred_change" not in rows[7]
+    assert rows[1]["payee_status"] == "verified"
+    # the second payment went somewhere new: a change nobody verified, and the money followed
+    assert rows[3]["inferred_change"] == {"account": "7766", "was": "4410"}
+    assert rows[3]["steps"][0]["tool"] == "vendors.change_request"
+    assert rows[3]["paid"] and rows[3]["payee_status"] == "unverified"
+    # the same account again is not a second change, but it is still unverified money
+    assert "inferred_change" not in rows[5] and rows[5]["payee_status"] == "unverified"
+    assert out["inferred_changes"] == 1
+    assert out["summary"]["money_unverified"] == 410_000 + 90_000
+    # with the rule, the change is held and both payments go to the account on file
+    assert twin[3]["decision"] == "hold" and twin[3]["payee_status"] == "verified"
+    assert out["compare"]["summary"]["money_unverified"] == 0
+
+
+def test_an_account_on_a_row_with_a_bill_number_is_not_a_change_request(client) -> None:
+    csv = "Invoice #,Account Number\nINV-88,****4410\n"
+    kinds = client.post("/shadow/mapping", json={"csv": csv}).json()["kinds"]
+    assert kinds == {"payment": 1}
