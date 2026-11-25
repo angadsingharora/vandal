@@ -186,6 +186,8 @@ interface State {
   inject: { phase: Phase; plan: ThreatPlan | null; jobId: string | null; result: InjectResult | null };
   /** R13: the hunt. Its attempts stream in one at a time. */
   hunt: { phase: Phase; jobId: string | null; attempts: HuntAttempt[]; result: HuntResult | null };
+  /** The Strike side of the loop run as one job (`runLoop`): which step it is on, and how it ended. */
+  loop: { phase: Phase; step: Stage | null; note: string | null };
   metrics: { phase: Phase; data: Metrics | null };
   explanation: { phase: Phase; data: Explanation | null; subject: string | null };
 }
@@ -218,6 +220,9 @@ interface Actions {
   setSearch(p: Partial<Pick<State["search"], "depth" | "scenario">>): void;
   /** `fresh` computes even when playback would serve a recording. */
   runSearch(fresh?: boolean): Promise<void>;
+  /** Attack, diagnose, fix and prove in one go, each on its own page as it runs, ending with the
+   * fix in Guard's inbox for a human to approve. Stops where a step has nothing to hand on. */
+  runLoop(): Promise<void>;
   replayAttack(policy: string): Promise<void>;
   diagnose(): Promise<void>;
   selectPayment(payment: string): Promise<void>;
@@ -407,6 +412,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
     replays: { before: null, after: null },
     inject: { ...idle, plan: null, jobId: null, result: null },
     hunt: { ...idle, jobId: null, attempts: [], result: null },
+    loop: { ...idle, step: null, note: null },
     metrics: { ...idle, data: null },
     explanation: { ...idle, data: null, subject: null },
 
@@ -594,6 +600,7 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
         replays: { before: null, after: null },
         inject: { ...idle, plan: null, jobId: null, result: null },
         hunt: { ...idle, jobId: null, attempts: [], result: null },
+        loop: { ...idle, step: null, note: null },
         explanation: { ...idle, data: null, subject: null },
         policies: await a.policies(),
         stage: "operate",
@@ -674,6 +681,40 @@ export const useWarRoom = create<WarRoom>()((set, get) => {
       // Show the attack on a fresh clone right away: its books, and the message that did it.
       if (get().search.result?.best) await get().replayAttack(policy);
     }),
+
+    runLoop: async () => {
+      if (get().loop.phase === "running") return;
+      const at = async (step: Stage) => {
+        set({ loop: { phase: "running", step, note: null } });
+        await get().setStage(step);
+      };
+      const end = (phase: Phase, note: string) => set((s) => ({ loop: { phase, step: s.loop.step, note } }));
+      set({ error: null });
+      const policy = get().summary?.policy ?? "v0";
+
+      await at("attack");
+      await get().runSearch();
+      if (get().search.phase !== "done") return end("failed", "The search did not finish.");
+      if (!get().search.result?.best) return end("done", `No sequence broke the books under ${policy} at this depth.`);
+
+      await at("diagnose");
+      await get().diagnose();
+      if (!get().diagnosis.data) return end("failed", get().diagnosis.reason ?? "The attack could not be traced to a gap.");
+
+      await at("fix");
+      await get().synthesize();
+      if (!get().synth.result?.policy) return end("failed", "No candidate rule survived the attack.");
+
+      await at("prove");
+      await get().verifyChoice();
+      const pack = get().verify.pack;
+      if (!pack) return end("failed", "Verification did not finish.");
+      if (!pack.approvable) return end("failed", `${pack.version} failed a check, so it was not sent for approval.`);
+
+      await get().submitPatch();
+      if (!get().patch) return end("failed", "The fix could not be sent for approval.");
+      set({ loop: { phase: "done", step: "approve", note: `${pack.version} is waiting for your approval.` } });
+    },
 
     replayAttack: guard(async (policy: string) => {
       const attack = get().attack;

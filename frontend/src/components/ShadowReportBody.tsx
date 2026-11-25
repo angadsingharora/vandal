@@ -3,9 +3,11 @@
 // The body of a shadow report, shared by the dialog in the workspace and the standalone page at
 // /report/shadow/{job}: the numbers (before and after, when the month ran under two policies),
 // what the compared policy changed, what needs a look, and every row with Guard's reason.
+// `plain` is the same report for someone outside the workspace: no policy versions, check ids,
+// tool names or account ids, only what happened to each row and what would clear a hold.
 
 import { cx, usd } from "@/lib/format";
-import { needs } from "@/lib/rules";
+import { clears, needs } from "@/lib/rules";
 import type { Decision, ShadowReport, ShadowRow, ShadowSummary } from "@/lib/types";
 import { Badge, DecisionBadge, Stat } from "./ui";
 
@@ -22,7 +24,39 @@ function RowDecision({ decision }: { decision: ShadowRow["decision"] }) {
   return <DecisionBadge decision={decision as Decision} />;
 }
 
-function Why({ row }: { row: ShadowRow }) {
+/** Why a row came out as it did, in a sentence with nothing of the workspace's in it. */
+export function plainWhy(row: ShadowRow): { text: string; tone: "bad" | "dim" | "faint" } {
+  if (row.note) return { text: row.note.charAt(0).toUpperCase() + row.note.slice(1) + ".", tone: "dim" };
+  if (row.kind === "payment" && row.paid && row.inferred_change) {
+    const amount = usd(row.amount_cents ?? 0);
+    const to = `a new account for this vendor (ending ${row.inferred_change.account}, was ${row.inferred_change.was})`;
+    if (row.payee_status !== "verified") return { text: `${amount} paid to ${to}. Nothing in the file shows the change was verified.`, tone: "bad" };
+    const held = row.steps.find((s) => s.decision === "hold" && s.requires.length > 0);
+    return {
+      text: `The switch to ${to} is held${held ? ` until it is confirmed by ${held.requires.map(clears).join("; and by ")}` : ""}. ${amount} goes to the account on file.`,
+      tone: "dim",
+    };
+  }
+  if (row.kind === "payment" && row.paid) {
+    const amount = usd(row.amount_cents ?? 0);
+    return row.payee_status === "verified"
+      ? { text: `${amount} paid to a verified account.`, tone: "dim" }
+      : { text: `${amount} paid to an account nobody verified.`, tone: "bad" };
+  }
+  const worst = row.steps.find((s) => s.decision === row.decision);
+  if (!worst || worst.decision === "allow") return { text: "No check objected.", tone: "faint" };
+  if (worst.decision === "escalate") return { text: "Sent to a person to approve.", tone: "dim" };
+  const verb = worst.decision === "block" ? "Blocked" : "Held";
+  if (worst.requires.length > 0) return { text: `${verb} until it is confirmed by ${worst.requires.map(clears).join("; and by ")}.`, tone: "dim" };
+  if (worst.fired.some((f) => f.includes("match"))) return { text: `${verb}: the bill does not match a purchase order and a receipt.`, tone: "dim" };
+  return { text: `${verb} by a check (${worst.fired.join(", ")}).`, tone: "dim" };
+}
+
+function Why({ row, plain }: { row: ShadowRow; plain?: boolean }) {
+  if (plain) {
+    const why = plainWhy(row);
+    return <span className={why.tone === "bad" ? "text-bad" : why.tone === "faint" ? "text-faint" : "text-dim"}>{why.text}</span>;
+  }
   const worst = row.steps.find((s) => s.decision === row.decision);
   if (row.note) return <span className="text-dim">{row.note}</span>;
   if (row.kind === "payment" && row.paid) {
@@ -47,7 +81,7 @@ function Why({ row }: { row: ShadowRow }) {
 
 const stopped = (s: ShadowSummary) => (s.by_decision.hold ?? 0) + (s.by_decision.block ?? 0);
 
-function Compare({ before, after }: { before: ShadowSummary; after: ShadowSummary }) {
+function Compare({ before, after, plain }: { before: ShadowSummary; after: ShadowSummary; plain?: boolean }) {
   const rows: { label: string; b: number; a: number; fmt: (n: number) => string; better: "down" | "up" | "none" }[] = [
     { label: "Allowed", b: before.by_decision.allow ?? 0, a: after.by_decision.allow ?? 0, fmt: String, better: "none" },
     { label: "Held or blocked", b: stopped(before), a: stopped(after), fmt: String, better: "up" },
@@ -61,8 +95,8 @@ function Compare({ before, after }: { before: ShadowSummary; after: ShadowSummar
       <thead>
         <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-faint">
           <th className="py-2 pr-4 font-semibold"></th>
-          <th className="num py-2 pr-4 text-right font-semibold">{before.policy}</th>
-          <th className="num py-2 text-right font-semibold">{after.policy}</th>
+          <th className="num py-2 pr-4 text-right font-semibold">{plain ? "Today" : before.policy}</th>
+          <th className="num py-2 text-right font-semibold">{plain ? "With the rule" : after.policy}</th>
         </tr>
       </thead>
       <tbody>
@@ -113,29 +147,44 @@ export function headline(report: ShadowReport): string {
   return `Nothing reached an unverified account under ${sum.policy}.`;
 }
 
+/** The finding in a sentence, for someone who has never heard of a policy version. */
+export function finding(report: ShadowReport): string {
+  const through = report.summary.money_unverified;
+  const after = report.compare?.summary.money_unverified ?? through;
+  if (through === 0) return "Every payment went to a verified account.";
+  const money = usd(through, { cents: false });
+  if (!report.compare || after >= through) return `${money} went to accounts nobody verified.`;
+  if (after === 0) return `${money} went to accounts nobody verified. One rule would have stopped all of it.`;
+  return `${money} went to accounts nobody verified. One rule would have stopped ${usd(through - after, { cents: false })} of it.`;
+}
+
 function Heading({ children }: { children: React.ReactNode }) {
   return <h3 className="text-[11px] font-semibold uppercase tracking-wider text-faint">{children}</h3>;
 }
 
-export function ShadowReportBody({ report }: { report: ShadowReport }) {
+export function ShadowReportBody({ report, plain }: { report: ShadowReport; plain?: boolean }) {
   const sum = report.summary;
   const other = report.compare;
   const d = report.delta;
   const byN = new Map((other?.rows ?? []).map((r) => [r.n, r]));
+  const mine = new Map(report.rows.map((r) => [r.n, r]));
+  /** A backend summary names checks and tools; the plain report says the row's own sentence. */
+  const say = (n: number, rows: Map<number, ShadowRow>, summary: string) => {
+    const row = plain ? rows.get(n) : undefined;
+    return row ? plainWhy(row).text : summary;
+  };
   return (
     <div className="space-y-5">
       {other && d ? (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <div>
-            <Heading>
-              {sum.policy} against {other.policy}
-            </Heading>
+            <Heading>{plain ? "Today, and with the proposed rule" : `${sum.policy} against ${other.policy}`}</Heading>
             <div className="mt-2">
-              <Compare before={sum} after={other.summary} />
+              <Compare before={sum} after={other.summary} plain={plain} />
             </div>
           </div>
           <div>
-            <Heading>What {d.after} changes</Heading>
+            <Heading>What {plain ? "the rule" : d.after} changes</Heading>
             {d.moved.length === 0 ? (
               <p className="mt-2 text-xs text-faint">No row decides differently.</p>
             ) : (
@@ -150,7 +199,7 @@ export function ShadowReportBody({ report }: { report: ShadowReport }) {
                       <span className="text-faint">→</span>
                       <RowDecision decision={m.after as ShadowRow["decision"]} />
                     </span>
-                    {m.summary && <div className="mt-0.5 text-dim">{m.summary}</div>}
+                    {(plain || m.summary) && <div className="mt-0.5 text-dim">{say(m.n, byN, m.summary)}</div>}
                   </li>
                 ))}
               </ul>
@@ -163,13 +212,13 @@ export function ShadowReportBody({ report }: { report: ShadowReport }) {
 
       {sum.attention.length > 0 && (
         <div>
-          <Heading>Needs a look under {sum.policy}</Heading>
+          <Heading>Needs a look {plain ? "today" : `under ${sum.policy}`}</Heading>
           <ul className="mt-2 space-y-1.5">
             {sum.attention.map((a, i) => (
               <li key={i} className={cx("rounded border px-3 py-2 text-xs", a.decision === "paid_unverified" ? "border-bad/40 bg-bad/[0.06]" : "border-warn/40 bg-warn/[0.05]")}>
                 <span className="num text-faint">#{a.n}</span> <span className="text-ink">{KIND_TEXT[a.kind] ?? a.kind}</span>
                 {a.vendor_name && <span className="text-dim"> · {a.vendor_name}</span>}
-                <div className="mt-0.5 text-dim">{a.summary}</div>
+                <div className="mt-0.5 text-dim">{say(a.n, mine, a.summary)}</div>
               </li>
             ))}
           </ul>
@@ -183,9 +232,9 @@ export function ShadowReportBody({ report }: { report: ShadowReport }) {
               <th className="px-2 py-1.5 font-medium">#</th>
               <th className="px-2 py-1.5 font-medium">Row</th>
               <th className="px-2 py-1.5 font-medium">Vendor</th>
-              <th className="px-2 py-1.5 font-medium">{other ? sum.policy : "Guard"}</th>
-              {other && <th className="px-2 py-1.5 font-medium">{other.policy}</th>}
-              <th className="px-2 py-1.5 font-medium">Why{other ? ` under ${other.policy}` : ""}</th>
+              <th className="px-2 py-1.5 font-medium">{!other ? (plain ? "Decision" : "Guard") : plain ? "Today" : sum.policy}</th>
+              {other && <th className="px-2 py-1.5 font-medium">{plain ? "With the rule" : other.policy}</th>}
+              <th className="px-2 py-1.5 font-medium">Why{!other ? "" : plain ? ", with the rule" : ` under ${other.policy}`}</th>
             </tr>
           </thead>
           <tbody>
@@ -212,7 +261,7 @@ export function ShadowReportBody({ report }: { report: ShadowReport }) {
                     </td>
                   )}
                   <td className="px-2 py-1.5">
-                    <Why row={shown} />
+                    <Why row={shown} plain={plain} />
                   </td>
                 </tr>
               );

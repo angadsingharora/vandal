@@ -301,7 +301,7 @@ function RunAgent({ conn, books }: { conn: AgentConnection; books: AgentBooks | 
   );
 }
 
-export function ConnectAgentDialog({ onClose, onSettings, onBooks }: { onClose: () => void; onSettings: () => void; onBooks: () => void }) {
+export function ConnectAgentDialog({ onClose, onSettings }: { onClose: () => void; onSettings: () => void }) {
   const s = useWarRoom();
   const runId = s.liveRunId;
   const [conns, setConns] = useState<AgentConnection[]>([]);
@@ -394,12 +394,12 @@ export function ConnectAgentDialog({ onClose, onSettings, onBooks }: { onClose: 
               Your agent works {s.summary?.company ?? "the company"}&apos;s books over MCP or REST. Guard checks every call before money moves.
             </p>
           </div>
-          <button type="button" onClick={onBooks} className="rounded-md border border-line p-4 text-left hover:border-dim">
-            <div className="text-sm font-semibold text-ink">Connect your books →</div>
+          <a href="/check" className="rounded-md border border-line p-4 text-left hover:border-dim">
+            <div className="text-sm font-semibold text-ink">No agent yet? Check a month of payments →</div>
             <p className="mt-1 text-xs leading-relaxed text-dim">
-              Upload an AP export from QuickBooks, Bill.com, NetSuite or Xero. See what Guard would have stopped last month.
+              Upload an AP export, or run the sample month. See what Guard would have stopped and where the money went.
             </p>
-          </button>
+          </a>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
           <div className="flex shrink-0 items-center gap-2 text-[11px] text-dim">

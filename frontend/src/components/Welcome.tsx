@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { cx } from "@/lib/format";
 import { useWarRoom } from "@/lib/store";
@@ -40,12 +42,14 @@ function Rise({ delay, className, children }: { delay: number; className?: strin
 }
 
 /** The landing: what Vandal is, and two ways in. The workspace opens on connecting an agent or
- * your books; the demo is the guided seven-step loop on a simulated company. */
+ * your books; the demo is the guided seven-step loop on a simulated company. The first button
+ * needs neither: /check replays a month of payables and reports what Guard would have done. */
 export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorkspace: () => void }) {
   const s = useWarRoom();
   const [entering, setEntering] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const mock = s.api?.mode === "mock";
+  const router = useRouter();
 
   // Fade out, then unmount.
   useEffect(() => {
@@ -76,7 +80,7 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
   };
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Enter" && (mock ? demo() : workspace());
+    const onKey = (e: KeyboardEvent) => e.key === "Enter" && (mock ? demo() : router.push("/check"));
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
@@ -126,16 +130,27 @@ export function Welcome({ onClose, onWorkspace }: { onClose: () => void; onWorks
           <Rise delay={320}>
             <div className="mt-10 flex flex-wrap items-center gap-3">
               {!mock && (
-                <Button tone="blue" onClick={workspace} disabled={!s.ready} className="h-11 px-6 text-sm font-semibold">
+                <Link href="/check" className="inline-flex h-11 items-center rounded border border-blue/60 bg-blue/15 px-6 text-sm font-semibold text-blue hover:bg-blue/25">
+                  Check a month of payments
+                </Link>
+              )}
+              {!mock && (
+                <Button onClick={workspace} disabled={!s.ready} className="h-11 px-6 text-sm font-semibold">
                   {s.ready ? "Open the workspace" : s.waking ? "Waking the server…" : "Connecting…"}
                 </Button>
               )}
-              <Button onClick={demo} busy={entering} disabled={!s.ready} className="h-11 px-6 text-sm font-semibold">
-                Watch the demo
-              </Button>
+              {mock ? (
+                <Button onClick={demo} busy={entering} disabled={!s.ready} className="h-11 px-6 text-sm font-semibold">
+                  Watch the demo
+                </Button>
+              ) : (
+                <button type="button" onClick={demo} disabled={!s.ready || entering} className="h-11 px-2 text-sm text-dim underline-offset-4 hover:text-ink hover:underline disabled:opacity-50">
+                  {entering ? "Starting the demo…" : "or watch the demo"}
+                </button>
+              )}
             </div>
             <p className="mt-3 max-w-xl text-xs leading-relaxed text-faint">
-              The workspace connects your AI agent or your AP export to Guard. The demo walks through an attack, the fix, and the proof.
+No agent yet? The check replays a month of payables and shows what Vandal would have stopped. Have one? The workspace puts Vandal in front of it.
             </p>
             <p role="status" className="mt-6 flex items-center gap-2 text-xs text-dim">
               <span className={cx("inline-block size-1.5 rounded-full", link.dot)} />

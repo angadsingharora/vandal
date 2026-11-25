@@ -342,6 +342,11 @@ export function WorkspaceDialog({ onClose }: { onClose: () => void }) {
           </div>
         </Section>
 
+        <details className="group rounded border border-line">
+          <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-dim hover:text-ink">
+            Advanced: seed, starting policy, search and proof depth
+          </summary>
+          <div className="space-y-5 border-t border-line p-3">
         <Section title="Run">
           <Num id="ws-seed" text="Seed" value={ws.seed} onChange={(n) => set({ seed: n })} min={0} title="Same company and seed: the same books, every time" />
           <label htmlFor="ws-policy" className={label}>
@@ -428,6 +433,8 @@ export function WorkspaceDialog({ onClose }: { onClose: () => void }) {
             </Check>
           </div>
         </Section>
+          </div>
+        </details>
       </div>
 
       <footer className="mt-5 flex flex-wrap items-center gap-3 border-t border-line pt-4">

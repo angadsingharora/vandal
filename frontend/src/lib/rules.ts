@@ -61,11 +61,17 @@ function money(cents: number): string {
  * outbound phone call to the number on file, to the contact on file before the request, within
  * 30 days". */
 export function needs(r: Requirement): string {
-  const channels = list(
+  return `${r.check} needs ${clears(r)}`;
+}
+
+/** The same requirement without the check's id, for a reader who has never seen one: "an
+ * outbound phone call to the number on file or the vendor portal, to the contact on file before
+ * the request, within 30 days". */
+export function clears(r: Requirement): string {
+  let out = list(
     r.accepted_channels.map((c) => CHANNEL[c] ?? c),
     "or",
   );
-  let out = `${r.check} needs ${channels}`;
   if (r.contact_as_of) out += `, to the contact on file ${r.contact_as_of === "before_request" ? "before the request" : "now"}`;
   if (r.window_days) out += `, within ${r.window_days} days`;
   return out;

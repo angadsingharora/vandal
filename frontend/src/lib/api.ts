@@ -130,7 +130,7 @@ export interface VandalApi {
   agentBooks(token: string, peek?: boolean): Promise<AgentBooks>;
   agentUrl(path: string): string;
   /** Shadow mode: an AP export (CSV) replayed through Guard on a clone of the run's books, report only. */
-  shadow(runId: string, body: { csv: string; approve_escalations?: boolean; compare?: string | null }): Promise<ShadowReport>;
+  shadow(runId: string, body: { csv: string; approve_escalations?: boolean; compare?: string | null; enroll?: boolean }): Promise<ShadowReport>;
   /** How a CSV's columns will be read (aliases for QuickBooks, Bill.com, NetSuite headers), before running it. */
   shadowMapping(csv: string): Promise<ShadowMapping>;
 
@@ -257,7 +257,7 @@ export class HttpApi implements VandalApi {
     return (await res.json()) as AgentBooks;
   };
   agentUrl = (path: string) => new URL(path, this.base.endsWith("/") ? this.base : this.base + "/").toString();
-  shadow = (runId: string, body: { csv: string; approve_escalations?: boolean; compare?: string | null }) =>
+  shadow = (runId: string, body: { csv: string; approve_escalations?: boolean; compare?: string | null; enroll?: boolean }) =>
     this.call<ShadowReport>("POST", `/runs/${runId}/shadow`, body);
   shadowMapping = (csv: string) => this.call<ShadowMapping>("POST", "/shadow/mapping", { csv });
 

@@ -140,6 +140,15 @@ const PAGE_LABEL: Record<string, string> = {
   enforce: "Enforce",
 };
 
+/** What the one-button loop says while each step runs. */
+const LOOP_DOING: Record<string, string> = {
+  attack: "Attacking a clone…",
+  diagnose: "Naming the gap…",
+  fix: "Building a rule…",
+  prove: "Proving it…",
+  approve: "Sending it over…",
+};
+
 /** The workspace's navigation: the same seven pages as the loop, as plain tabs grouped by the
  * side that owns them. No numbers, no done marks, no "next": nothing is scripted here. */
 export function PageNav() {
@@ -147,6 +156,11 @@ export function PageNav() {
   const setStage = useWarRoom((s) => s.setStage);
   const summary = useWarRoom((s) => s.summary);
   const ws = useWarRoom((s) => s.ws);
+  const loop = useWarRoom((s) => s.loop);
+  const runLoop = useWarRoom((s) => s.runLoop);
+  const ready = useWarRoom((s) => s.ready);
+  const busy = useWarRoom((s) => s.search.phase === "running" || s.synth.phase === "running" || s.verify.phase === "running" || s.diagnosis.phase === "running");
+  const running = loop.phase === "running";
   return (
     <nav aria-label="Pages" className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-line bg-bg px-4 py-1.5">
       {(["blue", "red"] as const).map((side) => (
@@ -174,6 +188,19 @@ export function PageNav() {
           })}
         </div>
       ))}
+      <div className="flex min-w-0 items-center gap-2">
+        <Button
+          tone="red"
+          onClick={() => void runLoop()}
+          busy={running}
+          disabled={!ready || (busy && !running)}
+          title="Attack a clone of the books, name the gap, build a rule that closes it and prove it. The fix then waits for your approval."
+          className="h-7 px-3 text-[11px] font-semibold"
+        >
+          {running ? LOOP_DOING[loop.step ?? "attack"] : "Find and fix a gap"}
+        </Button>
+        {!running && loop.note && <span className={cx("min-w-0 truncate text-[11px]", loop.phase === "failed" ? "text-warn" : "text-dim")}>{loop.note}</span>}
+      </div>
       {summary && (
         <p className="ml-auto min-w-0 truncate text-[11px] text-dim" title="The run being worked on: company, policy, seed">
           <span className="font-semibold text-ink">{summary.company}</span> · <span className="num">{summary.policy}</span> · seed{" "}
