@@ -8,6 +8,9 @@ LLM_CACHE_DIR (default backend/llm_cache/), so recordings can be committed and r
   - DEMO_PLAYBACK=true serves only from the cache: a miss raises LLMUnavailable, no key needed.
   - No API key, a timeout (LLM_TIMEOUT seconds), an API error, a refusal, or an unparseable reply
     raise LLMUnavailable, and every caller falls back to its deterministic path.
+  - Inside `with budget(max_calls=..., max_tokens=...)`, every call counts (cache hits too, so a
+    replay stops where the recorded run stopped), a call past the cap raises LLMUnavailable, and
+    `max_tokens` caps each live call. Neither is part of the cache key.
 
 Secrets come from backend/.env (see .env.example); set VANDAL_DOTENV=0 to skip loading it.
 """
@@ -18,6 +21,10 @@ import hashlib
 import json
 import logging
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +44,32 @@ _client_cache: Any = None
 
 class LLMUnavailable(RuntimeError):
     """No model to call: no API key, playback cache miss, timeout, API error, or refusal."""
+
+
+@dataclass
+class Budget:
+    """Caps on the model calls made inside one `with budget(...)` block."""
+
+    max_calls: int | None = None
+    max_tokens: int | None = None  # per call; the default is MAX_TOKENS
+    calls: int = 0
+
+    def remaining(self) -> int | None:
+        return None if self.max_calls is None else max(self.max_calls - self.calls, 0)
+
+
+_budget: ContextVar[Budget | None] = ContextVar("llm_budget", default=None)
+
+
+@contextmanager
+def budget(*, max_calls: int | None = None, max_tokens: int | None = None) -> Iterator[Budget]:
+    """Count and cap the model calls made in this context (this thread or task only)."""
+    b = Budget(max_calls=max_calls, max_tokens=max_tokens)
+    token = _budget.set(b)
+    try:
+        yield b
+    finally:
+        _budget.reset(token)
 
 
 def load_env() -> None:
@@ -117,13 +150,21 @@ def structured[T: BaseModel](
     prompt: str,
     schema: type[T],
     model_env: str = "MODEL_SYNTH",
+    max_tokens: int | None = None,
 ) -> T:
     """One structured Claude call, returning an instance of `schema`.
 
     agent/step/prompt_version and the prompt make the cache key. `model_env` names the env var
-    holding the model id (MODEL_AGENT or MODEL_SYNTH).
+    holding the model id (MODEL_AGENT or MODEL_SYNTH). `max_tokens` caps a live call (default:
+    the active budget's cap, else MAX_TOKENS); it isn't part of the key.
     """
     load_env()
+    b = _budget.get()
+    if b is not None:
+        if b.max_calls is not None and b.calls >= b.max_calls:
+            raise LLMUnavailable(f"budget: {b.max_calls} model calls used")
+        b.calls += 1
+        max_tokens = max_tokens or b.max_tokens
     model = os.environ.get(model_env) or DEFAULT_MODELS.get(model_env, "claude-opus-5-5")
     key = cache_key(
         agent=agent,
@@ -145,7 +186,7 @@ def structured[T: BaseModel](
     try:
         response = _client().beta.messages.parse(
             model=model,
-            max_tokens=MAX_TOKENS,
+            max_tokens=max_tokens or MAX_TOKENS,
             system=system,
             messages=[{"role": "user", "content": prompt}],
             output_format=schema,

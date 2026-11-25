@@ -46,7 +46,7 @@ class SearchRequest(BaseModel):
 
 
 class DiagnoseRequest(BaseModel):
-    search_id: str  # a search job, or an inject job (R9)
+    search_id: str  # a search job, or an inject, hunt, or message hunt job
 
 
 class SynthesizeRequest(BaseModel):
@@ -174,7 +174,7 @@ def start_search(request: Request, body: SearchRequest) -> dict[str, Any]:
 @router.post("/diagnose")
 def start_diagnose(request: Request, body: DiagnoseRequest) -> dict[str, Any]:
     """Root cause of a finished search's best counterexample (R5)."""
-    job = _done(request, body.search_id, "search", "inject", "hunt")
+    job = _done(request, body.search_id, "search", "inject", "hunt", "message_hunt")
     best = job.result.get("best")
     if best is None:
         return {
@@ -200,7 +200,7 @@ def start_synthesize(request: Request, body: SynthesizeRequest) -> dict[str, Any
     parent = deps.policy(body.policy, request)
     start, labels, scenario = None, [], "a"
     if body.search_id:
-        found = _done(request, body.search_id, "search", "inject", "hunt")
+        found = _done(request, body.search_id, "search", "inject", "hunt", "message_hunt")
         parent = deps.policy(found.meta["policy"], request)
         best = found.result.get("best")
         if best is None:

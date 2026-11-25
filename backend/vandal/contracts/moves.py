@@ -17,6 +17,7 @@ MoveKind = Literal[
     "refund_request",
     "tick",
     "message",  # content with no structured request: an inquiry, pressure, small talk
+    "inbound_message",  # free text with no structured fields: the Operator's intake reads it
 ]
 
 
